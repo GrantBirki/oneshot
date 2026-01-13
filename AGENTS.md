@@ -11,6 +11,14 @@ The mains goals of this project are:
   - Custom file naming conventions.
   - The ability to fully disable the floating thumbnail preview and just default to instantly saving the screenshot or copying to clipboard.
 
+## Ease of installation
+
+Once built, this project should be really easy to install. It should be installed via homebrew by doing something like:
+
+```bash
+brew install --cask grantbirki/tap/openshot
+```
+
 ## Code Standards
 
 ### Development Flow
