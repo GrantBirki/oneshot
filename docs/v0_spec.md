@@ -5,13 +5,13 @@ This document outlines the specifications for version 0 (v0) of the OpenShot mac
 ## Goals
 
 - Keep the app simple, reliable, and installable via Homebrew (open source, unsigned is acceptable for MVP).
-- Minimum macOS: 11 (Big Sur) to cover Apple Silicon devices broadly.
+- Minimum macOS: 14 (Sonoma).
 - Build as a macOS app bundle, unsigned for MVP; optional codesign + notary supported via env flags.
 - Distribute via Homebrew cask.
 - Users will need to approve the app on first run (Gatekeeper).
 - Provide an extemely simple and easy to use screenshot utility that works in a similar way to the built-in macOS screenshot tool.
 - Extend the MacOS screenshot tool with additional features such as:
-  - Custom delays or even disabling the post-capture overlay image preview/hover tile.
+  - Disabling the post-capture overlay image preview/hover tile.
   - Custom save locations including the ability to automatically save to clipboard, desktop, documents, or a user specified folder.
   - Custom file naming conventions.
   - The ability to fully disable the floating thumbnail preview and just default to instantly saving the screenshot or copying to clipboard.
@@ -32,15 +32,15 @@ This document outlines the specifications for version 0 (v0) of the OpenShot mac
 - Menu-bar only app (no Dock icon).
 - Preferences/settings window (full window, not a popover).
 - User setting to enable/disable launch at login.
-- Auto-launch implementation: use SMAppService where available, with legacy login item fallback for macOS 11.
+- Auto-launch implementation: SMAppService.
 
 ## Capture & Hotkeys
 
 - Capture modes: drag-to-select area (default), full screen, window capture.
 - Default global hotkeys (no external deps):
-  - `ctrl+p` => drag selection capture.
-  - `ctrl+shift+p` => window capture.
-- Default hotkey for full screen capture: TBD.
+  - `ctrl+p` => drag selection capture. This is the default and golden path for capturing screenshots. At least for me personally!
+  - `ctrl+shift+p` => full screen capture. I don't use this as much but I'm sure others do so we need it as a feature.
+- Default hotkey for window capture: TBD.
 - Hotkeys should be user-configurable in preferences.
 - No capture delay for v0 (always instant).
 - Use a custom selection overlay with CG APIs / ScreenCaptureKit for capture.
@@ -49,15 +49,17 @@ This document outlines the specifications for version 0 (v0) of the OpenShot mac
 
 - Show a floating preview tile after capture (supports drag/drop into other apps and click-to-open).
 - Preview timeout is configurable; include a "never timeout" mode that keeps the tile until the user closes it.
-- When timeout is disabled, the tile shows a small close control (circle with an "X") in a corner.
-- Closing the preview cancels any pending delayed save.
+- Preview actions:
+  - Upper-left "X" closes the preview and still allows the delayed save to occur.
+  - Upper-right red trash icon cancels the delayed save and deletes the pending capture.
 
 ## Output & Storage
 
 - Default output behavior:
   - Immediately copy the screenshot to clipboard.
   - After 7 seconds, save a PNG to `~/Downloads`.
-- If the preview is closed before the delay completes, do not save to disk.
+- If the delayed save timer completes, save to disk.
+- If the user clicks the trash icon before the delay completes, cancel the save.
 - Output format: PNG only for v0.
 - Save location should be configurable in preferences (desktop, downloads, documents, custom folder).
 
@@ -80,3 +82,4 @@ This document outlines the specifications for version 0 (v0) of the OpenShot mac
 ## Non-Goals (MVP)
 
 - No custom installer; Homebrew cask only.
+- No capture delays (instant only for v0).
