@@ -6,7 +6,7 @@ This document outlines the specifications for version 0 (v0) of the OpenShot mac
 
 - Keep the app simple, reliable, and installable via Homebrew (open source, unsigned is acceptable for MVP).
 - Minimum macOS: 11 (Big Sur) to cover Apple Silicon devices broadly.
-- Build as a macOS app bundle, unsigned for MVP.
+- Build as a macOS app bundle, unsigned for MVP; optional codesign + notary supported via env flags.
 - Distribute via Homebrew cask.
 - Users will need to approve the app on first run (Gatekeeper).
 - Provide an extemely simple and easy to use screenshot utility that works in a similar way to the built-in macOS screenshot tool.
@@ -25,7 +25,57 @@ This document outlines the specifications for version 0 (v0) of the OpenShot mac
   - It should have the ability to do click-and-drag after pressing the screenshot shortcut to immediately select the area to capture.
   - It should support capturing screenshots of specific windows, full screen, or selected areas.
   - By default, it should save screenshots as a maximum quality PNG file to preserve image quality.
-  - By default, filenames of screenshots should be named in the following format: `screenshot_<rfc3339_timestamp>.png`. The timestamp should be like `2026-01-12T13:43:15-08:00` so it has ease of use in the user's local timezone and is sortable.
+  - By default, filenames of screenshots should be named in a filesystem-safe RFC3339-like format (see Filename Format).
+
+## App Surface
+
+- Menu-bar only app (no Dock icon).
+- Preferences/settings window (full window, not a popover).
+- User setting to enable/disable launch at login.
+- Auto-launch implementation: use SMAppService where available, with legacy login item fallback for macOS 11.
+
+## Capture & Hotkeys
+
+- Capture modes: drag-to-select area (default), full screen, window capture.
+- Default global hotkeys (no external deps):
+  - `ctrl+p` => drag selection capture.
+  - `ctrl+shift+p` => window capture.
+- Default hotkey for full screen capture: TBD.
+- Hotkeys should be user-configurable in preferences.
+- No capture delay for v0 (always instant).
+- Use a custom selection overlay with CG APIs / ScreenCaptureKit for capture.
+
+## Floating Preview
+
+- Show a floating preview tile after capture (supports drag/drop into other apps and click-to-open).
+- Preview timeout is configurable; include a "never timeout" mode that keeps the tile until the user closes it.
+- When timeout is disabled, the tile shows a small close control (circle with an "X") in a corner.
+- Closing the preview cancels any pending delayed save.
+
+## Output & Storage
+
+- Default output behavior:
+  - Immediately copy the screenshot to clipboard.
+  - After 7 seconds, save a PNG to `~/Downloads`.
+- If the preview is closed before the delay completes, do not save to disk.
+- Output format: PNG only for v0.
+- Save location should be configurable in preferences (desktop, downloads, documents, custom folder).
+
+## Filename Format
+
+- Default filename format: `screenshot_<timestamp>.png`.
+- Timestamp is RFC3339-like but filesystem safe:
+  - Replace `:` and `-` characters in date/time with `_`.
+  - Replace timezone sign with `tz_plus` or `tz_minus`.
+  - Example: `screenshot_2026_01_12T13_43_15_tz_minus_08_00.png`.
+
+## Tooling & Distribution
+
+- Use XcodeGen (`project.yml`) to generate the Xcode project.
+- Use SwiftLint + SwiftFormat for linting/formatting.
+- "Scripts to rule them all" via `script/` (bootstrap/build/test/lint).
+- Bootstrap should be idempotent, fast, and cache where possible.
+- Package app as unsigned zip for Homebrew cask; support optional codesign + notary via env flags.
 
 ## Non-Goals (MVP)
 
