@@ -3,3 +3,40 @@
 set -euo pipefail
 
 source script/env "$@"
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo -e "${RED}Build requires macOS.${OFF}"
+  exit 1
+fi
+
+if ! command -v xcodebuild >/dev/null 2>&1; then
+  echo -e "${RED}xcodebuild not found. Install Xcode or Command Line Tools.${OFF}"
+  exit 1
+fi
+
+script/update
+
+PROJECT_PATH="${PROJECT_PATH:-}"
+if [[ -z "$PROJECT_PATH" ]]; then
+  PROJECT_PATH=$(find "$DIR" -maxdepth 1 -name "*.xcodeproj" -print -quit)
+fi
+
+if [[ -z "$PROJECT_PATH" ]]; then
+  echo -e "${RED}No .xcodeproj found. Run script/update.${OFF}"
+  exit 1
+fi
+
+APP_NAME="${APP_NAME:-OpenShot}"
+SCHEME="${SCHEME:-$APP_NAME}"
+CONFIGURATION="${CONFIGURATION:-Debug}"
+DERIVED_DATA="${DERIVED_DATA:-$DIR/build/DerivedData}"
+
+echo -e "${BLUE}Building ${SCHEME} (${CONFIGURATION})...${OFF}"
+
+xcodebuild \
+  -project "$PROJECT_PATH" \
+  -scheme "$SCHEME" \
+  -configuration "$CONFIGURATION" \
+  -derivedDataPath "$DERIVED_DATA" \
+  build \
+  CODE_SIGNING_ALLOWED=NO

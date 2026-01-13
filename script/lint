@@ -2,3 +2,31 @@
 
 set -euo pipefail
 source script/env "$@"
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo -e "${YELLOW}Skipping lint on non-macOS host.${OFF}"
+  exit 0
+fi
+
+if ! command -v swiftlint >/dev/null 2>&1; then
+  echo -e "${RED}swiftlint not found. Run script/bootstrap.${OFF}"
+  exit 1
+fi
+
+if ! command -v swiftformat >/dev/null 2>&1; then
+  echo -e "${RED}swiftformat not found. Run script/bootstrap.${OFF}"
+  exit 1
+fi
+
+if ! find "$DIR" -name "*.swift" -print -quit | grep -q .; then
+  echo -e "${YELLOW}No Swift files found; skipping lint.${OFF}"
+  exit 0
+fi
+
+echo -e "${BLUE}Running SwiftLint...${OFF}"
+swiftlint lint --quiet --path "$DIR"
+
+echo -e "${BLUE}Running SwiftFormat (lint)...${OFF}"
+swiftformat \
+  --lint "$DIR" \
+  --exclude ".build,build,DerivedData,.tmp,tmp"
