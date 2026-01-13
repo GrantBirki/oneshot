@@ -1,0 +1,20 @@
+name: OpenShot
+
+options:
+  bundleIdPrefix: com.grantbirki
+  deploymentTarget:
+    macOS: "14.0"
+
+targets:
+  OpenShot:
+    type: application
+    platform: macOS
+    sources:
+      - Sources
+    info:
+      path: Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.grantbirki.openshot
+        MARKETING_VERSION: 0.0.0
+        CURRENT_PROJECT_VERSION: 0.0.0
