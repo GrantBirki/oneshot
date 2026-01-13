@@ -8,7 +8,8 @@ final class PreviewController {
         image: NSImage,
         timeout: TimeInterval?,
         onClose: @escaping () -> Void,
-        onTrash: @escaping () -> Void
+        onTrash: @escaping () -> Void,
+        onAutoDismiss: (() -> Void)? = nil
     ) {
         hideWorkItem?.cancel()
 
@@ -28,6 +29,7 @@ final class PreviewController {
 
         if let timeout = timeout, timeout > 0 {
             let workItem = DispatchWorkItem { [weak self] in
+                onAutoDismiss?()
                 self?.hide()
             }
             hideWorkItem = workItem

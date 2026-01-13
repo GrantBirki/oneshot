@@ -5,7 +5,7 @@ final class PreviewPanel: NSPanel {
     private static let padding: CGFloat = 16
     private static let contentInset: CGFloat = 10
     private static let maxSize = NSSize(width: 360, height: 220)
-    private static let minSize = NSSize(width: 180, height: 120)
+    private static let minSize = NSSize(width: 200, height: 130)
 
     init(image: NSImage, onClose: @escaping () -> Void, onTrash: @escaping () -> Void) {
         let size = PreviewPanel.preferredSize(for: image)
@@ -37,7 +37,14 @@ final class PreviewPanel: NSPanel {
         }
 
         let visible = screen.visibleFrame
-        let frame = frameRect(forContentRect: content.bounds)
+        var frame = frameRect(forContentRect: content.bounds)
+        let maxWidth = max(visible.width - PreviewPanel.padding * 2, PreviewPanel.minSize.width)
+        let maxHeight = max(visible.height - PreviewPanel.padding * 2, PreviewPanel.minSize.height)
+
+        if frame.width > maxWidth || frame.height > maxHeight {
+            setContentSize(NSSize(width: min(frame.width, maxWidth), height: min(frame.height, maxHeight)))
+            frame = frameRect(forContentRect: content.bounds)
+        }
         var origin = CGPoint(
             x: visible.maxX - frame.width - PreviewPanel.padding,
             y: visible.minY + PreviewPanel.padding
@@ -52,11 +59,15 @@ final class PreviewPanel: NSPanel {
 
     private static func preferredSize(for image: NSImage) -> NSSize {
         let imageSize = image.size
-        let widthRatio = maxSize.width / imageSize.width
-        let heightRatio = maxSize.height / imageSize.height
+        let maxContentWidth = maxSize.width - contentInset * 2
+        let maxContentHeight = maxSize.height - contentInset * 2
+        let widthRatio = maxContentWidth / imageSize.width
+        let heightRatio = maxContentHeight / imageSize.height
         let scale = min(widthRatio, heightRatio, 1)
-        let width = max(imageSize.width * scale + contentInset * 2, minSize.width)
-        let height = max(imageSize.height * scale + contentInset * 2, minSize.height)
+        let contentWidth = imageSize.width * scale
+        let contentHeight = imageSize.height * scale
+        let width = min(max(contentWidth + contentInset * 2, minSize.width), maxSize.width)
+        let height = min(max(contentHeight + contentInset * 2, minSize.height), maxSize.height)
         return NSSize(width: width, height: height)
     }
 

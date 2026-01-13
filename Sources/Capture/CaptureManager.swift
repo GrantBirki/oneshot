@@ -52,11 +52,18 @@ final class CaptureManager {
             previewController.show(
                 image: nsImage,
                 timeout: settings.previewTimeout,
-                onClose: {},
+                onClose: { [weak self] in
+                    self?.outputCoordinator.finalize(id: saveID)
+                },
                 onTrash: { [weak self] in
                     self?.outputCoordinator.cancel(id: saveID)
+                },
+                onAutoDismiss: { [weak self] in
+                    self?.outputCoordinator.markAutoDismissed(id: saveID)
                 }
             )
+        } else {
+            outputCoordinator.markAutoDismissed(id: saveID)
         }
     }
 }

@@ -21,5 +21,8 @@ final class PreferencesWindowController: NSWindowController {
         window?.center()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async { [weak self] in
+            self?.window?.makeFirstResponder(nil)
+        }
     }
 }

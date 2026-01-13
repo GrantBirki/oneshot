@@ -39,12 +39,23 @@ final class WindowCaptureOverlayView: NSView {
 
     override var acceptsFirstResponder: Bool { true }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateHighlight(at: NSEvent.mouseLocation)
+    }
+
     override func mouseMoved(with event: NSEvent) {
         guard let window = window else { return }
         let point = convert(event.locationInWindow, from: nil)
         let screenPoint = window.convertPoint(toScreen: point)
-        highlightedWindow = WindowInfoProvider.window(at: screenPoint)
-        needsDisplay = true
+        updateHighlight(at: screenPoint)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window = window else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        let screenPoint = window.convertPoint(toScreen: point)
+        updateHighlight(at: screenPoint)
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -77,6 +88,11 @@ final class WindowCaptureOverlayView: NSView {
             path.lineWidth = 2
             path.stroke()
         }
+    }
+
+    private func updateHighlight(at screenPoint: CGPoint) {
+        highlightedWindow = WindowInfoProvider.window(at: screenPoint)
+        needsDisplay = true
     }
 }
 
