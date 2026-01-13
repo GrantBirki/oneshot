@@ -8,7 +8,7 @@ final class PreferencesWindowController: NSWindowController {
         let window = NSWindow(contentViewController: hosting)
         window.title = "OpenShot Preferences"
         window.styleMask = [.titled, .closable, .miniaturizable]
-        window.setContentSize(NSSize(width: 520, height: 420))
+        window.setContentSize(NSSize(width: 560, height: 480))
         window.isReleasedWhenClosed = false
         super.init(window: window)
     }

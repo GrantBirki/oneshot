@@ -19,28 +19,39 @@ struct PreferencesView: View {
             }
 
             Section("Output") {
-                TextField("Filename prefix", text: $settings.filenamePrefix)
+                LabeledContent("Filename prefix") {
+                    TextField("", text: $settings.filenamePrefix)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 220)
+                }
 
-                Picker("Save location", selection: $settings.saveLocationOption) {
-                    ForEach(SaveLocationOption.allCases) { option in
-                        Text(option.title).tag(option)
+                LabeledContent("Save location") {
+                    Picker("", selection: $settings.saveLocationOption) {
+                        ForEach(SaveLocationOption.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
                     }
+                    .labelsHidden()
+                    .frame(width: 220)
                 }
 
                 if settings.saveLocationOption == .custom {
-                    HStack {
-                        TextField("Custom folder", text: $settings.customSavePath)
-                        Button("Choose...") {
-                            chooseFolder()
+                    LabeledContent("Custom folder") {
+                        HStack(spacing: 8) {
+                            TextField("", text: $settings.customSavePath)
+                                .textFieldStyle(.roundedBorder)
+                            Button("Choose...") {
+                                chooseFolder()
+                            }
                         }
+                        .frame(width: 300)
                     }
                 }
 
-                HStack {
-                    Text("Save delay (seconds)")
-                    Spacer()
+                LabeledContent("Save delay (seconds)") {
                     TextField("", value: $settings.saveDelaySeconds, formatter: numberFormatter)
-                        .frame(width: 60)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 80)
                 }
             }
 
@@ -49,11 +60,10 @@ struct PreferencesView: View {
                 Toggle("Auto-dismiss preview", isOn: $settings.previewTimeoutEnabled)
                     .disabled(!settings.previewEnabled)
                 if settings.previewTimeoutEnabled && settings.previewEnabled {
-                    HStack {
-                        Text("Preview timeout (seconds)")
-                        Spacer()
+                    LabeledContent("Preview timeout (seconds)") {
                         TextField("", value: $settings.previewTimeoutSeconds, formatter: numberFormatter)
-                            .frame(width: 60)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 80)
                     }
                 } else if settings.previewEnabled {
                     Text("Preview stays until you close or trash it.")
@@ -62,13 +72,28 @@ struct PreferencesView: View {
             }
 
             Section("Hotkeys") {
-                TextField("Selection hotkey", text: $settings.hotkeySelection)
-                TextField("Full screen hotkey", text: $settings.hotkeyFullScreen)
-                TextField("Window hotkey", text: $settings.hotkeyWindow)
-                Text("Use format like ctrl+p or ctrl+shift+p.").foregroundStyle(.secondary)
+                LabeledContent("Selection") {
+                    TextField("", text: $settings.hotkeySelection)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 220)
+                }
+                LabeledContent("Full screen") {
+                    TextField("", text: $settings.hotkeyFullScreen)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 220)
+                }
+                LabeledContent("Window") {
+                    TextField("", text: $settings.hotkeyWindow)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 220)
+                }
+                Text("Use format like ctrl+p or ctrl+shift+p.")
+                    .foregroundStyle(.secondary)
             }
         }
-        .padding()
+        .formStyle(.grouped)
+        .padding(20)
+        .frame(minWidth: 520, minHeight: 420)
     }
 
     private func chooseFolder() {

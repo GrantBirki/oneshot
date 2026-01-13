@@ -2,6 +2,10 @@ import AppKit
 
 final class PreviewPanel: NSPanel {
     private let content: PreviewContentView
+    private static let padding: CGFloat = 16
+    private static let contentInset: CGFloat = 10
+    private static let maxSize = NSSize(width: 360, height: 220)
+    private static let minSize = NSSize(width: 180, height: 120)
 
     init(image: NSImage, onClose: @escaping () -> Void, onTrash: @escaping () -> Void) {
         let size = PreviewPanel.preferredSize(for: image)
@@ -26,50 +30,68 @@ final class PreviewPanel: NSPanel {
     }
 
     func show() {
-        guard let screen = NSScreen.main else {
+        guard let screen = PreviewPanel.targetScreen() else {
             center()
             makeKeyAndOrderFront(nil)
             return
         }
 
-        let padding: CGFloat = 24
+        let visible = screen.visibleFrame
         let frame = frameRect(forContentRect: content.bounds)
-        let origin = CGPoint(
-            x: screen.visibleFrame.maxX - frame.width - padding,
-            y: screen.visibleFrame.minY + padding
+        var origin = CGPoint(
+            x: visible.maxX - frame.width - PreviewPanel.padding,
+            y: visible.minY + PreviewPanel.padding
         )
+
+        origin.x = min(max(origin.x, visible.minX + PreviewPanel.padding), visible.maxX - frame.width - PreviewPanel.padding)
+        origin.y = min(max(origin.y, visible.minY + PreviewPanel.padding), visible.maxY - frame.height - PreviewPanel.padding)
+
         setFrameOrigin(origin)
         orderFrontRegardless()
     }
 
     private static func preferredSize(for image: NSImage) -> NSSize {
-        let maxWidth: CGFloat = 320
-        let maxHeight: CGFloat = 200
         let imageSize = image.size
-        let widthRatio = maxWidth / imageSize.width
-        let heightRatio = maxHeight / imageSize.height
+        let widthRatio = maxSize.width / imageSize.width
+        let heightRatio = maxSize.height / imageSize.height
         let scale = min(widthRatio, heightRatio, 1)
-        return NSSize(width: imageSize.width * scale, height: imageSize.height * scale)
+        let width = max(imageSize.width * scale + contentInset * 2, minSize.width)
+        let height = max(imageSize.height * scale + contentInset * 2, minSize.height)
+        return NSSize(width: width, height: height)
+    }
+
+    private static func targetScreen() -> NSScreen? {
+        let mouseLocation = NSEvent.mouseLocation
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) {
+            return screen
+        }
+        return NSScreen.main ?? NSScreen.screens.first
     }
 }
 
 final class PreviewContentView: NSView {
+    private let backgroundView = NSVisualEffectView()
     private let imageView = PreviewImageView()
     private let closeButton = NSButton()
     private let trashButton = NSButton()
     private var onClose: (() -> Void)?
     private var onTrash: (() -> Void)?
+    private let contentInset: CGFloat = 10
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.cornerRadius = 10
-        layer?.masksToBounds = true
-        layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.9).cgColor
+        backgroundView.material = .hudWindow
+        backgroundView.blendingMode = .withinWindow
+        backgroundView.state = .active
+        backgroundView.wantsLayer = true
+        backgroundView.layer?.cornerRadius = 12
+        backgroundView.layer?.masksToBounds = true
+        backgroundView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(backgroundView)
 
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(imageView)
+        backgroundView.addSubview(imageView)
 
         closeButton.bezelStyle = .inline
         closeButton.isBordered = false
@@ -78,7 +100,7 @@ final class PreviewContentView: NSView {
         closeButton.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Close")
         closeButton.contentTintColor = .secondaryLabelColor
         closeButton.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(closeButton)
+        backgroundView.addSubview(closeButton)
 
         trashButton.bezelStyle = .inline
         trashButton.isBordered = false
@@ -87,21 +109,26 @@ final class PreviewContentView: NSView {
         trashButton.image = NSImage(systemSymbolName: "trash.circle.fill", accessibilityDescription: "Trash")
         trashButton.contentTintColor = .systemRed
         trashButton.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(trashButton)
+        backgroundView.addSubview(trashButton)
 
         NSLayoutConstraint.activate([
-            imageView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            imageView.topAnchor.constraint(equalTo: topAnchor),
-            imageView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            backgroundView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            backgroundView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            backgroundView.topAnchor.constraint(equalTo: topAnchor),
+            backgroundView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            closeButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
-            closeButton.topAnchor.constraint(equalTo: topAnchor, constant: 6),
+            imageView.leadingAnchor.constraint(equalTo: backgroundView.leadingAnchor, constant: contentInset),
+            imageView.trailingAnchor.constraint(equalTo: backgroundView.trailingAnchor, constant: -contentInset),
+            imageView.topAnchor.constraint(equalTo: backgroundView.topAnchor, constant: contentInset),
+            imageView.bottomAnchor.constraint(equalTo: backgroundView.bottomAnchor, constant: -contentInset),
+
+            closeButton.leadingAnchor.constraint(equalTo: backgroundView.leadingAnchor, constant: 8),
+            closeButton.topAnchor.constraint(equalTo: backgroundView.topAnchor, constant: 8),
             closeButton.widthAnchor.constraint(equalToConstant: 18),
             closeButton.heightAnchor.constraint(equalToConstant: 18),
 
-            trashButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
-            trashButton.topAnchor.constraint(equalTo: topAnchor, constant: 6),
+            trashButton.trailingAnchor.constraint(equalTo: backgroundView.trailingAnchor, constant: -8),
+            trashButton.topAnchor.constraint(equalTo: backgroundView.topAnchor, constant: 8),
             trashButton.widthAnchor.constraint(equalToConstant: 18),
             trashButton.heightAnchor.constraint(equalToConstant: 18)
         ])
