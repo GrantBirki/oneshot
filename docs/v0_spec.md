@@ -50,7 +50,7 @@ This document outlines the specifications for version 0 (v0) of the OpenShot mac
 - Show a floating preview tile after capture (supports drag/drop into other apps and click-to-open).
 - Preview timeout is configurable; include a "never timeout" mode that keeps the tile until the user closes it.
 - Preview actions:
-  - Upper-left "X" closes the preview and still allows the delayed save to occur.
+  - Upper-left "X" closes the preview and immediately saves to disk (ends any delay early).
   - Upper-right red trash icon cancels the delayed save and deletes the pending capture.
 
 ## Output & Storage

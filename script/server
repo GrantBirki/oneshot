@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source script/env "$@"
+source "$DIR/script/lib/common.sh"
+
+require_macos error "Launch requires macOS."
+
+script/build
+
+APP_NAME="${APP_NAME:-OpenShot}"
+CONFIGURATION="${CONFIGURATION:-Debug}"
+DERIVED_DATA="${DERIVED_DATA:-$DIR/build/DerivedData}"
+APP_PATH="$DERIVED_DATA/Build/Products/$CONFIGURATION/$APP_NAME.app"
+
+if pgrep -x "$APP_NAME" >/dev/null 2>&1; then
+  echo -e "${BLUE}Quitting existing ${APP_NAME}...${OFF}"
+  osascript -e "tell application \"$APP_NAME\" to quit" >/dev/null 2>&1 || true
+  sleep 0.5
+  pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+fi
+
+if [[ ! -d "$APP_PATH" ]]; then
+  echo -e "${RED}App not found at ${APP_PATH}.${OFF}"
+  exit 1
+fi
+
+echo -e "${BLUE}Launching ${APP_NAME}...${OFF}"
+echo "Tip: you can stream logs with:"
+echo "log stream --predicate 'process == \"OpenShot\"' --style compact"
+open "$APP_PATH"
