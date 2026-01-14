@@ -3,7 +3,12 @@ import AppKit
 final class SelectionOverlayController {
     private var window: NSWindow?
 
-    func beginSelection(completion: @escaping (CGRect?) -> Void) {
+    struct SelectionResult {
+        let rect: CGRect
+        let excludeWindowID: CGWindowID?
+    }
+
+    func beginSelection(completion: @escaping (SelectionResult?) -> Void) {
         guard let frame = ScreenFrameHelper.allScreensFrame() else {
             completion(nil)
             return
@@ -11,9 +16,10 @@ final class SelectionOverlayController {
 
         let window = OverlayWindow(contentRect: frame)
         let view = SelectionOverlayView(frame: window.contentView?.bounds ?? frame)
+        var windowID: CGWindowID = 0
         view.onSelection = { [weak self] rect in
             self?.end()
-            completion(rect)
+            completion(SelectionResult(rect: rect, excludeWindowID: windowID))
         }
         view.onCancel = { [weak self] in
             self?.end()
@@ -22,6 +28,7 @@ final class SelectionOverlayController {
         window.contentView = view
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(view)
+        windowID = CGWindowID(window.windowNumber)
         self.window = window
     }
 

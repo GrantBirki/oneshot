@@ -10,12 +10,14 @@ enum ScreenCaptureService {
         )
     }
 
-    static func capture(rect: CGRect) -> CGImage? {
+    static func capture(rect: CGRect, excludingWindowID: CGWindowID? = nil) -> CGImage? {
         let captureRect = cgRect(fromScreenRect: rect)
+        let options: CGWindowListOption = excludingWindowID == nil ? .optionOnScreenOnly : .optionOnScreenBelowWindow
+        let windowID = excludingWindowID ?? kCGNullWindowID
         return CGWindowListCreateImage(
             captureRect,
-            .optionOnScreenOnly,
-            kCGNullWindowID,
+            options,
+            windowID,
             [.bestResolution]
         )
     }

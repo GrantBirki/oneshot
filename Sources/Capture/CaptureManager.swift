@@ -15,9 +15,9 @@ final class CaptureManager {
     func captureSelection() {
         guard ScreenCapturePermission.ensureAccess() else { return }
         NSApp.activate(ignoringOtherApps: true)
-        selectionOverlay.beginSelection { [weak self] rect in
-            guard let self = self, let rect = rect else { return }
-            self.capture(rect: rect)
+        selectionOverlay.beginSelection { [weak self] selection in
+            guard let self = self, let selection = selection else { return }
+            self.capture(rect: selection.rect, excludingWindowID: selection.excludeWindowID)
         }
     }
 
@@ -40,8 +40,8 @@ final class CaptureManager {
         }
     }
 
-    private func capture(rect: CGRect) {
-        if let image = ScreenCaptureService.capture(rect: rect) {
+    private func capture(rect: CGRect, excludingWindowID: CGWindowID?) {
+        if let image = ScreenCaptureService.capture(rect: rect, excludingWindowID: excludingWindowID) {
             handleCapture(image, displaySize: rect.size, anchorRect: rect)
         }
     }
