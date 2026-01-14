@@ -47,25 +47,29 @@ final class CaptureManager {
     }
 
     private func handleCapture(_ image: CGImage, displaySize: NSSize, anchorRect: CGRect?) {
-        let nsImage = NSImage(cgImage: image, size: displaySize)
-        let saveID = outputCoordinator.begin(image: nsImage)
-        if settings.previewEnabled {
-            previewController.show(
-                image: nsImage,
-                timeout: settings.previewTimeout,
-                onClose: { [weak self] in
-                    self?.outputCoordinator.finalize(id: saveID)
-                },
-                onTrash: { [weak self] in
-                    self?.outputCoordinator.cancel(id: saveID)
-                },
-                onAutoDismiss: { [weak self] in
-                    self?.outputCoordinator.markAutoDismissed(id: saveID)
-                },
-                anchorRect: anchorRect
-            )
-        } else {
-            outputCoordinator.markAutoDismissed(id: saveID)
+        do {
+            let captured = try CapturedImage(cgImage: image, displaySize: displaySize)
+            let saveID = outputCoordinator.begin(pngData: captured.pngData)
+            if settings.previewEnabled {
+                previewController.show(
+                    image: captured.previewImage,
+                    timeout: settings.previewTimeout,
+                    onClose: { [weak self] in
+                        self?.outputCoordinator.finalize(id: saveID)
+                    },
+                    onTrash: { [weak self] in
+                        self?.outputCoordinator.cancel(id: saveID)
+                    },
+                    onAutoDismiss: { [weak self] in
+                        self?.outputCoordinator.markAutoDismissed(id: saveID)
+                    },
+                    anchorRect: anchorRect
+                )
+            } else {
+                outputCoordinator.markAutoDismissed(id: saveID)
+            }
+        } catch {
+            NSLog("Failed to encode screenshot: \(error)")
         }
     }
 }

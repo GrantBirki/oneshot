@@ -1,9 +1,9 @@
 import AppKit
 
 enum ClipboardService {
-    static func copy(image: NSImage) {
+    static func copy(pngData: Data) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.writeObjects([image])
+        pasteboard.setData(pngData, forType: .png)
     }
 }

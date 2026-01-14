@@ -5,7 +5,7 @@ final class OutputCoordinator {
     private let queue: DispatchQueue
     private let queueKey = DispatchSpecificKey<Void>()
     private let dateProvider: () -> Date
-    private let clipboardCopy: (NSImage) -> Void
+    private let clipboardCopy: (Data) -> Void
     private let onSave: ((UUID, URL) -> Void)?
     private var pendingSaves: [UUID: PendingSave] = [:]
 
@@ -13,7 +13,7 @@ final class OutputCoordinator {
         settings: SettingsStore,
         queue: DispatchQueue = DispatchQueue(label: "openshot.output", qos: .userInitiated),
         dateProvider: @escaping () -> Date = Date.init,
-        clipboardCopy: @escaping (NSImage) -> Void = { ClipboardService.copy(image: $0) },
+        clipboardCopy: @escaping (Data) -> Void = { ClipboardService.copy(pngData: $0) },
         onSave: ((UUID, URL) -> Void)? = nil
     ) {
         self.settings = settings
@@ -24,8 +24,8 @@ final class OutputCoordinator {
         self.onSave = onSave
     }
 
-    func begin(image: NSImage) -> UUID {
-        clipboardCopy(image)
+    func begin(pngData: Data) -> UUID {
+        clipboardCopy(pngData)
 
         let id = UUID()
         let delay = settings.saveDelaySeconds
@@ -35,7 +35,7 @@ final class OutputCoordinator {
                 self?.performSave(id: id)
             }
             self.pendingSaves[id] = PendingSave(
-                image: image,
+                pngData: pngData,
                 workItem: workItem,
                 savedURL: nil,
                 releaseAfterSave: false
@@ -66,7 +66,7 @@ final class OutputCoordinator {
             guard let self = self, var pending = self.pendingSaves[id] else { return }
             pending.workItem.cancel()
             if pending.savedURL == nil {
-                pending.savedURL = self.saveNow(image: pending.image, id: id)
+                pending.savedURL = self.saveNow(pngData: pending.pngData, id: id)
             }
             self.pendingSaves.removeValue(forKey: id)
         }
@@ -91,7 +91,7 @@ final class OutputCoordinator {
         }
 
         if pending.savedURL == nil {
-            pending.savedURL = saveNow(image: pending.image, id: id)
+            pending.savedURL = saveNow(pngData: pending.pngData, id: id)
         }
 
         if pending.releaseAfterSave {
@@ -101,7 +101,7 @@ final class OutputCoordinator {
         }
     }
 
-    private func saveNow(image: NSImage, id: UUID) -> URL? {
+    private func saveNow(pngData: Data, id: UUID) -> URL? {
         let directory = SaveLocationResolver.resolve(
             option: settings.saveLocationOption,
             customPath: settings.customSavePath
@@ -109,7 +109,7 @@ final class OutputCoordinator {
         let filename = FilenameFormatter.makeFilename(prefix: settings.filenamePrefix, date: dateProvider())
 
         do {
-            let url = try FileSaveService.save(image: image, to: directory, filename: filename)
+            let url = try FileSaveService.save(pngData: pngData, to: directory, filename: filename)
             onSave?(id, url)
             return url
         } catch {
@@ -128,7 +128,7 @@ final class OutputCoordinator {
 }
 
 private struct PendingSave {
-    let image: NSImage
+    let pngData: Data
     var workItem: DispatchWorkItem
     var savedURL: URL?
     var releaseAfterSave: Bool

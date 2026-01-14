@@ -50,7 +50,8 @@ final class OutputCoordinatorTests: XCTestCase {
             }
         )
 
-        let id = coordinator.begin(image: Self.makeImage())
+        let pngData = Self.makePNGData()
+        let id = coordinator.begin(pngData: pngData)
         coordinator.finalize(id: id)
 
         wait(for: [saveExpectation], timeout: 2)
@@ -59,6 +60,8 @@ final class OutputCoordinatorTests: XCTestCase {
             return
         }
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        let savedData = try? Data(contentsOf: url)
+        XCTAssertEqual(savedData, pngData)
     }
 
     func testCancelDeletesSavedFileAfterSave() {
@@ -82,7 +85,7 @@ final class OutputCoordinatorTests: XCTestCase {
             }
         )
 
-        let id = coordinator.begin(image: Self.makeImage())
+        let id = coordinator.begin(pngData: Self.makePNGData())
         wait(for: [saveExpectation], timeout: 2)
 
         coordinator.cancel(id: id)
@@ -95,7 +98,31 @@ final class OutputCoordinatorTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
     }
 
-    private static func makeImage() -> NSImage {
+    func testBeginCopiesPNGDataToClipboard() {
+        let settings = SettingsStore(defaults: defaults)
+        settings.saveLocationOption = .custom
+        settings.customSavePath = tempDirectory.path
+        settings.saveDelaySeconds = 60
+
+        let queue = DispatchQueue(label: "OutputCoordinatorTests.queue")
+        let pngData = Self.makePNGData()
+        var clipboardData: Data?
+
+        let coordinator = OutputCoordinator(
+            settings: settings,
+            queue: queue,
+            clipboardCopy: { data in
+                clipboardData = data
+            }
+        )
+
+        let id = coordinator.begin(pngData: pngData)
+        coordinator.cancel(id: id)
+        queue.sync {}
+        XCTAssertEqual(clipboardData, pngData)
+    }
+
+    private static func makePNGData() -> Data {
         let size = NSSize(width: 2, height: 2)
         let rep = NSBitmapImageRep(
             bitmapDataPlanes: nil,
@@ -108,11 +135,7 @@ final class OutputCoordinatorTests: XCTestCase {
             colorSpaceName: .deviceRGB,
             bytesPerRow: 0,
             bitsPerPixel: 0
-        )
-        let image = NSImage(size: size)
-        if let rep = rep {
-            image.addRepresentation(rep)
-        }
-        return image
+        )!
+        return rep.representation(using: .png, properties: [:])!
     }
 }
