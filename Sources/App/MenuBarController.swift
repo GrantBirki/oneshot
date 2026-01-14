@@ -1,12 +1,14 @@
 import Cocoa
 
-final class MenuBarController: NSObject {
+final class MenuBarController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
     private let onCaptureSelection: () -> Void
     private let onCaptureFullScreen: () -> Void
     private let onCaptureWindow: () -> Void
     private let onPreferences: () -> Void
     private let onQuit: () -> Void
+    private let hotkeyProvider: () -> (selection: String, fullScreen: String, window: String)
+    private var menu: NSMenu?
     private let selectionItem: NSMenuItem
     private let windowItem: NSMenuItem
     private let fullScreenItem: NSMenuItem
@@ -16,13 +18,15 @@ final class MenuBarController: NSObject {
         onCaptureFullScreen: @escaping () -> Void,
         onCaptureWindow: @escaping () -> Void,
         onPreferences: @escaping () -> Void,
-        onQuit: @escaping () -> Void
+        onQuit: @escaping () -> Void,
+        hotkeyProvider: @escaping () -> (selection: String, fullScreen: String, window: String)
     ) {
         self.onCaptureSelection = onCaptureSelection
         self.onCaptureFullScreen = onCaptureFullScreen
         self.onCaptureWindow = onCaptureWindow
         self.onPreferences = onPreferences
         self.onQuit = onQuit
+        self.hotkeyProvider = hotkeyProvider
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         selectionItem = NSMenuItem(title: "Capture Selection", action: #selector(captureSelection), keyEquivalent: "")
         windowItem = NSMenuItem(title: "Capture Window", action: #selector(captureWindow), keyEquivalent: "")
@@ -45,7 +49,11 @@ final class MenuBarController: NSObject {
         } else {
             NSLog("Status item button unavailable")
         }
-        statusItem.menu = buildMenu()
+        let menu = buildMenu()
+        menu.delegate = self
+        statusItem.menu = menu
+        self.menu = menu
+        refreshHotkeys()
         NSLog("Menu bar item started")
     }
 
@@ -81,10 +89,20 @@ final class MenuBarController: NSObject {
         return menu
     }
 
-    func updateHotkeys(selection: String, fullScreen: String, window: String) {
+    func refreshHotkeys() {
+        let values = hotkeyProvider()
+        updateHotkeys(selection: values.selection, fullScreen: values.fullScreen, window: values.window)
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        refreshHotkeys()
+    }
+
+    private func updateHotkeys(selection: String, fullScreen: String, window: String) {
         applyHotkey(selection, to: selectionItem)
         applyHotkey(fullScreen, to: fullScreenItem)
         applyHotkey(window, to: windowItem)
+        menu?.update()
     }
 
     private func applyHotkey(_ value: String, to item: NSMenuItem) {

@@ -22,7 +22,14 @@ final class AppController {
             onCaptureFullScreen: { [weak captureManager] in captureManager?.captureFullScreen() },
             onCaptureWindow: { [weak captureManager] in captureManager?.captureWindow() },
             onPreferences: { [weak preferencesWindowController] in preferencesWindowController?.show() },
-            onQuit: { NSApp.terminate(nil) }
+            onQuit: { NSApp.terminate(nil) },
+            hotkeyProvider: { [weak settings] in
+                (
+                    selection: settings?.hotkeySelection ?? "",
+                    fullScreen: settings?.hotkeyFullScreen ?? "",
+                    window: settings?.hotkeyWindow ?? ""
+                )
+            }
         )
     }
 
@@ -82,10 +89,6 @@ final class AppController {
             NSLog("Window hotkey not set or invalid")
         }
 
-        menuBarController.updateHotkeys(
-            selection: settings.hotkeySelection,
-            fullScreen: settings.hotkeyFullScreen,
-            window: settings.hotkeyWindow
-        )
+        menuBarController.refreshHotkeys()
     }
 }
