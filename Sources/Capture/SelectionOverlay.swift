@@ -86,6 +86,10 @@ final class SelectionOverlayView: NSView {
         }
     }
 
+    override func cancelOperation(_ sender: Any?) {
+        onCancel?()
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         NSColor.black.withAlphaComponent(0.35).setFill()
         dirtyRect.fill()
@@ -115,6 +119,9 @@ final class SelectionOverlayView: NSView {
 }
 
 final class OverlayWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+
     init(contentRect: CGRect) {
         super.init(
             contentRect: contentRect,

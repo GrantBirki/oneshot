@@ -72,6 +72,10 @@ final class WindowCaptureOverlayView: NSView {
         }
     }
 
+    override func cancelOperation(_ sender: Any?) {
+        onCancel?()
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         NSColor.black.withAlphaComponent(0.25).setFill()
         dirtyRect.fill()
