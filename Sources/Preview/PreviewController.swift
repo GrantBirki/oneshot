@@ -9,7 +9,8 @@ final class PreviewController {
         timeout: TimeInterval?,
         onClose: @escaping () -> Void,
         onTrash: @escaping () -> Void,
-        onAutoDismiss: (() -> Void)? = nil
+        onAutoDismiss: (() -> Void)? = nil,
+        anchorRect: CGRect? = nil
     ) {
         hideWorkItem?.cancel()
 
@@ -24,7 +25,7 @@ final class PreviewController {
                 self?.hide()
             }
         )
-        panel.show()
+        panel.show(on: PreviewPanel.screen(for: anchorRect))
         self.panel = panel
 
         if let timeout = timeout, timeout > 0 {

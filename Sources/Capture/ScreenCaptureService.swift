@@ -11,8 +11,9 @@ enum ScreenCaptureService {
     }
 
     static func capture(rect: CGRect) -> CGImage? {
-        CGWindowListCreateImage(
-            rect,
+        let captureRect = cgRect(fromScreenRect: rect)
+        return CGWindowListCreateImage(
+            captureRect,
             .optionOnScreenOnly,
             kCGNullWindowID,
             [.bestResolution]
@@ -25,6 +26,17 @@ enum ScreenCaptureService {
             .optionIncludingWindow,
             windowID,
             [.bestResolution]
+        )
+    }
+
+    private static func cgRect(fromScreenRect rect: CGRect) -> CGRect {
+        guard let mainScreen = NSScreen.main ?? NSScreen.screens.first else { return rect }
+        let mainHeight = mainScreen.frame.height
+        return CGRect(
+            x: rect.origin.x,
+            y: mainHeight - rect.origin.y - rect.height,
+            width: rect.width,
+            height: rect.height
         )
     }
 }

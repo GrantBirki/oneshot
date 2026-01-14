@@ -3,7 +3,7 @@ import AppKit
 final class WindowCaptureOverlayController {
     private var window: NSWindow?
 
-    func beginSelection(completion: @escaping (CGWindowID?) -> Void) {
+    func beginSelection(completion: @escaping (WindowInfo?) -> Void) {
         guard let frame = ScreenFrameHelper.allScreensFrame() else {
             completion(nil)
             return
@@ -11,13 +11,13 @@ final class WindowCaptureOverlayController {
 
         let window = OverlayWindow(contentRect: frame)
         let view = WindowCaptureOverlayView(frame: window.contentView?.bounds ?? frame)
-        view.onSelection = { [weak self] windowID in
-            completion(windowID)
+        view.onSelection = { [weak self] windowInfo in
             self?.end()
+            completion(windowInfo)
         }
         view.onCancel = { [weak self] in
-            completion(nil)
             self?.end()
+            completion(nil)
         }
         window.contentView = view
         window.makeKeyAndOrderFront(nil)
@@ -32,7 +32,7 @@ final class WindowCaptureOverlayController {
 }
 
 final class WindowCaptureOverlayView: NSView {
-    var onSelection: ((CGWindowID) -> Void)?
+    var onSelection: ((WindowInfo) -> Void)?
     var onCancel: (() -> Void)?
 
     private var highlightedWindow: WindowInfo?
@@ -59,8 +59,8 @@ final class WindowCaptureOverlayView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
-        if let windowID = highlightedWindow?.id {
-            onSelection?(windowID)
+        if let windowInfo = highlightedWindow {
+            onSelection?(windowInfo)
         } else {
             onCancel?()
         }

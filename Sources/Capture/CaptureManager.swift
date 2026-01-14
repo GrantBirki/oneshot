@@ -24,29 +24,30 @@ final class CaptureManager {
     func captureFullScreen() {
         guard ScreenCapturePermission.ensureAccess() else { return }
         if let image = ScreenCaptureService.captureFullScreen() {
-            handleCapture(image)
+            let size = ScreenFrameHelper.allScreensFrame()?.size ?? NSSize(width: image.width, height: image.height)
+            handleCapture(image, displaySize: size, anchorRect: ScreenFrameHelper.allScreensFrame())
         }
     }
 
     func captureWindow() {
         guard ScreenCapturePermission.ensureAccess() else { return }
         NSApp.activate(ignoringOtherApps: true)
-        windowOverlay.beginSelection { [weak self] windowID in
-            guard let self = self, let windowID = windowID else { return }
-            if let image = ScreenCaptureService.capture(windowID: windowID) {
-                self.handleCapture(image)
+        windowOverlay.beginSelection { [weak self] windowInfo in
+            guard let self = self, let windowInfo = windowInfo else { return }
+            if let image = ScreenCaptureService.capture(windowID: windowInfo.id) {
+                self.handleCapture(image, displaySize: windowInfo.bounds.size, anchorRect: windowInfo.bounds)
             }
         }
     }
 
     private func capture(rect: CGRect) {
         if let image = ScreenCaptureService.capture(rect: rect) {
-            handleCapture(image)
+            handleCapture(image, displaySize: rect.size, anchorRect: rect)
         }
     }
 
-    private func handleCapture(_ image: CGImage) {
-        let nsImage = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+    private func handleCapture(_ image: CGImage, displaySize: NSSize, anchorRect: CGRect?) {
+        let nsImage = NSImage(cgImage: image, size: displaySize)
         let saveID = outputCoordinator.begin(image: nsImage)
         if settings.previewEnabled {
             previewController.show(
@@ -60,7 +61,8 @@ final class CaptureManager {
                 },
                 onAutoDismiss: { [weak self] in
                     self?.outputCoordinator.markAutoDismissed(id: saveID)
-                }
+                },
+                anchorRect: anchorRect
             )
         } else {
             outputCoordinator.markAutoDismissed(id: saveID)

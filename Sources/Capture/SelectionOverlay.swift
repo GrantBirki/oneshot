@@ -12,12 +12,12 @@ final class SelectionOverlayController {
         let window = OverlayWindow(contentRect: frame)
         let view = SelectionOverlayView(frame: window.contentView?.bounds ?? frame)
         view.onSelection = { [weak self] rect in
-            completion(rect)
             self?.end()
+            completion(rect)
         }
         view.onCancel = { [weak self] in
-            completion(nil)
             self?.end()
+            completion(nil)
         }
         window.contentView = view
         window.makeKeyAndOrderFront(nil)

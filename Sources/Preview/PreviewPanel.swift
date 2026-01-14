@@ -2,13 +2,13 @@ import AppKit
 
 final class PreviewPanel: NSPanel {
     private let content: PreviewContentView
+    private let image: NSImage
     private static let padding: CGFloat = 16
-    private static let contentInset: CGFloat = 10
-    private static let maxSize = NSSize(width: 360, height: 220)
-    private static let minSize = NSSize(width: 200, height: 130)
+    private static let desiredPixelSize = CGSize(width: 600, height: 500)
 
     init(image: NSImage, onClose: @escaping () -> Void, onTrash: @escaping () -> Void) {
-        let size = PreviewPanel.preferredSize(for: image)
+        self.image = image
+        let size = PreviewPanel.defaultSize()
         content = PreviewContentView(frame: NSRect(origin: .zero, size: size))
         super.init(
             contentRect: NSRect(origin: .zero, size: size),
@@ -29,46 +29,84 @@ final class PreviewPanel: NSPanel {
         contentView = content
     }
 
-    func show() {
-        guard let screen = PreviewPanel.targetScreen() else {
+    func show(on screen: NSScreen?) {
+        guard let screen = screen ?? PreviewPanel.targetScreen() else {
             center()
             makeKeyAndOrderFront(nil)
             return
         }
 
-        let visible = screen.visibleFrame
-        var frame = frameRect(forContentRect: content.bounds)
-        let maxWidth = max(visible.width - PreviewPanel.padding * 2, PreviewPanel.minSize.width)
-        let maxHeight = max(visible.height - PreviewPanel.padding * 2, PreviewPanel.minSize.height)
+        let safeFrame = PreviewPanel.safeFrame(for: screen)
+        let availableSize = NSSize(
+            width: max(safeFrame.width - PreviewPanel.padding * 2, 1),
+            height: max(safeFrame.height - PreviewPanel.padding * 2, 1)
+        )
+        let desiredSize = PreviewPanel.desiredSize(for: screen)
+        let targetSize = NSSize(
+            width: min(desiredSize.width, availableSize.width),
+            height: min(desiredSize.height, availableSize.height)
+        )
+        content.frame = NSRect(origin: .zero, size: targetSize)
+        content.autoresizingMask = [.width, .height]
+        setContentSize(targetSize)
 
-        if frame.width > maxWidth || frame.height > maxHeight {
-            setContentSize(NSSize(width: min(frame.width, maxWidth), height: min(frame.height, maxHeight)))
-            frame = frameRect(forContentRect: content.bounds)
-        }
+        let frame = frameRect(forContentRect: NSRect(origin: .zero, size: targetSize))
         var origin = CGPoint(
-            x: visible.maxX - frame.width - PreviewPanel.padding,
-            y: visible.minY + PreviewPanel.padding
+            x: safeFrame.maxX - frame.width - PreviewPanel.padding,
+            y: safeFrame.minY + PreviewPanel.padding
         )
 
-        origin.x = min(max(origin.x, visible.minX + PreviewPanel.padding), visible.maxX - frame.width - PreviewPanel.padding)
-        origin.y = min(max(origin.y, visible.minY + PreviewPanel.padding), visible.maxY - frame.height - PreviewPanel.padding)
+        let minX = safeFrame.minX + PreviewPanel.padding
+        let maxX = safeFrame.maxX - frame.width - PreviewPanel.padding
+        let minY = safeFrame.minY + PreviewPanel.padding
+        let maxY = safeFrame.maxY - frame.height - PreviewPanel.padding
 
-        setFrameOrigin(origin)
+        origin.x = maxX < minX ? minX : min(max(origin.x, minX), maxX)
+        origin.y = maxY < minY ? minY : min(max(origin.y, minY), maxY)
+
+        contentMinSize = targetSize
+        contentMaxSize = targetSize
+        minSize = frame.size
+        maxSize = frame.size
+
+        let targetFrame = NSRect(origin: origin, size: frame.size)
+        setFrame(targetFrame, display: false)
         orderFrontRegardless()
+        setFrame(targetFrame, display: false)
     }
 
-    private static func preferredSize(for image: NSImage) -> NSSize {
-        let imageSize = image.size
-        let maxContentWidth = maxSize.width - contentInset * 2
-        let maxContentHeight = maxSize.height - contentInset * 2
-        let widthRatio = maxContentWidth / imageSize.width
-        let heightRatio = maxContentHeight / imageSize.height
-        let scale = min(widthRatio, heightRatio, 1)
-        let contentWidth = imageSize.width * scale
-        let contentHeight = imageSize.height * scale
-        let width = min(max(contentWidth + contentInset * 2, minSize.width), maxSize.width)
-        let height = min(max(contentHeight + contentInset * 2, minSize.height), maxSize.height)
-        return NSSize(width: width, height: height)
+    private static func desiredSize(for screen: NSScreen) -> NSSize {
+        let rect = NSRect(origin: .zero, size: desiredPixelSize)
+        return screen.convertRectFromBacking(rect).size
+    }
+
+    private static func defaultSize() -> NSSize {
+        if let screen = NSScreen.main {
+            return desiredSize(for: screen)
+        }
+        return NSSize(
+            width: desiredPixelSize.width,
+            height: desiredPixelSize.height
+        )
+    }
+
+    static func screen(for rect: CGRect?) -> NSScreen? {
+        guard let rect = rect else {
+            return targetScreen()
+        }
+
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else { return nil }
+
+        let best = screens.max { lhs, rhs in
+            rect.intersection(lhs.frame).area < rect.intersection(rhs.frame).area
+        }
+
+        if let best = best, rect.intersection(best.frame).area > 0 {
+            return best
+        }
+
+        return targetScreen()
     }
 
     private static func targetScreen() -> NSScreen? {
@@ -77,6 +115,21 @@ final class PreviewPanel: NSPanel {
             return screen
         }
         return NSScreen.main ?? NSScreen.screens.first
+    }
+
+    private static func safeFrame(for screen: NSScreen) -> CGRect {
+        let visible = screen.visibleFrame
+        if visible.width > 0, visible.height > 0 {
+            return visible
+        }
+        return screen.frame
+    }
+}
+
+private extension CGRect {
+    var area: CGFloat {
+        guard !isNull else { return 0 }
+        return width * height
     }
 }
 
@@ -97,11 +150,9 @@ final class PreviewContentView: NSView {
         backgroundView.wantsLayer = true
         backgroundView.layer?.cornerRadius = 12
         backgroundView.layer?.masksToBounds = true
-        backgroundView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(backgroundView)
 
         imageView.imageScaling = .scaleProportionallyUpOrDown
-        imageView.translatesAutoresizingMaskIntoConstraints = false
         backgroundView.addSubview(imageView)
 
         closeButton.bezelStyle = .inline
@@ -110,7 +161,6 @@ final class PreviewContentView: NSView {
         closeButton.action = #selector(handleClose)
         closeButton.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Close")
         closeButton.contentTintColor = .secondaryLabelColor
-        closeButton.translatesAutoresizingMaskIntoConstraints = false
         backgroundView.addSubview(closeButton)
 
         trashButton.bezelStyle = .inline
@@ -119,34 +169,29 @@ final class PreviewContentView: NSView {
         trashButton.action = #selector(handleTrash)
         trashButton.image = NSImage(systemSymbolName: "trash.circle.fill", accessibilityDescription: "Trash")
         trashButton.contentTintColor = .systemRed
-        trashButton.translatesAutoresizingMaskIntoConstraints = false
         backgroundView.addSubview(trashButton)
-
-        NSLayoutConstraint.activate([
-            backgroundView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            backgroundView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            backgroundView.topAnchor.constraint(equalTo: topAnchor),
-            backgroundView.bottomAnchor.constraint(equalTo: bottomAnchor),
-
-            imageView.leadingAnchor.constraint(equalTo: backgroundView.leadingAnchor, constant: contentInset),
-            imageView.trailingAnchor.constraint(equalTo: backgroundView.trailingAnchor, constant: -contentInset),
-            imageView.topAnchor.constraint(equalTo: backgroundView.topAnchor, constant: contentInset),
-            imageView.bottomAnchor.constraint(equalTo: backgroundView.bottomAnchor, constant: -contentInset),
-
-            closeButton.leadingAnchor.constraint(equalTo: backgroundView.leadingAnchor, constant: 8),
-            closeButton.topAnchor.constraint(equalTo: backgroundView.topAnchor, constant: 8),
-            closeButton.widthAnchor.constraint(equalToConstant: 18),
-            closeButton.heightAnchor.constraint(equalToConstant: 18),
-
-            trashButton.trailingAnchor.constraint(equalTo: backgroundView.trailingAnchor, constant: -8),
-            trashButton.topAnchor.constraint(equalTo: backgroundView.topAnchor, constant: 8),
-            trashButton.widthAnchor.constraint(equalToConstant: 18),
-            trashButton.heightAnchor.constraint(equalToConstant: 18)
-        ])
     }
 
     required init?(coder: NSCoder) {
         return nil
+    }
+
+    override func layout() {
+        super.layout()
+        backgroundView.frame = bounds
+        imageView.frame = bounds.insetBy(dx: contentInset, dy: contentInset)
+        closeButton.frame = NSRect(
+            x: 8,
+            y: bounds.height - 8 - 18,
+            width: 18,
+            height: 18
+        )
+        trashButton.frame = NSRect(
+            x: bounds.width - 8 - 18,
+            y: bounds.height - 8 - 18,
+            width: 18,
+            height: 18
+        )
     }
 
     func configure(image: NSImage, onClose: @escaping () -> Void, onTrash: @escaping () -> Void) {
