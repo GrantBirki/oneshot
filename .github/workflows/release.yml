@@ -27,7 +27,7 @@ jobs:
         run: script/bootstrap
 
       - name: upload artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # pin@v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # pin@v6.0.0
         id: upload-artifact
         with:
           name: dist
@@ -43,13 +43,13 @@ jobs:
       attestations: write
       contents: read
     steps:
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # pin@6.0.0
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # pin@7.0.0
         with:
           artifact-ids: ${{ needs.release.outputs.artifact-id }}
           path: "dist/"
 
       - name: attest build provenance
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # pin@v3.0.0
+        uses: actions/attest-build-provenance@00014ed6ed5efc5b1ab7f7f34a39eb55d41aa4f8 # pin@v3.1.0
         with:
           subject-path: "dist/"
 
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [release, sign]
     steps:
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # pin@6.0.0
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # pin@7.0.0
         with:
           artifact-ids: ${{ needs.release.outputs.artifact-id }}
           path: "dist/"
