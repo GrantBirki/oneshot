@@ -1,33 +1,45 @@
 import AppKit
 
 final class WindowCaptureOverlayController {
-    private var window: NSWindow?
+    private var windows: [OverlayWindow] = []
 
     func beginSelection(completion: @escaping (WindowInfo?) -> Void) {
-        guard let frame = ScreenFrameHelper.allScreensFrame() else {
+        guard windows.isEmpty else { return }
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else {
             completion(nil)
             return
         }
 
-        let window = OverlayWindow(contentRect: frame)
-        let view = WindowCaptureOverlayView(frame: window.contentView?.bounds ?? frame)
-        view.onSelection = { [weak self] windowInfo in
-            self?.end()
-            completion(windowInfo)
+        var didFinish = false
+        let finish: (WindowInfo?) -> Void = { [weak self] result in
+            guard let self, !didFinish else { return }
+            didFinish = true
+            end()
+            completion(result)
         }
-        view.onCancel = { [weak self] in
-            self?.end()
-            completion(nil)
+
+        for screen in screens {
+            let window = OverlayWindow(contentRect: screen.frame)
+            let view = WindowCaptureOverlayView(frame: window.contentView?.bounds ?? .zero)
+            view.onSelection = { windowInfo in
+                finish(windowInfo)
+            }
+            view.onCancel = {
+                finish(nil)
+            }
+            window.contentView = view
+            window.makeKeyAndOrderFront(nil)
+            window.makeFirstResponder(view)
+            windows.append(window)
         }
-        window.contentView = view
-        window.makeKeyAndOrderFront(nil)
-        window.makeFirstResponder(view)
-        self.window = window
     }
 
     private func end() {
-        window?.orderOut(nil)
-        window = nil
+        for window in windows {
+            window.orderOut(nil)
+        }
+        windows.removeAll()
     }
 }
 

@@ -1,7 +1,7 @@
 import AppKit
 
 final class SelectionOverlayController {
-    private var window: NSWindow?
+    private var windows: [OverlayWindow] = []
 
     struct SelectionResult {
         let rect: CGRect
@@ -9,32 +9,44 @@ final class SelectionOverlayController {
     }
 
     func beginSelection(completion: @escaping (SelectionResult?) -> Void) {
-        guard let frame = ScreenFrameHelper.allScreensFrame() else {
+        guard windows.isEmpty else { return }
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else {
             completion(nil)
             return
         }
 
-        let window = OverlayWindow(contentRect: frame)
-        let view = SelectionOverlayView(frame: window.contentView?.bounds ?? frame)
-        var windowID: CGWindowID = 0
-        view.onSelection = { [weak self] rect in
-            self?.end()
-            completion(SelectionResult(rect: rect, excludeWindowID: windowID))
+        var didFinish = false
+        let finish: (SelectionResult?) -> Void = { [weak self] result in
+            guard let self, !didFinish else { return }
+            didFinish = true
+            end()
+            completion(result)
         }
-        view.onCancel = { [weak self] in
-            self?.end()
-            completion(nil)
+
+        for screen in screens {
+            let window = OverlayWindow(contentRect: screen.frame)
+            let view = SelectionOverlayView(frame: window.contentView?.bounds ?? .zero)
+            var windowID: CGWindowID = 0
+            view.onSelection = { rect in
+                finish(SelectionResult(rect: rect, excludeWindowID: windowID))
+            }
+            view.onCancel = {
+                finish(nil)
+            }
+            window.contentView = view
+            window.makeKeyAndOrderFront(nil)
+            window.makeFirstResponder(view)
+            windowID = CGWindowID(window.windowNumber)
+            windows.append(window)
         }
-        window.contentView = view
-        window.makeKeyAndOrderFront(nil)
-        window.makeFirstResponder(view)
-        windowID = CGWindowID(window.windowNumber)
-        self.window = window
     }
 
     private func end() {
-        window?.orderOut(nil)
-        window = nil
+        for window in windows {
+            window.orderOut(nil)
+        }
+        windows.removeAll()
     }
 }
 
