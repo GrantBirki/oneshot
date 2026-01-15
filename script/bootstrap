@@ -20,19 +20,59 @@ require_tool brew "Homebrew not found. Install from https://brew.sh/"
 export HOMEBREW_NO_AUTO_UPDATE=1
 export HOMEBREW_NO_INSTALL_CLEANUP=1
 
+XCODEGEN_VERSION="${XCODEGEN_VERSION:-2.44.1}"
+SWIFTLINT_VERSION="${SWIFTLINT_VERSION:-0.63.0}"
+SWIFTFORMAT_VERSION="${SWIFTFORMAT_VERSION:-0.58.7}"
+
 deps=(
   xcodegen
   swiftlint
   swiftformat
 )
+versions=(
+  "$XCODEGEN_VERSION"
+  "$SWIFTLINT_VERSION"
+  "$SWIFTFORMAT_VERSION"
+)
 
-for dep in "${deps[@]}"; do
+installed_version() {
+  brew list --versions "$1" 2>/dev/null | awk '{print $2}'
+}
+
+ensure_brew_dep() {
+  local dep="$1"
+  local required_version="$2"
+  local current_version=""
+
   if brew list --formula "$dep" >/dev/null 2>&1; then
-    echo -e "${GREEN}OK${OFF} - $dep"
-  else
-    echo -e "${BLUE}Installing${OFF} - $dep"
-    brew install "$dep"
+    current_version="$(installed_version "$dep")"
+    if [[ "$current_version" == "$required_version" ]]; then
+      echo -e "${GREEN}OK${OFF} - $dep $current_version"
+      return 0
+    fi
+
+    echo -e "${RED}Version mismatch for ${dep}.${OFF}"
+    echo "Installed: $current_version"
+    echo "Required:  $required_version"
+    echo "Run: brew upgrade $dep (or update pinned versions in script/bootstrap)."
+    exit 1
   fi
+
+  echo -e "${BLUE}Installing${OFF} - $dep $required_version"
+  brew install "$dep"
+
+  current_version="$(installed_version "$dep")"
+  if [[ "$current_version" != "$required_version" ]]; then
+    echo -e "${RED}Version mismatch for ${dep}.${OFF}"
+    echo "Installed: $current_version"
+    echo "Required:  $required_version"
+    echo "Update pinned versions in script/bootstrap."
+    exit 1
+  fi
+}
+
+for index in "${!deps[@]}"; do
+  ensure_brew_dep "${deps[$index]}" "${versions[$index]}"
 done
 
 generate_xcodeproj
