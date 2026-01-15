@@ -14,7 +14,7 @@ final class OutputCoordinator {
         queue: DispatchQueue = DispatchQueue(label: "oneshot.output", qos: .userInitiated),
         dateProvider: @escaping () -> Date = Date.init,
         clipboardCopy: @escaping (Data) -> Void = { ClipboardService.copy(pngData: $0) },
-        onSave: ((UUID, URL) -> Void)? = nil
+        onSave: ((UUID, URL) -> Void)? = nil,
     ) {
         self.settings = settings
         self.queue = queue
@@ -30,17 +30,17 @@ final class OutputCoordinator {
         let id = UUID()
         let delay = settings.saveDelaySeconds
         let schedule = { [weak self] in
-            guard let self = self else { return }
+            guard let self else { return }
             let workItem = DispatchWorkItem { [weak self] in
                 self?.performSave(id: id)
             }
-            self.pendingSaves[id] = PendingSave(
+            pendingSaves[id] = PendingSave(
                 pngData: pngData,
                 workItem: workItem,
                 savedURL: nil,
-                releaseAfterSave: false
+                releaseAfterSave: false,
             )
-            self.queue.asyncAfter(deadline: .now() + delay, execute: workItem)
+            queue.asyncAfter(deadline: .now() + delay, execute: workItem)
         }
         if DispatchQueue.getSpecific(key: queueKey) != nil {
             schedule()
@@ -52,34 +52,34 @@ final class OutputCoordinator {
 
     func cancel(id: UUID) {
         queue.async { [weak self] in
-            guard let self = self, var pending = self.pendingSaves[id] else { return }
+            guard let self, let pending = pendingSaves[id] else { return }
             pending.workItem.cancel()
             if let savedURL = pending.savedURL {
-                self.deleteSavedFile(at: savedURL)
+                deleteSavedFile(at: savedURL)
             }
-            self.pendingSaves.removeValue(forKey: id)
+            pendingSaves.removeValue(forKey: id)
         }
     }
 
     func finalize(id: UUID) {
         queue.async { [weak self] in
-            guard let self = self, var pending = self.pendingSaves[id] else { return }
+            guard let self, var pending = pendingSaves[id] else { return }
             pending.workItem.cancel()
             if pending.savedURL == nil {
-                pending.savedURL = self.saveNow(pngData: pending.pngData, id: id)
+                pending.savedURL = saveNow(pngData: pending.pngData, id: id)
             }
-            self.pendingSaves.removeValue(forKey: id)
+            pendingSaves.removeValue(forKey: id)
         }
     }
 
     func markAutoDismissed(id: UUID) {
         queue.async { [weak self] in
-            guard let self = self, var pending = self.pendingSaves[id] else { return }
+            guard let self, var pending = pendingSaves[id] else { return }
             if pending.savedURL != nil {
-                self.pendingSaves.removeValue(forKey: id)
+                pendingSaves.removeValue(forKey: id)
             } else {
                 pending.releaseAfterSave = true
-                self.pendingSaves[id] = pending
+                pendingSaves[id] = pending
             }
         }
     }
@@ -104,7 +104,7 @@ final class OutputCoordinator {
     private func saveNow(pngData: Data, id: UUID) -> URL? {
         let directory = SaveLocationResolver.resolve(
             option: settings.saveLocationOption,
-            customPath: settings.customSavePath
+            customPath: settings.customSavePath,
         )
         let filename = FilenameFormatter.makeFilename(prefix: settings.filenamePrefix, date: dateProvider())
 

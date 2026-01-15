@@ -16,8 +16,8 @@ final class CaptureManager {
         guard ScreenCapturePermission.ensureAccess() else { return }
         NSApp.activate(ignoringOtherApps: true)
         selectionOverlay.beginSelection { [weak self] selection in
-            guard let self = self, let selection = selection else { return }
-            self.capture(rect: selection.rect, excludingWindowID: selection.excludeWindowID)
+            guard let self, let selection else { return }
+            capture(rect: selection.rect, excludingWindowID: selection.excludeWindowID)
         }
     }
 
@@ -33,9 +33,9 @@ final class CaptureManager {
         guard ScreenCapturePermission.ensureAccess() else { return }
         NSApp.activate(ignoringOtherApps: true)
         windowOverlay.beginSelection { [weak self] windowInfo in
-            guard let self = self, let windowInfo = windowInfo else { return }
+            guard let self, let windowInfo else { return }
             if let image = ScreenCaptureService.capture(windowID: windowInfo.id) {
-                self.handleCapture(image, displaySize: windowInfo.bounds.size, anchorRect: windowInfo.bounds)
+                handleCapture(image, displaySize: windowInfo.bounds.size, anchorRect: windowInfo.bounds)
             }
         }
     }
@@ -52,7 +52,7 @@ final class CaptureManager {
             let saveID = outputCoordinator.begin(pngData: captured.pngData)
             if settings.previewEnabled {
                 let replacementBehavior = settings.previewReplacementBehavior
-                previewController.show(
+                let request = PreviewRequest(
                     image: captured.previewImage,
                     pngData: captured.pngData,
                     filenamePrefix: settings.filenamePrefix,
@@ -64,19 +64,20 @@ final class CaptureManager {
                         self?.outputCoordinator.cancel(id: saveID)
                     },
                     onReplace: { [weak self] in
-                        guard let self = self else { return }
+                        guard let self else { return }
                         switch replacementBehavior {
                         case .saveImmediately:
-                            self.outputCoordinator.finalize(id: saveID)
+                            outputCoordinator.finalize(id: saveID)
                         case .discard:
-                            self.outputCoordinator.cancel(id: saveID)
+                            outputCoordinator.cancel(id: saveID)
                         }
                     },
                     onAutoDismiss: { [weak self] in
                         self?.outputCoordinator.markAutoDismissed(id: saveID)
                     },
-                    anchorRect: anchorRect
+                    anchorRect: anchorRect,
                 )
+                previewController.show(request)
             } else {
                 outputCoordinator.finalize(id: saveID)
             }

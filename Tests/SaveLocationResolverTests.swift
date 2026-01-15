@@ -46,7 +46,7 @@ final class SaveLocationResolverTests: XCTestCase {
 
     private func normalizedPath(_ url: URL) -> String {
         var path = url.standardizedFileURL.path
-        if path.hasSuffix("/") && path.count > 1 {
+        if path.hasSuffix("/"), path.count > 1 {
             path.removeLast()
         }
         return path

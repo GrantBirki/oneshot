@@ -24,12 +24,12 @@ final class AppController {
             onSettings: { [weak settingsWindowController] in settingsWindowController?.show() },
             onQuit: { NSApp.terminate(nil) },
             hotkeyProvider: { [weak settings] in
-                (
+                MenuBarController.HotkeyBindings(
                     selection: settings?.hotkeySelection ?? "",
                     fullScreen: settings?.hotkeyFullScreen ?? "",
-                    window: settings?.hotkeyWindow ?? ""
+                    window: settings?.hotkeyWindow ?? "",
                 )
-            }
+            },
         )
     }
 

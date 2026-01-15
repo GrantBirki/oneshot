@@ -14,10 +14,10 @@ enum FilenameFormatter {
         let absOffset = abs(offsetSeconds)
         let hours = absOffset / 3600
         let minutes = (absOffset % 3600) / 60
-        let tz = String(format: "%02d_%02d", hours, minutes)
+        let timeZoneOffset = String(format: "%02d_%02d", hours, minutes)
 
         let sanitizedPrefix = sanitizePrefix(prefix)
-        return "\(sanitizedPrefix)_\(timestamp)_\(sign)_\(tz).png"
+        return "\(sanitizedPrefix)_\(timestamp)_\(sign)_\(timeZoneOffset).png"
     }
 
     private static func sanitizePrefix(_ prefix: String) -> String {

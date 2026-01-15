@@ -10,7 +10,7 @@ enum ClipboardService {
         }
         pasteboard.declareTypes(types, owner: nil)
         pasteboard.setData(pngData, forType: .png)
-        if let tiffData = tiffData {
+        if let tiffData {
             pasteboard.setData(tiffData, forType: .tiff)
         }
     }

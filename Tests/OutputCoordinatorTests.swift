@@ -17,10 +17,10 @@ final class OutputCoordinatorTests: XCTestCase {
     }
 
     override func tearDown() {
-        if let tempDirectory = tempDirectory {
+        if let tempDirectory {
             try? FileManager.default.removeItem(at: tempDirectory)
         }
-        if let suiteName = suiteName {
+        if let suiteName {
             defaults.removePersistentDomain(forName: suiteName)
         }
         defaults = nil
@@ -47,7 +47,7 @@ final class OutputCoordinatorTests: XCTestCase {
             onSave: { _, url in
                 savedURL = url
                 saveExpectation.fulfill()
-            }
+            },
         )
 
         let pngData = Self.makePNGData()
@@ -82,7 +82,7 @@ final class OutputCoordinatorTests: XCTestCase {
             onSave: { _, url in
                 savedURL = url
                 saveExpectation.fulfill()
-            }
+            },
         )
 
         let id = coordinator.begin(pngData: Self.makePNGData())
@@ -113,7 +113,7 @@ final class OutputCoordinatorTests: XCTestCase {
             queue: queue,
             clipboardCopy: { data in
                 clipboardData = data
-            }
+            },
         )
 
         let id = coordinator.begin(pngData: pngData)
@@ -134,7 +134,7 @@ final class OutputCoordinatorTests: XCTestCase {
             isPlanar: false,
             colorSpaceName: .deviceRGB,
             bytesPerRow: 0,
-            bitsPerPixel: 0
+            bitsPerPixel: 0,
         )!
         return rep.representation(using: .png, properties: [:])!
     }

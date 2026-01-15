@@ -9,7 +9,7 @@ final class PreviewDragPayloadTests: XCTestCase {
         super.setUp()
         tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "oneshot-preview-drag-tests-\(UUID().uuidString)",
-            isDirectory: true
+            isDirectory: true,
         )
     }
 
@@ -31,7 +31,7 @@ final class PreviewDragPayloadTests: XCTestCase {
             pngData: pngData,
             filenamePrefix: "screenshot",
             baseDirectory: tempDirectory,
-            cleanupDelay: 60
+            cleanupDelay: 60,
         )
 
         guard let item = payload.makePasteboardItem() else {
@@ -64,7 +64,7 @@ final class PreviewDragPayloadTests: XCTestCase {
             pngData: pngData,
             filenamePrefix: "screenshot",
             baseDirectory: tempDirectory,
-            cleanupDelay: 60
+            cleanupDelay: 60,
         )
 
         guard let item = payload.makePasteboardItem(),
@@ -105,7 +105,7 @@ final class PreviewDragPayloadTests: XCTestCase {
             isPlanar: false,
             colorSpaceName: .deviceRGB,
             bytesPerRow: 0,
-            bitsPerPixel: 0
+            bitsPerPixel: 0,
         )!
     }
 }

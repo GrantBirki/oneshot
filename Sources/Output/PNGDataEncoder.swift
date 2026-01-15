@@ -9,12 +9,12 @@ enum PNGDataEncoder {
             data,
             UTType.png.identifier as CFString,
             1,
-            nil
+            nil,
         ) else {
             throw NSError(
                 domain: "OneShot.PNGDataEncoder",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Failed to create PNG destination."]
+                userInfo: [NSLocalizedDescriptionKey: "Failed to create PNG destination."],
             )
         }
 
@@ -23,7 +23,7 @@ enum PNGDataEncoder {
             throw NSError(
                 domain: "OneShot.PNGDataEncoder",
                 code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "Failed to finalize PNG data."]
+                userInfo: [NSLocalizedDescriptionKey: "Failed to finalize PNG data."],
             )
         }
 
@@ -38,7 +38,7 @@ enum PNGDataEncoder {
         throw NSError(
             domain: "OneShot.PNGDataEncoder",
             code: 3,
-            userInfo: [NSLocalizedDescriptionKey: "Failed to extract CGImage from NSImage."]
+            userInfo: [NSLocalizedDescriptionKey: "Failed to extract CGImage from NSImage."],
         )
     }
 

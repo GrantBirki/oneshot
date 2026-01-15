@@ -12,7 +12,7 @@ final class PreviewPanel: NSPanel {
         pngData: Data,
         filenamePrefix: String,
         onClose: @escaping () -> Void,
-        onTrash: @escaping () -> Void
+        onTrash: @escaping () -> Void,
     ) {
         let size = PreviewPanel.defaultSize()
         content = PreviewContentView(frame: NSRect(origin: .zero, size: size))
@@ -21,7 +21,7 @@ final class PreviewPanel: NSPanel {
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
-            defer: false
+            defer: false,
         )
 
         isFloatingPanel = true
@@ -37,7 +37,7 @@ final class PreviewPanel: NSPanel {
             pngData: pngData,
             filenamePrefix: filenamePrefix,
             onClose: onClose,
-            onTrash: onTrash
+            onTrash: onTrash,
         )
         contentView = content
     }
@@ -53,12 +53,12 @@ final class PreviewPanel: NSPanel {
         let padding = Layout.padding
         let availableSize = NSSize(
             width: max(safeFrame.width - padding * 2, 1),
-            height: max(safeFrame.height - padding * 2, 1)
+            height: max(safeFrame.height - padding * 2, 1),
         )
         let desiredSize = PreviewPanel.desiredSize(for: screen)
         let targetSize = NSSize(
             width: min(desiredSize.width, availableSize.width),
-            height: min(desiredSize.height, availableSize.height)
+            height: min(desiredSize.height, availableSize.height),
         )
         let contentRect = NSRect(origin: .zero, size: targetSize)
         content.frame = contentRect
@@ -67,7 +67,7 @@ final class PreviewPanel: NSPanel {
         let frame = frameRect(forContentRect: contentRect)
         var origin = CGPoint(
             x: safeFrame.maxX - frame.width - padding,
-            y: safeFrame.minY + padding
+            y: safeFrame.minY + padding,
         )
 
         let minX = safeFrame.minX + padding
@@ -101,12 +101,12 @@ final class PreviewPanel: NSPanel {
         }
         return NSSize(
             width: Layout.desiredPixelSize.width,
-            height: Layout.desiredPixelSize.height
+            height: Layout.desiredPixelSize.height,
         )
     }
 
     static func screen(for rect: CGRect?) -> NSScreen? {
-        guard let rect = rect else {
+        guard let rect else {
             return targetScreen()
         }
 
@@ -117,7 +117,7 @@ final class PreviewPanel: NSPanel {
             rect.intersection(lhs.frame).area < rect.intersection(rhs.frame).area
         }
 
-        if let best = best, rect.intersection(best.frame).area > 0 {
+        if let best, rect.intersection(best.frame).area > 0 {
             return best
         }
 
@@ -155,6 +155,14 @@ final class PreviewContentView: NSView {
         static let cornerRadius: CGFloat = 12
     }
 
+    private struct ActionButtonConfiguration {
+        let title: String
+        let textColor: NSColor
+        let backgroundColor: NSColor
+        let accessibilityLabel: String
+        let identifier: String
+    }
+
     private static let tempFileCleanupDelay: TimeInterval = 60
 
     private let backgroundView = NSVisualEffectView()
@@ -180,11 +188,13 @@ final class PreviewContentView: NSView {
 
         configureActionButton(
             closeButton,
-            title: "X",
-            textColor: .labelColor,
-            backgroundColor: .windowBackgroundColor,
-            accessibilityLabel: "Dismiss preview",
-            identifier: "preview-close"
+            configuration: ActionButtonConfiguration(
+                title: "X",
+                textColor: .labelColor,
+                backgroundColor: .windowBackgroundColor,
+                accessibilityLabel: "Dismiss preview",
+                identifier: "preview-close",
+            ),
         )
         closeButton.target = self
         closeButton.action = #selector(handleClose)
@@ -192,11 +202,13 @@ final class PreviewContentView: NSView {
 
         configureActionButton(
             trashButton,
-            title: "Del",
-            textColor: .white,
-            backgroundColor: .systemRed,
-            accessibilityLabel: "Delete screenshot",
-            identifier: "preview-trash"
+            configuration: ActionButtonConfiguration(
+                title: "Del",
+                textColor: .white,
+                backgroundColor: .systemRed,
+                accessibilityLabel: "Delete screenshot",
+                identifier: "preview-trash",
+            ),
         )
         trashButton.target = self
         trashButton.action = #selector(handleTrash)
@@ -204,7 +216,7 @@ final class PreviewContentView: NSView {
     }
 
     required init?(coder _: NSCoder) {
-        return nil
+        nil
     }
 
     override func layout() {
@@ -216,7 +228,7 @@ final class PreviewContentView: NSView {
             x: 0,
             y: 0,
             width: bounds.width,
-            height: imageHeight
+            height: imageHeight,
         )
         let buttonOriginY = imageHeight
         let buttonWidth = bounds.width / 2
@@ -224,13 +236,13 @@ final class PreviewContentView: NSView {
             x: 0,
             y: buttonOriginY,
             width: buttonWidth,
-            height: actionBarHeight
+            height: actionBarHeight,
         )
         trashButton.frame = NSRect(
             x: buttonWidth,
             y: buttonOriginY,
             width: bounds.width - buttonWidth,
-            height: actionBarHeight
+            height: actionBarHeight,
         )
     }
 
@@ -239,13 +251,13 @@ final class PreviewContentView: NSView {
         pngData: Data,
         filenamePrefix: String,
         onClose: @escaping () -> Void,
-        onTrash: @escaping () -> Void
+        onTrash: @escaping () -> Void,
     ) {
         imageView.image = image
         let payload = PreviewDragPayload(
             image: image,
             pngData: pngData,
-            filenamePrefix: filenamePrefix
+            filenamePrefix: filenamePrefix,
         )
         dragPayload = payload
         imageView.dragPayload = payload
@@ -286,22 +298,15 @@ final class PreviewContentView: NSView {
         onTrash?()
     }
 
-    private func configureActionButton(
-        _ button: NSButton,
-        title: String,
-        textColor: NSColor,
-        backgroundColor: NSColor,
-        accessibilityLabel: String,
-        identifier: String
-    ) {
+    private func configureActionButton(_ button: NSButton, configuration: ActionButtonConfiguration) {
         button.bezelStyle = .inline
         button.isBordered = false
         button.wantsLayer = true
-        button.layer?.backgroundColor = backgroundColor.cgColor
+        button.layer?.backgroundColor = configuration.backgroundColor.cgColor
         button.layer?.masksToBounds = true
-        button.attributedTitle = actionTitle(title, textColor: textColor)
-        button.setAccessibilityLabel(accessibilityLabel)
-        button.identifier = NSUserInterfaceItemIdentifier(identifier)
+        button.attributedTitle = actionTitle(configuration.title, textColor: configuration.textColor)
+        button.setAccessibilityLabel(configuration.accessibilityLabel)
+        button.identifier = NSUserInterfaceItemIdentifier(configuration.identifier)
     }
 
     private func actionTitle(_ title: String, textColor: NSColor) -> NSAttributedString {
@@ -343,7 +348,7 @@ final class PreviewImageView: NSImageView, NSDraggingSource {
     }
 
     func draggingSession(_: NSDraggingSession, sourceOperationMaskFor _: NSDraggingContext) -> NSDragOperation {
-        return .copy
+        .copy
     }
 
     func draggingSession(_: NSDraggingSession, endedAt _: NSPoint, operation _: NSDragOperation) {

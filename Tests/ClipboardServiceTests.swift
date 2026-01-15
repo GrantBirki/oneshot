@@ -25,7 +25,7 @@ final class ClipboardServiceTests: XCTestCase {
             isPlanar: false,
             colorSpaceName: .deviceRGB,
             bytesPerRow: 0,
-            bitsPerPixel: 0
+            bitsPerPixel: 0,
         )!
         return rep.representation(using: .png, properties: [:])!
     }

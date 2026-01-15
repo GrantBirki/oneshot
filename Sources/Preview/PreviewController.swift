@@ -1,47 +1,49 @@
 import AppKit
 
+struct PreviewRequest {
+    let image: NSImage
+    let pngData: Data
+    let filenamePrefix: String
+    let timeout: TimeInterval?
+    let onClose: () -> Void
+    let onTrash: () -> Void
+    let onReplace: () -> Void
+    let onAutoDismiss: (() -> Void)?
+    let anchorRect: CGRect?
+}
+
 final class PreviewController {
     private var panel: PreviewPanel?
     private var hideWorkItem: DispatchWorkItem?
     private var replaceAction: (() -> Void)?
 
-    func show(
-        image: NSImage,
-        pngData: Data,
-        filenamePrefix: String,
-        timeout: TimeInterval?,
-        onClose: @escaping () -> Void,
-        onTrash: @escaping () -> Void,
-        onReplace: @escaping () -> Void,
-        onAutoDismiss: (() -> Void)? = nil,
-        anchorRect: CGRect? = nil
-    ) {
+    func show(_ request: PreviewRequest) {
         dismissForReplacement()
         hideWorkItem?.cancel()
 
         let panel = PreviewPanel(
-            image: image,
-            pngData: pngData,
-            filenamePrefix: filenamePrefix,
+            image: request.image,
+            pngData: request.pngData,
+            filenamePrefix: request.filenamePrefix,
             onClose: { [weak self] in
-                onClose()
+                request.onClose()
                 self?.hide()
             },
             onTrash: { [weak self] in
-                onTrash()
+                request.onTrash()
                 self?.hide()
-            }
+            },
         )
-        panel.show(on: PreviewPanel.screen(for: anchorRect))
+        panel.show(on: PreviewPanel.screen(for: request.anchorRect))
         self.panel = panel
         replaceAction = { [weak self] in
-            onReplace()
+            request.onReplace()
             self?.hide()
         }
 
-        if let timeout = timeout, timeout > 0 {
+        if let timeout = request.timeout, timeout > 0 {
             let workItem = DispatchWorkItem { [weak self] in
-                onAutoDismiss?()
+                request.onAutoDismiss?()
                 self?.hide()
             }
             hideWorkItem = workItem

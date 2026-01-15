@@ -7,7 +7,9 @@ final class PreviewContentViewTests: XCTestCase {
         let view = PreviewContentView(frame: NSRect(x: 0, y: 0, width: 200, height: 120))
         view.layout()
 
-        guard let backgroundView = view.subviews.first(where: { $0 is NSVisualEffectView }) as? NSVisualEffectView else {
+        guard let backgroundView = view.subviews.first(
+            where: { $0 is NSVisualEffectView },
+        ) as? NSVisualEffectView else {
             XCTFail("Missing background view")
             return
         }

@@ -15,7 +15,7 @@ final class HotkeyManager {
         let id = nextID
         nextID += 1
 
-        var hotKeyID = EventHotKeyID(signature: HotkeyManager.signature, id: id)
+        let hotKeyID = EventHotKeyID(signature: HotkeyManager.signature, id: id)
         var hotKeyRef: EventHotKeyRef?
         let status = RegisterEventHotKey(
             hotkey.keyCode,
@@ -23,7 +23,7 @@ final class HotkeyManager {
             hotKeyID,
             GetApplicationEventTarget(),
             0,
-            &hotKeyRef
+            &hotKeyRef,
         )
 
         guard status == noErr, let ref = hotKeyRef else {
@@ -56,7 +56,7 @@ final class HotkeyManager {
             1,
             &eventType,
             selfPointer,
-            &eventHandlerRef
+            &eventHandlerRef,
         )
 
         if status != noErr {
@@ -71,7 +71,7 @@ final class HotkeyManager {
     private static let signature: OSType = 0x4F53_484B // "OSHK"
 
     private static let eventHandler: EventHandlerUPP = { _, eventRef, userData in
-        guard let eventRef = eventRef, let userData = userData else {
+        guard let eventRef, let userData else {
             return noErr
         }
 
@@ -83,7 +83,7 @@ final class HotkeyManager {
             nil,
             MemoryLayout<EventHotKeyID>.size,
             nil,
-            &hotKeyID
+            &hotKeyID,
         )
 
         if status == noErr, hotKeyID.signature == HotkeyManager.signature {

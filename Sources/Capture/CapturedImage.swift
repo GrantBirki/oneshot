@@ -7,7 +7,7 @@ struct CapturedImage {
     init(
         cgImage: CGImage,
         displaySize: NSSize,
-        encoder: (CGImage) throws -> Data = PNGDataEncoder.encode
+        encoder: (CGImage) throws -> Data = PNGDataEncoder.encode,
     ) throws {
         previewImage = NSImage(cgImage: cgImage, size: displaySize)
         pngData = try encoder(cgImage)
