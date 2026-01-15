@@ -19,3 +19,6 @@ jobs:
 
       - name: bootstrap
         run: script/bootstrap
+
+      - name: build
+        run: script/build
