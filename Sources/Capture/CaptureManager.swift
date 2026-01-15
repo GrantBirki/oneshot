@@ -78,7 +78,7 @@ final class CaptureManager {
                     anchorRect: anchorRect
                 )
             } else {
-                outputCoordinator.markAutoDismissed(id: saveID)
+                outputCoordinator.finalize(id: saveID)
             }
         } catch {
             NSLog("Failed to encode screenshot: \(error)")

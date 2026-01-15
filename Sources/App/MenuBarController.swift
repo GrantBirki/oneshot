@@ -5,7 +5,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let onCaptureSelection: () -> Void
     private let onCaptureFullScreen: () -> Void
     private let onCaptureWindow: () -> Void
-    private let onPreferences: () -> Void
+    private let onSettings: () -> Void
     private let onQuit: () -> Void
     private let hotkeyProvider: () -> (selection: String, fullScreen: String, window: String)
     private var menu: NSMenu?
@@ -17,14 +17,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         onCaptureSelection: @escaping () -> Void,
         onCaptureFullScreen: @escaping () -> Void,
         onCaptureWindow: @escaping () -> Void,
-        onPreferences: @escaping () -> Void,
+        onSettings: @escaping () -> Void,
         onQuit: @escaping () -> Void,
         hotkeyProvider: @escaping () -> (selection: String, fullScreen: String, window: String)
     ) {
         self.onCaptureSelection = onCaptureSelection
         self.onCaptureFullScreen = onCaptureFullScreen
         self.onCaptureWindow = onCaptureWindow
-        self.onPreferences = onPreferences
+        self.onSettings = onSettings
         self.onQuit = onQuit
         self.hotkeyProvider = hotkeyProvider
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -68,13 +68,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let preferencesItem = NSMenuItem(
-            title: "Preferences...",
-            action: #selector(openPreferences),
-            keyEquivalent: ","
+        let settingsItem = NSMenuItem(
+            title: "Settings...",
+            action: #selector(openSettings),
+            keyEquivalent: ""
         )
-        preferencesItem.target = self
-        menu.addItem(preferencesItem)
+        settingsItem.target = self
+        menu.addItem(settingsItem)
 
         menu.addItem(.separator())
 
@@ -149,8 +149,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         onCaptureFullScreen()
     }
 
-    @objc private func openPreferences() {
-        onPreferences()
+    @objc private func openSettings() {
+        onSettings()
     }
 
     @objc private func quit() {

@@ -6,7 +6,7 @@ final class AppController {
     private let hotkeyManager: HotkeyManager
     private let captureManager: CaptureManager
     private let menuBarController: MenuBarController
-    private let preferencesWindowController: PreferencesWindowController
+    private let settingsWindowController: SettingsWindowController
     private let launchAtLoginManager: LaunchAtLoginManager
     private var cancellables = Set<AnyCancellable>()
 
@@ -14,14 +14,14 @@ final class AppController {
         settings = SettingsStore()
         hotkeyManager = HotkeyManager()
         captureManager = CaptureManager(settings: settings)
-        preferencesWindowController = PreferencesWindowController(settings: settings)
+        settingsWindowController = SettingsWindowController(settings: settings)
         launchAtLoginManager = LaunchAtLoginManager()
 
         menuBarController = MenuBarController(
             onCaptureSelection: { [weak captureManager] in captureManager?.captureSelection() },
             onCaptureFullScreen: { [weak captureManager] in captureManager?.captureFullScreen() },
             onCaptureWindow: { [weak captureManager] in captureManager?.captureWindow() },
-            onPreferences: { [weak preferencesWindowController] in preferencesWindowController?.show() },
+            onSettings: { [weak settingsWindowController] in settingsWindowController?.show() },
             onQuit: { NSApp.terminate(nil) },
             hotkeyProvider: { [weak settings] in
                 (

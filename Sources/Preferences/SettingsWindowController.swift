@@ -1,12 +1,12 @@
 import Cocoa
 import SwiftUI
 
-final class PreferencesWindowController: NSWindowController {
+final class SettingsWindowController: NSWindowController {
     init(settings: SettingsStore) {
-        let view = PreferencesView(settings: settings)
+        let view = SettingsView(settings: settings)
         let hosting = NSHostingController(rootView: view)
         let window = NSWindow(contentViewController: hosting)
-        window.title = "OneShot Preferences"
+        window.title = "OneShot Settings"
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.setContentSize(NSSize(width: 560, height: 480))
         window.isReleasedWhenClosed = false

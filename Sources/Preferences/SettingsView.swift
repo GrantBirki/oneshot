@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-struct PreferencesView: View {
+struct SettingsView: View {
     @ObservedObject var settings: SettingsStore
 
     private let numberFormatter: NumberFormatter = {
@@ -45,17 +45,19 @@ struct PreferencesView: View {
                     }
                 }
 
-                LabeledContent("Save delay (seconds)") {
-                    TextField("", value: $settings.saveDelaySeconds, formatter: numberFormatter)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(maxWidth: 80)
-                }
             }
 
             Section("Preview") {
                 Toggle("Show floating preview", isOn: $settings.previewEnabled)
                 Toggle("Auto-dismiss preview", isOn: $settings.previewTimeoutEnabled)
                     .disabled(!settings.previewEnabled)
+                if settings.previewEnabled {
+                    LabeledContent("Save delay (seconds)") {
+                        TextField("", value: $settings.saveDelaySeconds, formatter: numberFormatter)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: 80)
+                    }
+                }
                 Picker("On new screenshot", selection: $settings.previewReplacementBehavior) {
                     ForEach(PreviewReplacementBehavior.allCases) { behavior in
                         Text(behavior.title)
@@ -65,12 +67,6 @@ struct PreferencesView: View {
                 }
                 .disabled(!settings.previewEnabled)
                 .help("Choose what happens to the current preview when a new screenshot is taken and the old preview is still visible.")
-                if settings.previewEnabled {
-                    Text(settings.previewTimeoutEnabled
-                        ? "Auto-dismiss uses the save delay in Output."
-                        : "Preview stays until you close or trash it.")
-                        .foregroundStyle(.secondary)
-                }
             }
 
             Section("Hotkeys") {
