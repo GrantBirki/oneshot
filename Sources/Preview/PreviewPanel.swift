@@ -122,9 +122,11 @@ final class PreviewPanel: NSPanel {
 
         if globalKeyMonitor == nil {
             globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-                guard let self else { return }
-                guard !NSApp.isActive else { return }
-                _ = handleKeyEvent(event)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    guard !NSApp.isActive else { return }
+                    _ = handleKeyEvent(event)
+                }
             }
         }
     }
