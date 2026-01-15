@@ -61,7 +61,10 @@ final class PreviewDragPayload {
 
     private func ensureFileURL() -> URL? {
         if let preparedFileURL {
-            return preparedFileURL
+            if fileManager.fileExists(atPath: preparedFileURL.path) {
+                return preparedFileURL
+            }
+            self.preparedFileURL = nil
         }
 
         do {
@@ -80,11 +83,12 @@ final class PreviewDragPayload {
         let fileURL = preparedFileURL
         let directoryURL = workingDirectory
         let manager = fileManager
-        let workItem = DispatchWorkItem {
+        let workItem = DispatchWorkItem { [weak self] in
             if let fileURL {
                 try? manager.removeItem(at: fileURL)
             }
             try? manager.removeItem(at: directoryURL)
+            self?.preparedFileURL = nil
         }
         cleanupWorkItem = workItem
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + cleanupDelay, execute: workItem)

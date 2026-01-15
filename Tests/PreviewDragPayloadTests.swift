@@ -53,6 +53,40 @@ final class PreviewDragPayloadTests: XCTestCase {
         XCTAssertTrue(item.types.contains(.png))
     }
 
+    func testPasteboardItemRecreatesFileWhenMissing() throws {
+        let cgImage = makeCGImage(width: 1, height: 1)
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: 1, height: 1))
+        let pngData = try PNGDataEncoder.encode(cgImage: cgImage)
+
+        let payload = PreviewDragPayload(
+            image: image,
+            pngData: pngData,
+            filenamePrefix: "screenshot",
+            baseDirectory: tempDirectory,
+            cleanupDelay: 60
+        )
+
+        guard let item = payload.makePasteboardItem(),
+              let fileURLString = item.string(forType: .fileURL),
+              let fileURL = URL(string: fileURLString) else {
+            XCTFail("Expected file URL from pasteboard item")
+            return
+        }
+
+        let parentDirectory = fileURL.deletingLastPathComponent()
+        try FileManager.default.removeItem(at: parentDirectory)
+
+        guard let recreatedItem = payload.makePasteboardItem(),
+              let recreatedURLString = recreatedItem.string(forType: .fileURL),
+              let recreatedURL = URL(string: recreatedURLString) else {
+            XCTFail("Expected recreated file URL from pasteboard item")
+            return
+        }
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recreatedURL.path))
+        XCTAssertTrue(recreatedURL.path.hasPrefix(tempDirectory.path))
+    }
+
     private func makeCGImage(width: Int, height: Int) -> CGImage {
         makeBitmapRep(width: width, height: height).cgImage!
     }
