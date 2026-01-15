@@ -51,6 +51,7 @@ final class CaptureManager {
             let captured = try CapturedImage(cgImage: image, displaySize: displaySize)
             let saveID = outputCoordinator.begin(pngData: captured.pngData)
             if settings.previewEnabled {
+                let replacementBehavior = settings.previewReplacementBehavior
                 previewController.show(
                     image: captured.previewImage,
                     pngData: captured.pngData,
@@ -61,6 +62,15 @@ final class CaptureManager {
                     },
                     onTrash: { [weak self] in
                         self?.outputCoordinator.cancel(id: saveID)
+                    },
+                    onReplace: { [weak self] in
+                        guard let self = self else { return }
+                        switch replacementBehavior {
+                        case .saveImmediately:
+                            self.outputCoordinator.finalize(id: saveID)
+                        case .discard:
+                            self.outputCoordinator.cancel(id: saveID)
+                        }
                     },
                     onAutoDismiss: { [weak self] in
                         self?.outputCoordinator.markAutoDismissed(id: saveID)

@@ -12,6 +12,7 @@ final class PreviewController {
         timeout: TimeInterval?,
         onClose: @escaping () -> Void,
         onTrash: @escaping () -> Void,
+        onReplace: @escaping () -> Void,
         onAutoDismiss: (() -> Void)? = nil,
         anchorRect: CGRect? = nil
     ) {
@@ -34,7 +35,7 @@ final class PreviewController {
         panel.show(on: PreviewPanel.screen(for: anchorRect))
         self.panel = panel
         replaceAction = { [weak self] in
-            onClose()
+            onReplace()
             self?.hide()
         }
 

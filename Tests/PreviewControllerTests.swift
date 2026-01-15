@@ -4,20 +4,21 @@ import XCTest
 
 final class PreviewControllerTests: XCTestCase {
     @MainActor
-    func testShowReplacesExistingPreviewByFinalizing() throws {
+    func testShowReplacesExistingPreviewByInvokingReplaceHandler() throws {
         let controller = PreviewController()
         let cgImage = makeCGImage(width: 1, height: 1)
         let image = NSImage(cgImage: cgImage, size: NSSize(width: 1, height: 1))
         let pngData = try PNGDataEncoder.encode(cgImage: cgImage)
 
-        var closeCount = 0
+        var replaceCount = 0
         controller.show(
             image: image,
             pngData: pngData,
             filenamePrefix: "screenshot",
             timeout: nil,
-            onClose: { closeCount += 1 },
+            onClose: {},
             onTrash: {},
+            onReplace: { replaceCount += 1 },
             onAutoDismiss: nil,
             anchorRect: nil
         )
@@ -29,11 +30,12 @@ final class PreviewControllerTests: XCTestCase {
             timeout: nil,
             onClose: {},
             onTrash: {},
+            onReplace: {},
             onAutoDismiss: nil,
             anchorRect: nil
         )
 
-        XCTAssertEqual(closeCount, 1)
+        XCTAssertEqual(replaceCount, 1)
         controller.hide()
     }
 

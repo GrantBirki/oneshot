@@ -56,6 +56,15 @@ struct PreferencesView: View {
                 Toggle("Show floating preview", isOn: $settings.previewEnabled)
                 Toggle("Auto-dismiss preview", isOn: $settings.previewTimeoutEnabled)
                     .disabled(!settings.previewEnabled)
+                Picker("On new screenshot", selection: $settings.previewReplacementBehavior) {
+                    ForEach(PreviewReplacementBehavior.allCases) { behavior in
+                        Text(behavior.title)
+                            .tag(behavior)
+                            .help(behavior.helpText)
+                    }
+                }
+                .disabled(!settings.previewEnabled)
+                .help("Choose what happens to the current preview when a new screenshot is taken and the old preview is still visible.")
                 if settings.previewEnabled {
                     Text(settings.previewTimeoutEnabled
                         ? "Auto-dismiss uses the save delay in Output."

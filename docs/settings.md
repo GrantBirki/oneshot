@@ -28,5 +28,6 @@ This document describes the preferences available in OneShot.
 - `Window`: Hotkey for window capture.
 
 Notes:
+
 - Use formats like `ctrl+p` or `ctrl+shift+p`.
 - Some hotkey changes require quitting and reopening OneShot.

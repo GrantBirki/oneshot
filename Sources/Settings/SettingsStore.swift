@@ -18,6 +18,31 @@ enum SaveLocationOption: String, CaseIterable, Identifiable {
     }
 }
 
+enum PreviewReplacementBehavior: String, CaseIterable, Identifiable {
+    case saveImmediately
+    case discard
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .saveImmediately:
+            return "Save previous capture"
+        case .discard:
+            return "Discard previous capture"
+        }
+    }
+
+    var helpText: String {
+        switch self {
+        case .saveImmediately:
+            return "Save the previous capture to disk immediately, then replace the preview."
+        case .discard:
+            return "Cancel the previous capture without saving, then replace the preview."
+        }
+    }
+}
+
 final class SettingsStore: ObservableObject {
     @Published var autoLaunchEnabled: Bool {
         didSet { defaults.set(autoLaunchEnabled, forKey: Keys.autoLaunchEnabled) }
@@ -33,6 +58,10 @@ final class SettingsStore: ObservableObject {
 
     @Published var previewEnabled: Bool {
         didSet { defaults.set(previewEnabled, forKey: Keys.previewEnabled) }
+    }
+
+    @Published var previewReplacementBehavior: PreviewReplacementBehavior {
+        didSet { defaults.set(previewReplacementBehavior.rawValue, forKey: Keys.previewReplacementBehavior) }
     }
 
     @Published var saveLocationOption: SaveLocationOption {
@@ -79,6 +108,8 @@ final class SettingsStore: ObservableObject {
         }
         previewTimeoutEnabled = defaults.object(forKey: Keys.previewTimeoutEnabled) as? Bool ?? true
         previewEnabled = defaults.object(forKey: Keys.previewEnabled) as? Bool ?? true
+        let replacementRaw = defaults.string(forKey: Keys.previewReplacementBehavior) ?? PreviewReplacementBehavior.saveImmediately.rawValue
+        previewReplacementBehavior = PreviewReplacementBehavior(rawValue: replacementRaw) ?? .saveImmediately
 
         let locationRaw = defaults.string(forKey: Keys.saveLocationOption) ?? SaveLocationOption.downloads.rawValue
         saveLocationOption = SaveLocationOption(rawValue: locationRaw) ?? .downloads
@@ -97,6 +128,7 @@ private enum Keys {
     static let saveDelaySeconds = "settings.saveDelaySeconds"
     static let previewTimeoutEnabled = "settings.previewTimeoutEnabled"
     static let previewEnabled = "settings.previewEnabled"
+    static let previewReplacementBehavior = "settings.previewReplacementBehavior"
     static let saveLocationOption = "settings.saveLocationOption"
     static let customSavePath = "settings.customSavePath"
     static let filenamePrefix = "settings.filenamePrefix"
