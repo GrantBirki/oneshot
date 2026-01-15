@@ -6,6 +6,8 @@ final class PreviewController {
 
     func show(
         image: NSImage,
+        pngData: Data,
+        filenamePrefix: String,
         timeout: TimeInterval?,
         onClose: @escaping () -> Void,
         onTrash: @escaping () -> Void,
@@ -16,6 +18,8 @@ final class PreviewController {
 
         let panel = PreviewPanel(
             image: image,
+            pngData: pngData,
+            filenamePrefix: filenamePrefix,
             onClose: { [weak self] in
                 onClose()
                 self?.hide()

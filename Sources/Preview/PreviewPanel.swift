@@ -7,7 +7,13 @@ final class PreviewPanel: NSPanel {
         static let desiredPixelSize = CGSize(width: 600, height: 500)
     }
 
-    init(image: NSImage, onClose: @escaping () -> Void, onTrash: @escaping () -> Void) {
+    init(
+        image: NSImage,
+        pngData: Data,
+        filenamePrefix: String,
+        onClose: @escaping () -> Void,
+        onTrash: @escaping () -> Void
+    ) {
         let size = PreviewPanel.defaultSize()
         content = PreviewContentView(frame: NSRect(origin: .zero, size: size))
         content.autoresizingMask = [.width, .height]
@@ -26,7 +32,13 @@ final class PreviewPanel: NSPanel {
         hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        content.configure(image: image, onClose: onClose, onTrash: onTrash)
+        content.configure(
+            image: image,
+            pngData: pngData,
+            filenamePrefix: filenamePrefix,
+            onClose: onClose,
+            onTrash: onTrash
+        )
         contentView = content
     }
 
@@ -148,6 +160,7 @@ final class PreviewContentView: NSView {
     private let imageView = PreviewImageView()
     private let closeButton = NSButton()
     private let trashButton = NSButton()
+    private var dragPayload: PreviewDragPayload?
     private var onClose: (() -> Void)?
     private var onTrash: (() -> Void)?
 
@@ -220,8 +233,21 @@ final class PreviewContentView: NSView {
         )
     }
 
-    func configure(image: NSImage, onClose: @escaping () -> Void, onTrash: @escaping () -> Void) {
+    func configure(
+        image: NSImage,
+        pngData: Data,
+        filenamePrefix: String,
+        onClose: @escaping () -> Void,
+        onTrash: @escaping () -> Void
+    ) {
         imageView.image = image
+        let payload = PreviewDragPayload(
+            image: image,
+            pngData: pngData,
+            filenamePrefix: filenamePrefix
+        )
+        dragPayload = payload
+        imageView.dragPayload = payload
         imageView.onOpen = { [weak self] in
             self?.openImage(image)
         }
@@ -291,6 +317,7 @@ final class PreviewContentView: NSView {
 
 final class PreviewImageView: NSImageView, NSDraggingSource {
     var onOpen: (() -> Void)?
+    var dragPayload: PreviewDragPayload?
     private var didDrag = false
     private var draggingSessionStarted = false
 
@@ -300,13 +327,11 @@ final class PreviewImageView: NSImageView, NSDraggingSource {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard !draggingSessionStarted, let image = image else { return }
+        guard !draggingSessionStarted, let payload = dragPayload else { return }
+        guard let draggingItem = payload.makeDraggingItem(dragFrame: bounds) else { return }
         didDrag = true
         draggingSessionStarted = true
 
-        let draggingItem = NSDraggingItem(pasteboardWriter: image)
-        let dragFrame = bounds
-        draggingItem.setDraggingFrame(dragFrame, contents: image)
         beginDraggingSession(with: [draggingItem], event: event, source: self)
     }
 
@@ -322,5 +347,6 @@ final class PreviewImageView: NSImageView, NSDraggingSource {
 
     func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
         draggingSessionStarted = false
+        dragPayload?.rescheduleCleanup()
     }
 }

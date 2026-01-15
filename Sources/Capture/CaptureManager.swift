@@ -53,6 +53,8 @@ final class CaptureManager {
             if settings.previewEnabled {
                 previewController.show(
                     image: captured.previewImage,
+                    pngData: captured.pngData,
+                    filenamePrefix: settings.filenamePrefix,
                     timeout: settings.previewTimeout,
                     onClose: { [weak self] in
                         self?.outputCoordinator.finalize(id: saveID)
