@@ -138,9 +138,8 @@ private extension CGRect {
 
 final class PreviewContentView: NSView {
     private enum Layout {
-        static let contentInset: CGFloat = 10
-        static let buttonInset: CGFloat = 8
-        static let buttonSize: CGFloat = 18
+        static let actionBarHeight: CGFloat = 28
+        static let actionFontSize: CGFloat = 12
         static let cornerRadius: CGFloat = 12
     }
     private static let tempFileCleanupDelay: TimeInterval = 60
@@ -165,20 +164,28 @@ final class PreviewContentView: NSView {
         imageView.imageScaling = .scaleProportionallyUpOrDown
         backgroundView.addSubview(imageView)
 
-        closeButton.bezelStyle = .inline
-        closeButton.isBordered = false
+        configureActionButton(
+            closeButton,
+            title: "X",
+            textColor: .labelColor,
+            backgroundColor: .windowBackgroundColor,
+            accessibilityLabel: "Dismiss preview",
+            identifier: "preview-close"
+        )
         closeButton.target = self
         closeButton.action = #selector(handleClose)
-        closeButton.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Close")
-        closeButton.contentTintColor = .secondaryLabelColor
         backgroundView.addSubview(closeButton)
 
-        trashButton.bezelStyle = .inline
-        trashButton.isBordered = false
+        configureActionButton(
+            trashButton,
+            title: "Del",
+            textColor: .white,
+            backgroundColor: .systemRed,
+            accessibilityLabel: "Delete screenshot",
+            identifier: "preview-trash"
+        )
         trashButton.target = self
         trashButton.action = #selector(handleTrash)
-        trashButton.image = NSImage(systemSymbolName: "trash.circle.fill", accessibilityDescription: "Trash")
-        trashButton.contentTintColor = .systemRed
         backgroundView.addSubview(trashButton)
     }
 
@@ -189,19 +196,27 @@ final class PreviewContentView: NSView {
     override func layout() {
         super.layout()
         backgroundView.frame = bounds
-        imageView.frame = bounds.insetBy(dx: Layout.contentInset, dy: Layout.contentInset)
-        let buttonOriginY = bounds.height - Layout.buttonInset - Layout.buttonSize
+        let actionBarHeight = Layout.actionBarHeight
+        let imageHeight = max(bounds.height - actionBarHeight, 0)
+        imageView.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: bounds.width,
+            height: imageHeight
+        )
+        let buttonOriginY = imageHeight
+        let buttonWidth = bounds.width / 2
         closeButton.frame = NSRect(
-            x: Layout.buttonInset,
+            x: 0,
             y: buttonOriginY,
-            width: Layout.buttonSize,
-            height: Layout.buttonSize
+            width: buttonWidth,
+            height: actionBarHeight
         )
         trashButton.frame = NSRect(
-            x: bounds.width - Layout.buttonInset - Layout.buttonSize,
+            x: buttonWidth,
             y: buttonOriginY,
-            width: Layout.buttonSize,
-            height: Layout.buttonSize
+            width: bounds.width - buttonWidth,
+            height: actionBarHeight
         )
     }
 
@@ -242,6 +257,35 @@ final class PreviewContentView: NSView {
 
     @objc private func handleTrash() {
         onTrash?()
+    }
+
+    private func configureActionButton(
+        _ button: NSButton,
+        title: String,
+        textColor: NSColor,
+        backgroundColor: NSColor,
+        accessibilityLabel: String,
+        identifier: String
+    ) {
+        button.bezelStyle = .inline
+        button.isBordered = false
+        button.wantsLayer = true
+        button.layer?.backgroundColor = backgroundColor.cgColor
+        button.layer?.masksToBounds = true
+        button.attributedTitle = actionTitle(title, textColor: textColor)
+        button.setAccessibilityLabel(accessibilityLabel)
+        button.identifier = NSUserInterfaceItemIdentifier(identifier)
+    }
+
+    private func actionTitle(_ title: String, textColor: NSColor) -> NSAttributedString {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: Layout.actionFontSize, weight: .semibold),
+            .foregroundColor: textColor,
+            .paragraphStyle: paragraphStyle
+        ]
+        return NSAttributedString(string: title, attributes: attributes)
     }
 }
 
