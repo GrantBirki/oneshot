@@ -30,7 +30,7 @@ This document outlines the specifications for version 0 (v0) of the OneShot macO
 ## App Surface
 
 - Menu-bar only app (no Dock icon).
-- Preferences/settings window (full window, not a popover).
+- Settings window (full window, not a popover).
 - User setting to enable/disable launch at login.
 - Auto-launch implementation: SMAppService.
 
@@ -41,7 +41,7 @@ This document outlines the specifications for version 0 (v0) of the OneShot macO
   - `ctrl+p` => drag selection capture. This is the default and golden path for capturing screenshots. At least for me personally!
   - `ctrl+shift+p` => full screen capture. I don't use this as much but I'm sure others do so we need it as a feature.
 - Default hotkey for window capture: TBD.
-- Hotkeys should be user-configurable in preferences.
+- Hotkeys should be user-configurable in settings.
 - No capture delay for v0 (always instant).
 - Use a custom selection overlay with CG APIs / ScreenCaptureKit for capture.
 
@@ -61,7 +61,7 @@ This document outlines the specifications for version 0 (v0) of the OneShot macO
 - If the delayed save timer completes, save to disk.
 - If the user clicks the trash icon before the delay completes, cancel the save.
 - Output format: PNG only for v0.
-- Save location should be configurable in preferences (desktop, downloads, documents, custom folder).
+- Save location should be configurable in settings (desktop, downloads, documents, custom folder).
 
 ## Filename Format
 

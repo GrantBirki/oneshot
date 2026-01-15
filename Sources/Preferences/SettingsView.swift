@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-struct PreferencesView: View {
+struct SettingsView: View {
     @ObservedObject var settings: SettingsStore
 
     private let numberFormatter: NumberFormatter = {

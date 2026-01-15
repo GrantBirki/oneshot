@@ -1,6 +1,6 @@
 # Settings
 
-This document describes the preferences available in OneShot.
+This document describes the settings available in OneShot.
 
 ## General
 
