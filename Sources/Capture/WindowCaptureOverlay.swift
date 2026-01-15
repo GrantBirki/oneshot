@@ -45,14 +45,14 @@ final class WindowCaptureOverlayView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        guard let window = window else { return }
+        guard let window else { return }
         let point = convert(event.locationInWindow, from: nil)
         let screenPoint = window.convertPoint(toScreen: point)
         updateHighlight(at: screenPoint)
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard let window = window else { return }
+        guard let window else { return }
         let point = convert(event.locationInWindow, from: nil)
         let screenPoint = window.convertPoint(toScreen: point)
         updateHighlight(at: screenPoint)
@@ -80,7 +80,7 @@ final class WindowCaptureOverlayView: NSView {
         NSColor.black.withAlphaComponent(0.25).setFill()
         dirtyRect.fill()
 
-        if let highlight = highlightedWindow?.bounds, let window = window {
+        if let highlight = highlightedWindow?.bounds, let window {
             let localRect = window.convertFromScreen(highlight)
             guard let context = NSGraphicsContext.current?.cgContext else { return }
             context.setBlendMode(.clear)
@@ -109,7 +109,7 @@ enum WindowInfoProvider {
     static func window(at point: CGPoint) -> WindowInfo? {
         guard let list = CGWindowListCopyWindowInfo(
             [.optionOnScreenOnly, .excludeDesktopElements],
-            kCGNullWindowID
+            kCGNullWindowID,
         ) as? [[String: Any]] else {
             return nil
         }

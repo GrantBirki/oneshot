@@ -10,10 +10,10 @@ enum SaveLocationOption: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .downloads: return "Downloads"
-        case .desktop: return "Desktop"
-        case .documents: return "Documents"
-        case .custom: return "Custom"
+        case .downloads: "Downloads"
+        case .desktop: "Desktop"
+        case .documents: "Documents"
+        case .custom: "Custom"
         }
     }
 }
@@ -27,18 +27,18 @@ enum PreviewReplacementBehavior: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .saveImmediately:
-            return "Save previous capture"
+            "Save previous capture"
         case .discard:
-            return "Discard previous capture"
+            "Discard previous capture"
         }
     }
 
     var helpText: String {
         switch self {
         case .saveImmediately:
-            return "Save the previous capture to disk immediately, then replace the preview."
+            "Save the previous capture to disk immediately, then replace the preview."
         case .discard:
-            return "Cancel the previous capture without saving, then replace the preview."
+            "Cancel the previous capture without saving, then replace the preview."
         }
     }
 }

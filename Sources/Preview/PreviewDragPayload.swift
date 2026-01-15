@@ -23,7 +23,7 @@ final class PreviewDragPayload {
         baseDirectory: URL? = nil,
         cleanupDelay: TimeInterval = Defaults.cleanupDelay,
         dateProvider: @escaping () -> Date = Date.init,
-        uuidProvider: @escaping () -> UUID = UUID.init
+        uuidProvider: @escaping () -> UUID = UUID.init,
     ) {
         self.image = image
         self.pngData = pngData

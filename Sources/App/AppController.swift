@@ -27,9 +27,9 @@ final class AppController {
                 MenuBarController.HotkeyBindings(
                     selection: settings?.hotkeySelection ?? "",
                     fullScreen: settings?.hotkeyFullScreen ?? "",
-                    window: settings?.hotkeyWindow ?? ""
+                    window: settings?.hotkeyWindow ?? "",
                 )
-            }
+            },
         )
     }
 

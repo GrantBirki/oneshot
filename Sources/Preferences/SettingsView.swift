@@ -67,7 +67,7 @@ struct SettingsView: View {
                 .disabled(!settings.previewEnabled)
                 .help(
                     "Choose what happens to the current preview when a new screenshot is taken " +
-                        "and the old preview is still visible."
+                        "and the old preview is still visible.",
                 )
             }
 
@@ -135,7 +135,7 @@ private struct FocusClearView: NSViewRepresentable {
             }
 
             monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
-                guard let self = self,
+                guard let self,
                       let view = self.view,
                       let window = view.window,
                       window == event.window,
@@ -145,7 +145,7 @@ private struct FocusClearView: NSViewRepresentable {
                 }
 
                 let point = contentView.convert(event.locationInWindow, from: nil)
-                if let hitView = contentView.hitTest(point), self.isTextInput(view: hitView) {
+                if let hitView = contentView.hitTest(point), isTextInput(view: hitView) {
                     return event
                 }
 

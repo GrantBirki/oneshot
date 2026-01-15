@@ -14,7 +14,7 @@ final class SettingsWindowController: NSWindowController {
     }
 
     required init?(coder _: NSCoder) {
-        return nil
+        nil
     }
 
     func show() {

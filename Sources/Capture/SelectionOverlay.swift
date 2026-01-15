@@ -59,7 +59,7 @@ final class SelectionOverlayView: NSView {
     }
 
     override func mouseUp(with _: NSEvent) {
-        guard let start = dragStart, let end = dragCurrent, let window = window else {
+        guard let start = dragStart, let end = dragCurrent, let window else {
             onCancel?()
             return
         }
@@ -70,7 +70,7 @@ final class SelectionOverlayView: NSView {
             x: min(startScreen.x, endScreen.x),
             y: min(startScreen.y, endScreen.y),
             width: abs(startScreen.x - endScreen.x),
-            height: abs(startScreen.y - endScreen.y)
+            height: abs(startScreen.y - endScreen.y),
         )
 
         if rect.width < 2 || rect.height < 2 {
@@ -113,7 +113,7 @@ final class SelectionOverlayView: NSView {
             x: min(start.x, current.x),
             y: min(start.y, current.y),
             width: abs(start.x - current.x),
-            height: abs(start.y - current.y)
+            height: abs(start.y - current.y),
         )
     }
 }
@@ -127,7 +127,7 @@ final class OverlayWindow: NSWindow {
             contentRect: contentRect,
             styleMask: .borderless,
             backing: .buffered,
-            defer: false
+            defer: false,
         )
         isOpaque = false
         backgroundColor = .clear

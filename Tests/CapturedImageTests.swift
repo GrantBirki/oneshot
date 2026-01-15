@@ -7,7 +7,7 @@ final class CapturedImageTests: XCTestCase {
         let cgImage = makeCGImage(width: 4, height: 4)
         let captured = try CapturedImage(
             cgImage: cgImage,
-            displaySize: NSSize(width: 2, height: 2)
+            displaySize: NSSize(width: 2, height: 2),
         )
 
         let decoded = NSBitmapImageRep(data: captured.pngData)
@@ -29,7 +29,7 @@ final class CapturedImageTests: XCTestCase {
             isPlanar: false,
             colorSpaceName: .deviceRGB,
             bytesPerRow: 0,
-            bitsPerPixel: 0
+            bitsPerPixel: 0,
         )!.cgImage!
     }
 }

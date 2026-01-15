@@ -32,7 +32,7 @@ final class PreviewController {
             onTrash: { [weak self] in
                 request.onTrash()
                 self?.hide()
-            }
+            },
         )
         panel.show(on: PreviewPanel.screen(for: request.anchorRect))
         self.panel = panel

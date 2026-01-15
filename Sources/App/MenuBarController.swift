@@ -25,7 +25,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         onCaptureWindow: @escaping () -> Void,
         onSettings: @escaping () -> Void,
         onQuit: @escaping () -> Void,
-        hotkeyProvider: @escaping () -> HotkeyBindings
+        hotkeyProvider: @escaping () -> HotkeyBindings,
     ) {
         self.onCaptureSelection = onCaptureSelection
         self.onCaptureFullScreen = onCaptureFullScreen
@@ -37,17 +37,17 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         selectionItem = NSMenuItem(
             title: "Capture Selection",
             action: #selector(captureSelection),
-            keyEquivalent: ""
+            keyEquivalent: "",
         )
         windowItem = NSMenuItem(
             title: "Capture Window",
             action: #selector(captureWindow),
-            keyEquivalent: ""
+            keyEquivalent: "",
         )
         fullScreenItem = NSMenuItem(
             title: "Capture Full Screen",
             action: #selector(captureFullScreen),
-            keyEquivalent: ""
+            keyEquivalent: "",
         )
         super.init()
 
@@ -89,7 +89,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let settingsItem = NSMenuItem(
             title: "Settings...",
             action: #selector(openSettings),
-            keyEquivalent: ""
+            keyEquivalent: "",
         )
         settingsItem.target = self
         menu.addItem(settingsItem)
@@ -99,7 +99,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let quitItem = NSMenuItem(
             title: "Quit OneShot",
             action: #selector(quit),
-            keyEquivalent: "q"
+            keyEquivalent: "q",
         )
         quitItem.target = self
         menu.addItem(quitItem)
@@ -112,7 +112,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         updateHotkeys(
             selection: values.selection,
             fullScreen: values.fullScreen,
-            window: values.window
+            window: values.window,
         )
     }
 

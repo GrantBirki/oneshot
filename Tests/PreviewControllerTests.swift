@@ -12,27 +12,31 @@ final class PreviewControllerTests: XCTestCase {
 
         var replaceCount = 0
         controller.show(
-            image: image,
-            pngData: pngData,
-            filenamePrefix: "screenshot",
-            timeout: nil,
-            onClose: {},
-            onTrash: {},
-            onReplace: { replaceCount += 1 },
-            onAutoDismiss: nil,
-            anchorRect: nil
+            PreviewRequest(
+                image: image,
+                pngData: pngData,
+                filenamePrefix: "screenshot",
+                timeout: nil,
+                onClose: {},
+                onTrash: {},
+                onReplace: { replaceCount += 1 },
+                onAutoDismiss: nil,
+                anchorRect: nil,
+            ),
         )
 
         controller.show(
-            image: image,
-            pngData: pngData,
-            filenamePrefix: "screenshot",
-            timeout: nil,
-            onClose: {},
-            onTrash: {},
-            onReplace: {},
-            onAutoDismiss: nil,
-            anchorRect: nil
+            PreviewRequest(
+                image: image,
+                pngData: pngData,
+                filenamePrefix: "screenshot",
+                timeout: nil,
+                onClose: {},
+                onTrash: {},
+                onReplace: {},
+                onAutoDismiss: nil,
+                anchorRect: nil,
+            ),
         )
 
         XCTAssertEqual(replaceCount, 1)
@@ -54,7 +58,7 @@ final class PreviewControllerTests: XCTestCase {
             isPlanar: false,
             colorSpaceName: .deviceRGB,
             bytesPerRow: 0,
-            bitsPerPixel: 0
+            bitsPerPixel: 0,
         )!
     }
 }

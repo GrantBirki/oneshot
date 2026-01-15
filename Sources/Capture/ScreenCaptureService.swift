@@ -6,7 +6,7 @@ enum ScreenCaptureService {
             CGRect.infinite,
             .optionOnScreenOnly,
             kCGNullWindowID,
-            [.bestResolution]
+            [.bestResolution],
         )
     }
 
@@ -18,7 +18,7 @@ enum ScreenCaptureService {
             captureRect,
             options,
             windowID,
-            [.bestResolution]
+            [.bestResolution],
         )
     }
 
@@ -27,7 +27,7 @@ enum ScreenCaptureService {
             .null,
             .optionIncludingWindow,
             windowID,
-            [.bestResolution]
+            [.bestResolution],
         )
     }
 
@@ -38,7 +38,7 @@ enum ScreenCaptureService {
             x: rect.origin.x,
             y: mainHeight - rect.origin.y - rect.height,
             width: rect.width,
-            height: rect.height
+            height: rect.height,
         )
     }
 }
