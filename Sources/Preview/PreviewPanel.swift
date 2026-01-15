@@ -561,7 +561,7 @@ final class PreviewContentView: NSView {
             actionOverlayView.animator().alphaValue = hovered ? 1 : 0
         } completionHandler: { [weak self] in
             guard let self else { return }
-            if !hovered {
+            if !isHovered {
                 actionOverlayView.isHidden = true
             }
         }

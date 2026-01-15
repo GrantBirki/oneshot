@@ -118,7 +118,8 @@ enum WindowInfoProvider {
 
         for info in list {
             guard let boundsDict = info[kCGWindowBounds as String] as? [String: CGFloat],
-                  let bounds = CGRect(dictionaryRepresentation: boundsDict as CFDictionary),
+                  let cgBounds = CGRect(dictionaryRepresentation: boundsDict as CFDictionary),
+                  let bounds = appKitBounds(for: cgBounds),
                   bounds.contains(point),
                   let windowID = info[kCGWindowNumber as String] as? CGWindowID,
                   let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
@@ -138,6 +139,43 @@ enum WindowInfoProvider {
             return WindowInfo(id: windowID, bounds: bounds)
         }
 
+        return nil
+    }
+
+    private static func appKitBounds(for cgBounds: CGRect) -> CGRect? {
+        guard let screen = screen(for: cgBounds),
+              let displayID = displayID(for: screen)
+        else {
+            return nil
+        }
+        let cgScreenFrame = CGDisplayBounds(displayID)
+        let localX = cgBounds.origin.x - cgScreenFrame.origin.x
+        let localY = cgBounds.origin.y - cgScreenFrame.origin.y
+        let flippedY = cgScreenFrame.height - localY - cgBounds.height
+        return CGRect(
+            x: screen.frame.origin.x + localX,
+            y: screen.frame.origin.y + flippedY,
+            width: cgBounds.width,
+            height: cgBounds.height,
+        )
+    }
+
+    private static func screen(for cgBounds: CGRect) -> NSScreen? {
+        let center = CGPoint(x: cgBounds.midX, y: cgBounds.midY)
+        for screen in NSScreen.screens {
+            guard let displayID = displayID(for: screen) else { continue }
+            if CGDisplayBounds(displayID).contains(center) {
+                return screen
+            }
+        }
+        return NSScreen.main ?? NSScreen.screens.first
+    }
+
+    private static func displayID(for screen: NSScreen) -> CGDirectDisplayID? {
+        let key = NSDeviceDescriptionKey("NSScreenNumber")
+        if let number = screen.deviceDescription[key] as? NSNumber {
+            return CGDirectDisplayID(number.uint32Value)
+        }
         return nil
     }
 }
