@@ -2,9 +2,9 @@ import Cocoa
 
 final class MenuBarController: NSObject, NSMenuDelegate {
     struct HotkeyBindings {
-        let selection: String
-        let fullScreen: String
-        let window: String
+        let selection: Hotkey?
+        let fullScreen: Hotkey?
+        let window: Hotkey?
     }
 
     private let statusItem: NSStatusItem
@@ -120,43 +120,23 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         refreshHotkeys()
     }
 
-    private func updateHotkeys(selection: String, fullScreen: String, window: String) {
+    private func updateHotkeys(selection: Hotkey?, fullScreen: Hotkey?, window: Hotkey?) {
         applyHotkey(selection, to: selectionItem)
         applyHotkey(fullScreen, to: fullScreenItem)
         applyHotkey(window, to: windowItem)
         menu?.update()
     }
 
-    private func applyHotkey(_ value: String, to item: NSMenuItem) {
-        guard let shortcut = MenuBarController.menuShortcut(from: value) else {
+    private func applyHotkey(_ value: Hotkey?, to item: NSMenuItem) {
+        guard let hotkey = value,
+              let keyEquivalent = HotkeyFormatter.keyEquivalent(for: hotkey.keyCode)
+        else {
             item.keyEquivalent = ""
             item.keyEquivalentModifierMask = []
             return
         }
-        item.keyEquivalent = shortcut.key
-        item.keyEquivalentModifierMask = shortcut.modifiers
-    }
-
-    private static func menuShortcut(from value: String) -> (key: String, modifiers: NSEvent.ModifierFlags)? {
-        guard let parsed = HotkeyStringParser.parse(value) else {
-            return nil
-        }
-
-        var modifiers: NSEvent.ModifierFlags = []
-        if parsed.modifiers.contains(.control) {
-            modifiers.insert(.control)
-        }
-        if parsed.modifiers.contains(.shift) {
-            modifiers.insert(.shift)
-        }
-        if parsed.modifiers.contains(.option) {
-            modifiers.insert(.option)
-        }
-        if parsed.modifiers.contains(.command) {
-            modifiers.insert(.command)
-        }
-
-        return (key: parsed.key, modifiers: modifiers)
+        item.keyEquivalent = keyEquivalent
+        item.keyEquivalentModifierMask = hotkey.modifiers
     }
 
     @objc private func captureSelection() {

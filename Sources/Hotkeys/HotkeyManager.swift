@@ -18,8 +18,8 @@ final class HotkeyManager {
         let hotKeyID = EventHotKeyID(signature: HotkeyManager.signature, id: id)
         var hotKeyRef: EventHotKeyRef?
         let status = RegisterEventHotKey(
-            hotkey.keyCode,
-            hotkey.modifiers,
+            hotkey.carbonKeyCode,
+            hotkey.carbonModifiers,
             hotKeyID,
             GetApplicationEventTarget(),
             0,
@@ -27,13 +27,13 @@ final class HotkeyManager {
         )
 
         guard status == noErr, let ref = hotKeyRef else {
-            NSLog("Hotkey registration failed (\(status)) for \(hotkey.display)")
+            NSLog("Hotkey registration failed (\(status)) for \(hotkey.displayString)")
             return
         }
 
         hotKeyRefs[id] = ref
         handlers[id] = handler
-        NSLog("Hotkey registered: \(hotkey.display)")
+        NSLog("Hotkey registered: \(hotkey.displayString)")
     }
 
     func unregisterAll() {

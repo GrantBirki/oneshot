@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 
 struct SettingsView: View {
@@ -72,21 +73,33 @@ struct SettingsView: View {
             }
 
             Section("Hotkeys") {
-                LabeledContent("Selection") {
-                    TextField("", text: $settings.hotkeySelection)
-                        .textFieldStyle(.roundedBorder)
-                }
-                LabeledContent("Full screen") {
-                    TextField("", text: $settings.hotkeyFullScreen)
-                        .textFieldStyle(.roundedBorder)
-                }
-                LabeledContent("Window") {
-                    TextField("", text: $settings.hotkeyWindow)
-                        .textFieldStyle(.roundedBorder)
-                }
-                Text("Use format like ctrl+p or ctrl+shift+p.")
+                HotkeyRecorderRow(
+                    title: "Selection",
+                    hotkey: $settings.hotkeySelection,
+                    conflictMessage: conflictMessage(
+                        for: settings.hotkeySelection,
+                        against: [settings.hotkeyFullScreen, settings.hotkeyWindow],
+                    ),
+                )
+                HotkeyRecorderRow(
+                    title: "Full screen",
+                    hotkey: $settings.hotkeyFullScreen,
+                    conflictMessage: conflictMessage(
+                        for: settings.hotkeyFullScreen,
+                        against: [settings.hotkeySelection, settings.hotkeyWindow],
+                    ),
+                )
+                HotkeyRecorderRow(
+                    title: "Window",
+                    hotkey: $settings.hotkeyWindow,
+                    conflictMessage: conflictMessage(
+                        for: settings.hotkeyWindow,
+                        against: [settings.hotkeySelection, settings.hotkeyFullScreen],
+                    ),
+                )
+                Text("Click a field and press the shortcut. Press Esc to cancel.")
                     .foregroundStyle(.secondary)
-                Text("Some hotkey changes require quitting and reopening OneShot.")
+                Text("Many hotkey changes require quitting and reopening OneShot for changes to take effect.")
                     .foregroundStyle(.secondary)
             }
         }
@@ -105,6 +118,57 @@ struct SettingsView: View {
 
         if panel.runModal() == .OK, let url = panel.url {
             settings.customSavePath = url.path
+        }
+    }
+
+    private func conflictMessage(for hotkey: Hotkey?, against others: [Hotkey?]) -> String? {
+        guard let hotkey, hotkey.isValid else {
+            return nil
+        }
+
+        if others.compactMap(\.self).contains(hotkey) {
+            return "This shortcut is already used by OneShot."
+        }
+
+        if SettingsView.reservedSystemHotkeys.contains(hotkey) {
+            return "This shortcut may conflict with system shortcuts."
+        }
+
+        return nil
+    }
+
+    private static let reservedSystemHotkeys: Set<Hotkey> = [
+        Hotkey(keyCode: UInt16(kVK_ANSI_3), modifiers: [.command, .shift]),
+        Hotkey(keyCode: UInt16(kVK_ANSI_4), modifiers: [.command, .shift]),
+        Hotkey(keyCode: UInt16(kVK_ANSI_5), modifiers: [.command, .shift]),
+        Hotkey(keyCode: UInt16(kVK_ANSI_6), modifiers: [.command, .shift]),
+        Hotkey(keyCode: UInt16(kVK_ANSI_3), modifiers: [.command, .shift, .control]),
+        Hotkey(keyCode: UInt16(kVK_ANSI_4), modifiers: [.command, .shift, .control]),
+    ]
+}
+
+private struct HotkeyRecorderRow: View {
+    let title: String
+    @Binding var hotkey: Hotkey?
+    let conflictMessage: String?
+
+    var body: some View {
+        LabeledContent(title) {
+            VStack(alignment: .leading, spacing: 4) {
+                HotkeyRecorder(
+                    hotkey: $hotkey,
+                    placeholder: "Type shortcut...",
+                    accessibilityLabel: "\(title) hotkey",
+                    showsConflict: conflictMessage != nil,
+                )
+                .frame(maxWidth: 200)
+
+                if let conflictMessage {
+                    Text(conflictMessage)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
         }
     }
 }
@@ -161,13 +225,13 @@ private struct FocusClearView: NSViewRepresentable {
         }
 
         private func isTextInput(view: NSView) -> Bool {
-            if view is NSTextView || view is NSTextField {
+            if view is NSTextView || view is NSTextField || view is HotkeyRecorderView {
                 return true
             }
 
             var current = view.superview
             while let currentView = current {
-                if currentView is NSTextField {
+                if currentView is NSTextField || currentView is HotkeyRecorderView {
                     return true
                 }
                 current = currentView.superview

@@ -42,7 +42,7 @@ enum HotkeyStringParser {
             }
         }
 
-        guard let key, KeyCodeMapper.keyCode(for: key) != nil else {
+        guard let key, HotkeyFormatter.keyCode(for: key) != nil else {
             return nil
         }
 

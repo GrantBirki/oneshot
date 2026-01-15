@@ -25,9 +25,9 @@ final class AppController {
             onQuit: { NSApp.terminate(nil) },
             hotkeyProvider: { [weak settings] in
                 MenuBarController.HotkeyBindings(
-                    selection: settings?.hotkeySelection ?? "",
-                    fullScreen: settings?.hotkeyFullScreen ?? "",
-                    window: settings?.hotkeyWindow ?? "",
+                    selection: settings?.hotkeySelection,
+                    fullScreen: settings?.hotkeyFullScreen,
+                    window: settings?.hotkeyWindow,
                 )
             },
         )
@@ -62,8 +62,8 @@ final class AppController {
     private func registerHotkeys() {
         hotkeyManager.unregisterAll()
 
-        if let selectionHotkey = HotkeyParser.parse(settings.hotkeySelection) {
-            NSLog("Registering selection hotkey: \(selectionHotkey.display)")
+        if let selectionHotkey = settings.hotkeySelection, selectionHotkey.isValid {
+            NSLog("Registering selection hotkey: \(selectionHotkey.displayString)")
             hotkeyManager.register(hotkey: selectionHotkey) { [weak self] in
                 self?.captureManager.captureSelection()
             }
@@ -71,8 +71,8 @@ final class AppController {
             NSLog("Selection hotkey not set or invalid")
         }
 
-        if let fullScreenHotkey = HotkeyParser.parse(settings.hotkeyFullScreen) {
-            NSLog("Registering full screen hotkey: \(fullScreenHotkey.display)")
+        if let fullScreenHotkey = settings.hotkeyFullScreen, fullScreenHotkey.isValid {
+            NSLog("Registering full screen hotkey: \(fullScreenHotkey.displayString)")
             hotkeyManager.register(hotkey: fullScreenHotkey) { [weak self] in
                 self?.captureManager.captureFullScreen()
             }
@@ -80,8 +80,8 @@ final class AppController {
             NSLog("Full screen hotkey not set or invalid")
         }
 
-        if let windowHotkey = HotkeyParser.parse(settings.hotkeyWindow) {
-            NSLog("Registering window hotkey: \(windowHotkey.display)")
+        if let windowHotkey = settings.hotkeyWindow, windowHotkey.isValid {
+            NSLog("Registering window hotkey: \(windowHotkey.displayString)")
             hotkeyManager.register(hotkey: windowHotkey) { [weak self] in
                 self?.captureManager.captureWindow()
             }

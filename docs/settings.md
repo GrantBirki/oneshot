@@ -31,5 +31,8 @@ When previews are disabled, screenshots are saved immediately and the save delay
 
 Notes:
 
-- Use formats like `ctrl+p` or `ctrl+shift+p`.
+- Click a field and press the shortcut you want to record.
+- Press `Esc` to cancel recording and keep the previous shortcut.
+- Use the clear button (or Delete while recording) to set the shortcut to `None`.
+- A warning appears if the shortcut may conflict with system shortcuts.
 - Some hotkey changes require quitting and reopening OneShot.

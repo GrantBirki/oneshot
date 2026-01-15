@@ -1,3 +1,4 @@
+import AppKit
 import Carbon.HIToolbox
 @testable import OneShot
 import XCTest
@@ -6,23 +7,15 @@ final class HotkeyParserTests: XCTestCase {
     func testParsesControlKey() {
         let hotkey = HotkeyParser.parse("ctrl+p")
         XCTAssertNotNil(hotkey)
-        XCTAssertEqual(hotkey?.keyCode, 35)
-        guard let modifiers = hotkey?.modifiers else {
-            XCTFail("Missing modifiers")
-            return
-        }
-        XCTAssertEqual(modifiers & UInt32(controlKey), UInt32(controlKey))
+        XCTAssertEqual(hotkey?.keyCode, UInt16(kVK_ANSI_P))
+        XCTAssertTrue(hotkey?.modifiers.contains(.control) ?? false)
     }
 
     func testParsesMultipleModifiers() {
         let hotkey = HotkeyParser.parse("ctrl+shift+p")
         XCTAssertNotNil(hotkey)
-        guard let modifiers = hotkey?.modifiers else {
-            XCTFail("Missing modifiers")
-            return
-        }
-        XCTAssertEqual(modifiers & UInt32(shiftKey), UInt32(shiftKey))
-        XCTAssertEqual(modifiers & UInt32(controlKey), UInt32(controlKey))
+        XCTAssertTrue(hotkey?.modifiers.contains(.shift) ?? false)
+        XCTAssertTrue(hotkey?.modifiers.contains(.control) ?? false)
     }
 
     func testInvalidHotkeyReturnsNil() {

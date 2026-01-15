@@ -1,3 +1,5 @@
+import AppKit
+import Carbon.HIToolbox
 import Foundation
 
 enum SaveLocationOption: String, CaseIterable, Identifiable {
@@ -76,16 +78,34 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(filenamePrefix, forKey: Keys.filenamePrefix) }
     }
 
-    @Published var hotkeySelection: String {
-        didSet { defaults.set(hotkeySelection, forKey: Keys.hotkeySelection) }
+    @Published var hotkeySelection: Hotkey? {
+        didSet {
+            persistHotkey(
+                hotkeySelection,
+                keyCodeKey: Keys.hotkeySelectionKeyCode,
+                modifiersKey: Keys.hotkeySelectionModifiers,
+            )
+        }
     }
 
-    @Published var hotkeyFullScreen: String {
-        didSet { defaults.set(hotkeyFullScreen, forKey: Keys.hotkeyFullScreen) }
+    @Published var hotkeyFullScreen: Hotkey? {
+        didSet {
+            persistHotkey(
+                hotkeyFullScreen,
+                keyCodeKey: Keys.hotkeyFullScreenKeyCode,
+                modifiersKey: Keys.hotkeyFullScreenModifiers,
+            )
+        }
     }
 
-    @Published var hotkeyWindow: String {
-        didSet { defaults.set(hotkeyWindow, forKey: Keys.hotkeyWindow) }
+    @Published var hotkeyWindow: Hotkey? {
+        didSet {
+            persistHotkey(
+                hotkeyWindow,
+                keyCodeKey: Keys.hotkeyWindowKeyCode,
+                modifiersKey: Keys.hotkeyWindowModifiers,
+            )
+        }
     }
 
     var previewTimeout: TimeInterval? {
@@ -118,10 +138,99 @@ final class SettingsStore: ObservableObject {
         customSavePath = defaults.string(forKey: Keys.customSavePath) ?? ""
         filenamePrefix = defaults.string(forKey: Keys.filenamePrefix) ?? "screenshot"
 
-        hotkeySelection = defaults.string(forKey: Keys.hotkeySelection) ?? "ctrl+p"
-        hotkeyFullScreen = defaults.string(forKey: Keys.hotkeyFullScreen) ?? "ctrl+shift+p"
-        hotkeyWindow = defaults.string(forKey: Keys.hotkeyWindow) ?? ""
+        hotkeySelection = loadHotkey(
+            keyCodeKey: Keys.hotkeySelectionKeyCode,
+            modifiersKey: Keys.hotkeySelectionModifiers,
+            legacyKey: LegacyKeys.hotkeySelection,
+            defaultValue: SettingsStore.defaultHotkeySelection,
+        )
+        hotkeyFullScreen = loadHotkey(
+            keyCodeKey: Keys.hotkeyFullScreenKeyCode,
+            modifiersKey: Keys.hotkeyFullScreenModifiers,
+            legacyKey: LegacyKeys.hotkeyFullScreen,
+            defaultValue: SettingsStore.defaultHotkeyFullScreen,
+        )
+        hotkeyWindow = loadHotkey(
+            keyCodeKey: Keys.hotkeyWindowKeyCode,
+            modifiersKey: Keys.hotkeyWindowModifiers,
+            legacyKey: LegacyKeys.hotkeyWindow,
+            defaultValue: nil,
+        )
     }
+
+    private func loadHotkey(
+        keyCodeKey: String,
+        modifiersKey: String,
+        legacyKey: String?,
+        defaultValue: Hotkey?,
+    ) -> Hotkey? {
+        if defaults.object(forKey: keyCodeKey) != nil {
+            return storedHotkey(keyCodeKey: keyCodeKey, modifiersKey: modifiersKey)
+        }
+
+        if let legacyKey, let legacyValue = defaults.string(forKey: legacyKey) {
+            let parsed = HotkeyParser.parse(legacyValue)
+            defaults.removeObject(forKey: legacyKey)
+            if let parsed {
+                persistHotkey(parsed, keyCodeKey: keyCodeKey, modifiersKey: modifiersKey)
+                return parsed
+            }
+        }
+
+        return defaultValue
+    }
+
+    private func storedHotkey(keyCodeKey: String, modifiersKey: String) -> Hotkey? {
+        guard let keyCodeValue = defaults.object(forKey: keyCodeKey) else {
+            return nil
+        }
+
+        let keyCodeInt = if let intValue = keyCodeValue as? Int {
+            intValue
+        } else if let uintValue = keyCodeValue as? UInt {
+            Int(uintValue)
+        } else {
+            defaults.integer(forKey: keyCodeKey)
+        }
+
+        if keyCodeInt < 0 || keyCodeInt > Int(UInt16.max) {
+            return nil
+        }
+
+        let keyCode = UInt16(keyCodeInt)
+        let rawValue = modifierRawValue(forKey: modifiersKey)
+        return Hotkey(keyCode: keyCode, modifiers: NSEvent.ModifierFlags(rawValue: rawValue))
+    }
+
+    private func modifierRawValue(forKey key: String) -> UInt {
+        if let value = defaults.object(forKey: key) as? UInt {
+            return value
+        }
+        if let value = defaults.object(forKey: key) as? Int {
+            return UInt(value)
+        }
+        return UInt(defaults.integer(forKey: key))
+    }
+
+    private func persistHotkey(_ hotkey: Hotkey?, keyCodeKey: String, modifiersKey: String) {
+        if let hotkey {
+            defaults.set(Int(hotkey.keyCode), forKey: keyCodeKey)
+            defaults.set(Int(hotkey.modifiers.rawValue), forKey: modifiersKey)
+        } else {
+            defaults.set(SettingsStore.unsetKeyCodeSentinel, forKey: keyCodeKey)
+            defaults.set(0, forKey: modifiersKey)
+        }
+    }
+
+    private static let unsetKeyCodeSentinel = -1
+    private static let defaultHotkeySelection = Hotkey(
+        keyCode: UInt16(kVK_ANSI_P),
+        modifiers: [.control],
+    )
+    private static let defaultHotkeyFullScreen = Hotkey(
+        keyCode: UInt16(kVK_ANSI_P),
+        modifiers: [.control, .shift],
+    )
 }
 
 private enum Keys {
@@ -133,11 +242,17 @@ private enum Keys {
     static let saveLocationOption = "settings.saveLocationOption"
     static let customSavePath = "settings.customSavePath"
     static let filenamePrefix = "settings.filenamePrefix"
-    static let hotkeySelection = "settings.hotkeySelection"
-    static let hotkeyFullScreen = "settings.hotkeyFullScreen"
-    static let hotkeyWindow = "settings.hotkeyWindow"
+    static let hotkeySelectionKeyCode = "settings.hotkeySelection.keyCode"
+    static let hotkeySelectionModifiers = "settings.hotkeySelection.modifiers"
+    static let hotkeyFullScreenKeyCode = "settings.hotkeyFullScreen.keyCode"
+    static let hotkeyFullScreenModifiers = "settings.hotkeyFullScreen.modifiers"
+    static let hotkeyWindowKeyCode = "settings.hotkeyWindow.keyCode"
+    static let hotkeyWindowModifiers = "settings.hotkeyWindow.modifiers"
 }
 
 private enum LegacyKeys {
     static let previewTimeoutSeconds = "settings.previewTimeoutSeconds"
+    static let hotkeySelection = "settings.hotkeySelection"
+    static let hotkeyFullScreen = "settings.hotkeyFullScreen"
+    static let hotkeyWindow = "settings.hotkeyWindow"
 }

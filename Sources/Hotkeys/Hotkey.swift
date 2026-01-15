@@ -1,50 +1,112 @@
+import AppKit
 import Carbon.HIToolbox
 import Foundation
 
-struct Hotkey: Equatable {
-    let keyCode: UInt32
-    let modifiers: UInt32
-    let display: String
+struct Hotkey: Codable, Equatable, Hashable {
+    let keyCode: UInt16
+    let modifiers: NSEvent.ModifierFlags
+
+    init(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
+        self.keyCode = keyCode
+        self.modifiers = Hotkey.normalizedModifiers(modifiers)
+    }
+
+    var displayString: String {
+        HotkeyFormatter.displayString(keyCode: keyCode, modifiers: modifiers) ?? "?"
+    }
+
+    var isValid: Bool {
+        HotkeyFormatter.keyString(for: keyCode) != nil
+    }
+
+    var carbonKeyCode: UInt32 {
+        UInt32(keyCode)
+    }
+
+    var carbonModifiers: UInt32 {
+        var mask: UInt32 = 0
+        if modifiers.contains(.control) {
+            mask |= UInt32(controlKey)
+        }
+        if modifiers.contains(.shift) {
+            mask |= UInt32(shiftKey)
+        }
+        if modifiers.contains(.option) {
+            mask |= UInt32(optionKey)
+        }
+        if modifiers.contains(.command) {
+            mask |= UInt32(cmdKey)
+        }
+        return mask
+    }
+
+    static func normalizedModifiers(_ flags: NSEvent.ModifierFlags) -> NSEvent.ModifierFlags {
+        var normalized: NSEvent.ModifierFlags = []
+        if flags.contains(.command) {
+            normalized.insert(.command)
+        }
+        if flags.contains(.control) {
+            normalized.insert(.control)
+        }
+        if flags.contains(.option) {
+            normalized.insert(.option)
+        }
+        if flags.contains(.shift) {
+            normalized.insert(.shift)
+        }
+        return normalized
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case keyCode
+        case modifiers
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        keyCode = try container.decode(UInt16.self, forKey: .keyCode)
+        let rawValue = try container.decode(UInt.self, forKey: .modifiers)
+        modifiers = Hotkey.normalizedModifiers(NSEvent.ModifierFlags(rawValue: rawValue))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(keyCode, forKey: .keyCode)
+        try container.encode(modifiers.rawValue, forKey: .modifiers)
+    }
+
+    static func == (lhs: Hotkey, rhs: Hotkey) -> Bool {
+        lhs.keyCode == rhs.keyCode && lhs.modifiers.rawValue == rhs.modifiers.rawValue
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(keyCode)
+        hasher.combine(modifiers.rawValue)
+    }
 }
 
 enum HotkeyParser {
     static func parse(_ string: String) -> Hotkey? {
         guard let parsed = HotkeyStringParser.parse(string),
-              let keyCode = KeyCodeMapper.keyCode(for: parsed.key)
+              let keyCode = HotkeyFormatter.keyCode(for: parsed.key)
         else {
             return nil
         }
 
-        var modifiers: UInt32 = 0
+        var modifiers: NSEvent.ModifierFlags = []
         if parsed.modifiers.contains(.control) {
-            modifiers |= UInt32(controlKey)
+            modifiers.insert(.control)
         }
         if parsed.modifiers.contains(.shift) {
-            modifiers |= UInt32(shiftKey)
+            modifiers.insert(.shift)
         }
         if parsed.modifiers.contains(.option) {
-            modifiers |= UInt32(optionKey)
+            modifiers.insert(.option)
         }
         if parsed.modifiers.contains(.command) {
-            modifiers |= UInt32(cmdKey)
+            modifiers.insert(.command)
         }
 
-        return Hotkey(keyCode: keyCode, modifiers: modifiers, display: parsed.normalized)
-    }
-}
-
-enum KeyCodeMapper {
-    private static let mapping: [String: UInt32] = [
-        "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7,
-        "c": 8, "v": 9, "b": 11, "q": 12, "w": 13, "e": 14, "r": 15,
-        "y": 16, "t": 17, "1": 18, "2": 19, "3": 20, "4": 21, "6": 22,
-        "5": 23, "=": 24, "9": 25, "7": 26, "-": 27, "8": 28, "0": 29,
-        "]": 30, "o": 31, "u": 32, "[": 33, "i": 34, "p": 35, "l": 37,
-        "j": 38, "'": 39, "k": 40, ";": 41, "\\": 42, ",": 43, "/": 44,
-        "n": 45, "m": 46, ".": 47, "`": 50,
-    ]
-
-    static func keyCode(for key: String) -> UInt32? {
-        mapping[key]
+        return Hotkey(keyCode: keyCode, modifiers: modifiers)
     }
 }

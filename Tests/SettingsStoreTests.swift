@@ -26,8 +26,9 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.previewReplacementBehavior, .saveImmediately)
         XCTAssertEqual(settings.saveLocationOption, .downloads)
         XCTAssertEqual(settings.filenamePrefix, "screenshot")
-        XCTAssertEqual(settings.hotkeySelection, "ctrl+p")
-        XCTAssertEqual(settings.hotkeyFullScreen, "ctrl+shift+p")
+        XCTAssertEqual(settings.hotkeySelection, HotkeyParser.parse("ctrl+p"))
+        XCTAssertEqual(settings.hotkeyFullScreen, HotkeyParser.parse("ctrl+shift+p"))
+        XCTAssertNil(settings.hotkeyWindow)
     }
 
     func testValuesPersistToDefaults() {
@@ -40,9 +41,9 @@ final class SettingsStoreTests: XCTestCase {
         settings.saveLocationOption = .desktop
         settings.customSavePath = "/tmp"
         settings.filenamePrefix = "grab"
-        settings.hotkeySelection = "ctrl+z"
-        settings.hotkeyFullScreen = "ctrl+shift+z"
-        settings.hotkeyWindow = "ctrl+w"
+        settings.hotkeySelection = HotkeyParser.parse("ctrl+z")
+        settings.hotkeyFullScreen = HotkeyParser.parse("ctrl+shift+z")
+        settings.hotkeyWindow = HotkeyParser.parse("ctrl+w")
 
         settings = SettingsStore(defaults: defaults)
         XCTAssertTrue(settings.autoLaunchEnabled)
@@ -54,9 +55,9 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.saveLocationOption, .desktop)
         XCTAssertEqual(settings.customSavePath, "/tmp")
         XCTAssertEqual(settings.filenamePrefix, "grab")
-        XCTAssertEqual(settings.hotkeySelection, "ctrl+z")
-        XCTAssertEqual(settings.hotkeyFullScreen, "ctrl+shift+z")
-        XCTAssertEqual(settings.hotkeyWindow, "ctrl+w")
+        XCTAssertEqual(settings.hotkeySelection, HotkeyParser.parse("ctrl+z"))
+        XCTAssertEqual(settings.hotkeyFullScreen, HotkeyParser.parse("ctrl+shift+z"))
+        XCTAssertEqual(settings.hotkeyWindow, HotkeyParser.parse("ctrl+w"))
     }
 
     func testPreviewTimeoutUsesSaveDelay() {
@@ -64,5 +65,13 @@ final class SettingsStoreTests: XCTestCase {
         settings.saveDelaySeconds = 5
         settings.previewTimeoutEnabled = true
         XCTAssertEqual(settings.previewTimeout, 5)
+    }
+
+    func testClearingHotkeyPersists() {
+        var settings = SettingsStore(defaults: defaults)
+        settings.hotkeySelection = nil
+
+        settings = SettingsStore(defaults: defaults)
+        XCTAssertNil(settings.hotkeySelection)
     }
 }
