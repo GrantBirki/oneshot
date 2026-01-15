@@ -13,7 +13,7 @@ final class PreferencesWindowController: NSWindowController {
         super.init(window: window)
     }
 
-    required init?(coder: NSCoder) {
+    required init?(coder _: NSCoder) {
         return nil
     }
 

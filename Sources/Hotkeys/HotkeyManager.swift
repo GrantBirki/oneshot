@@ -1,5 +1,5 @@
-import Foundation
 import Carbon.HIToolbox
+import Foundation
 
 final class HotkeyManager {
     private var hotKeyRefs: [UInt32: EventHotKeyRef] = [:]
@@ -68,7 +68,7 @@ final class HotkeyManager {
         handlers[id]?()
     }
 
-    private static let signature: OSType = 0x4F53484B // "OSHK"
+    private static let signature: OSType = 0x4F53_484B // "OSHK"
 
     private static let eventHandler: EventHandlerUPP = { _, eventRef, userData in
         guard let eventRef = eventRef, let userData = userData else {

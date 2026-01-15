@@ -45,7 +45,8 @@ enum PNGDataEncoder {
     private static func bestCGImage(from image: NSImage) -> CGImage? {
         let bitmapReps = image.representations.compactMap { $0 as? NSBitmapImageRep }
         if let bestRep = bitmapReps.max(by: { $0.pixelsWide * $0.pixelsHigh < $1.pixelsWide * $1.pixelsHigh }),
-           let cgImage = bestRep.cgImage {
+           let cgImage = bestRep.cgImage
+        {
             return cgImage
         }
 

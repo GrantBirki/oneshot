@@ -1,6 +1,6 @@
 import AppKit
-import XCTest
 @testable import OneShot
+import XCTest
 
 final class PreviewDragPayloadTests: XCTestCase {
     private var tempDirectory: URL!
@@ -40,7 +40,8 @@ final class PreviewDragPayloadTests: XCTestCase {
         }
 
         guard let fileURLString = item.string(forType: .fileURL),
-              let fileURL = URL(string: fileURLString) else {
+              let fileURL = URL(string: fileURLString)
+        else {
             XCTFail("Expected file URL on pasteboard item")
             return
         }
@@ -68,7 +69,8 @@ final class PreviewDragPayloadTests: XCTestCase {
 
         guard let item = payload.makePasteboardItem(),
               let fileURLString = item.string(forType: .fileURL),
-              let fileURL = URL(string: fileURLString) else {
+              let fileURL = URL(string: fileURLString)
+        else {
             XCTFail("Expected file URL from pasteboard item")
             return
         }
@@ -78,7 +80,8 @@ final class PreviewDragPayloadTests: XCTestCase {
 
         guard let recreatedItem = payload.makePasteboardItem(),
               let recreatedURLString = recreatedItem.string(forType: .fileURL),
-              let recreatedURL = URL(string: recreatedURLString) else {
+              let recreatedURL = URL(string: recreatedURLString)
+        else {
             XCTFail("Expected recreated file URL from pasteboard item")
             return
         }

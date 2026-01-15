@@ -1,6 +1,6 @@
 import AppKit
-import XCTest
 @testable import OneShot
+import XCTest
 
 final class PNGDataEncoderTests: XCTestCase {
     func testEncodeCGImageProducesPNGData() throws {

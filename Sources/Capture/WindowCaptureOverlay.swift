@@ -58,7 +58,7 @@ final class WindowCaptureOverlayView: NSView {
         updateHighlight(at: screenPoint)
     }
 
-    override func mouseUp(with event: NSEvent) {
+    override func mouseUp(with _: NSEvent) {
         if let windowInfo = highlightedWindow {
             onSelection?(windowInfo)
         } else {
@@ -72,7 +72,7 @@ final class WindowCaptureOverlayView: NSView {
         }
     }
 
-    override func cancelOperation(_ sender: Any?) {
+    override func cancelOperation(_: Any?) {
         onCancel?()
     }
 
@@ -122,7 +122,8 @@ enum WindowInfoProvider {
                   bounds.contains(point),
                   let windowID = info[kCGWindowNumber as String] as? CGWindowID,
                   let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
-                  ownerPID != currentPID else {
+                  ownerPID != currentPID
+            else {
                 continue
             }
 

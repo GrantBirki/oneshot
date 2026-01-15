@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct PreferencesView: View {
     @ObservedObject var settings: SettingsStore
@@ -69,7 +69,7 @@ struct PreferencesView: View {
                     Text(settings.previewTimeoutEnabled
                         ? "Auto-dismiss uses the save delay in Output."
                         : "Preview stays until you close or trash it.")
-                    .foregroundStyle(.secondary)
+                        .foregroundStyle(.secondary)
                 }
             }
 

@@ -1,6 +1,6 @@
 import Foundation
-import XCTest
 @testable import OneShot
+import XCTest
 
 final class SaveLocationResolverTests: XCTestCase {
     func testCustomPathExpandsTilde() {

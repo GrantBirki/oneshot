@@ -154,6 +154,7 @@ final class PreviewContentView: NSView {
         static let actionFontSize: CGFloat = 12
         static let cornerRadius: CGFloat = 12
     }
+
     private static let tempFileCleanupDelay: TimeInterval = 60
 
     private let backgroundView = NSVisualEffectView()
@@ -202,7 +203,7 @@ final class PreviewContentView: NSView {
         backgroundView.addSubview(trashButton)
     }
 
-    required init?(coder: NSCoder) {
+    required init?(coder _: NSCoder) {
         return nil
     }
 
@@ -309,7 +310,7 @@ final class PreviewContentView: NSView {
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: Layout.actionFontSize, weight: .semibold),
             .foregroundColor: textColor,
-            .paragraphStyle: paragraphStyle
+            .paragraphStyle: paragraphStyle,
         ]
         return NSAttributedString(string: title, attributes: attributes)
     }
@@ -321,7 +322,7 @@ final class PreviewImageView: NSImageView, NSDraggingSource {
     private var didDrag = false
     private var draggingSessionStarted = false
 
-    override func mouseDown(with event: NSEvent) {
+    override func mouseDown(with _: NSEvent) {
         didDrag = false
         draggingSessionStarted = false
     }
@@ -335,17 +336,17 @@ final class PreviewImageView: NSImageView, NSDraggingSource {
         beginDraggingSession(with: [draggingItem], event: event, source: self)
     }
 
-    override func mouseUp(with event: NSEvent) {
+    override func mouseUp(with _: NSEvent) {
         if !didDrag {
             onOpen?()
         }
     }
 
-    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+    func draggingSession(_: NSDraggingSession, sourceOperationMaskFor _: NSDraggingContext) -> NSDragOperation {
         return .copy
     }
 
-    func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+    func draggingSession(_: NSDraggingSession, endedAt _: NSPoint, operation _: NSDragOperation) {
         draggingSessionStarted = false
         dragPayload?.rescheduleCleanup()
     }

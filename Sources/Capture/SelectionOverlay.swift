@@ -58,7 +58,7 @@ final class SelectionOverlayView: NSView {
         needsDisplay = true
     }
 
-    override func mouseUp(with event: NSEvent) {
+    override func mouseUp(with _: NSEvent) {
         guard let start = dragStart, let end = dragCurrent, let window = window else {
             onCancel?()
             return
@@ -86,7 +86,7 @@ final class SelectionOverlayView: NSView {
         }
     }
 
-    override func cancelOperation(_ sender: Any?) {
+    override func cancelOperation(_: Any?) {
         onCancel?()
     }
 

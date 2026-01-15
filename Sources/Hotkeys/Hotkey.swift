@@ -1,5 +1,5 @@
-import Foundation
 import Carbon.HIToolbox
+import Foundation
 
 struct Hotkey: Equatable {
     let keyCode: UInt32
@@ -10,7 +10,8 @@ struct Hotkey: Equatable {
 enum HotkeyParser {
     static func parse(_ string: String) -> Hotkey? {
         guard let parsed = HotkeyStringParser.parse(string),
-              let keyCode = KeyCodeMapper.keyCode(for: parsed.key) else {
+              let keyCode = KeyCodeMapper.keyCode(for: parsed.key)
+        else {
             return nil
         }
 
@@ -40,7 +41,7 @@ enum KeyCodeMapper {
         "5": 23, "=": 24, "9": 25, "7": 26, "-": 27, "8": 28, "0": 29,
         "]": 30, "o": 31, "u": 32, "[": 33, "i": 34, "p": 35, "l": 37,
         "j": 38, "'": 39, "k": 40, ";": 41, "\\": 42, ",": 43, "/": 44,
-        "n": 45, "m": 46, ".": 47, "`": 50
+        "n": 45, "m": 46, ".": 47, "`": 50,
     ]
 
     static func keyCode(for key: String) -> UInt32? {

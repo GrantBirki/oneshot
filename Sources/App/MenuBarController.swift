@@ -94,7 +94,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         updateHotkeys(selection: values.selection, fullScreen: values.fullScreen, window: values.window)
     }
 
-    func menuNeedsUpdate(_ menu: NSMenu) {
+    func menuNeedsUpdate(_: NSMenu) {
         refreshHotkeys()
     }
 

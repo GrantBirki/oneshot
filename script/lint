@@ -14,7 +14,7 @@ if ! has_swift_files; then
 fi
 
 echo -e "${BLUE}Running SwiftLint...${OFF}"
-swiftlint lint --quiet --path "$DIR"
+swiftlint lint --quiet "$DIR"
 
 echo -e "${BLUE}Running SwiftFormat (lint)...${OFF}"
 swiftformat \
