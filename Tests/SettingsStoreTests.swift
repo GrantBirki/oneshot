@@ -1,5 +1,5 @@
 import XCTest
-@testable import OpenShot
+@testable import OneShot
 
 final class SettingsStoreTests: XCTestCase {
     private var defaults: UserDefaults!

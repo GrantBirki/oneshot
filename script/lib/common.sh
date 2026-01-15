@@ -63,7 +63,7 @@ find_project() {
 }
 
 set_xcodebuild_vars() {
-  APP_NAME="${APP_NAME:-OpenShot}"
+  APP_NAME="${APP_NAME:-OneShot}"
   SCHEME="${SCHEME:-$APP_NAME}"
   CONFIGURATION="${CONFIGURATION:-Debug}"
   DERIVED_DATA="${DERIVED_DATA:-$DIR/build/DerivedData}"

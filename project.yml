@@ -1,4 +1,4 @@
-name: OpenShot
+name: OneShot
 
 options:
   bundleIdPrefix: com.grantbirki
@@ -6,7 +6,7 @@ options:
     macOS: "14.0"
 
 targets:
-  OpenShot:
+  OneShot:
     type: application
     platform: macOS
     sources:
@@ -14,19 +14,19 @@ targets:
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: OpenShot
+        CFBundleDisplayName: OneShot
         LSUIElement: true
         NSHighResolutionCapable: true
-        NSScreenCaptureUsageDescription: OpenShot needs screen recording access to capture screenshots.
+        NSScreenCaptureUsageDescription: OneShot needs screen recording access to capture screenshots.
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.grantbirki.openshot
+        PRODUCT_BUNDLE_IDENTIFIER: com.grantbirki.oneshot
         MARKETING_VERSION: 0.0.0
         CURRENT_PROJECT_VERSION: 0.0.0
-  OpenShotTests:
+  OneShotTests:
     type: bundle.unit-test
     platform: macOS
     sources:
       - Tests
     dependencies:
-      - target: OpenShot
+      - target: OneShot

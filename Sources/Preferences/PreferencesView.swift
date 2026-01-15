@@ -79,7 +79,7 @@ struct PreferencesView: View {
                 }
                 Text("Use format like ctrl+p or ctrl+shift+p.")
                     .foregroundStyle(.secondary)
-                Text("Some hotkey changes require quitting and reopening OpenShot.")
+                Text("Some hotkey changes require quitting and reopening OneShot.")
                     .foregroundStyle(.secondary)
             }
         }

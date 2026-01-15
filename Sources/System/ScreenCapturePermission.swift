@@ -16,7 +16,7 @@ enum ScreenCapturePermission {
     private static func showPermissionAlert() {
         let alert = NSAlert()
         alert.messageText = "Screen Recording Permission Required"
-        alert.informativeText = "Enable screen recording access for OpenShot in System Settings > Privacy & Security > Screen Recording."
+        alert.informativeText = "Enable screen recording access for OneShot in System Settings > Privacy & Security > Screen Recording."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "OK")
         alert.runModal()

@@ -12,7 +12,7 @@ enum PNGDataEncoder {
             nil
         ) else {
             throw NSError(
-                domain: "OpenShot.PNGDataEncoder",
+                domain: "OneShot.PNGDataEncoder",
                 code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "Failed to create PNG destination."]
             )
@@ -21,7 +21,7 @@ enum PNGDataEncoder {
         CGImageDestinationAddImage(destination, cgImage, nil)
         guard CGImageDestinationFinalize(destination) else {
             throw NSError(
-                domain: "OpenShot.PNGDataEncoder",
+                domain: "OneShot.PNGDataEncoder",
                 code: 2,
                 userInfo: [NSLocalizedDescriptionKey: "Failed to finalize PNG data."]
             )
@@ -36,7 +36,7 @@ enum PNGDataEncoder {
         }
 
         throw NSError(
-            domain: "OpenShot.PNGDataEncoder",
+            domain: "OneShot.PNGDataEncoder",
             code: 3,
             userInfo: [NSLocalizedDescriptionKey: "Failed to extract CGImage from NSImage."]
         )

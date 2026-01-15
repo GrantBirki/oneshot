@@ -1,6 +1,6 @@
 # v0 Specification
 
-This document outlines the specifications for version 0 (v0) of the OpenShot macOS screenshot utility.
+This document outlines the specifications for version 0 (v0) of the OneShot macOS screenshot utility.
 
 ## Goals
 

@@ -11,7 +11,7 @@ final class OutputCoordinator {
 
     init(
         settings: SettingsStore,
-        queue: DispatchQueue = DispatchQueue(label: "openshot.output", qos: .userInitiated),
+        queue: DispatchQueue = DispatchQueue(label: "oneshot.output", qos: .userInitiated),
         dateProvider: @escaping () -> Date = Date.init,
         clipboardCopy: @escaping (Data) -> Void = { ClipboardService.copy(pngData: $0) },
         onSave: ((UUID, URL) -> Void)? = nil

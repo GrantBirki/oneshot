@@ -40,11 +40,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     func start() {
         if let button = statusItem.button {
-            if let image = NSImage(systemSymbolName: "camera.fill", accessibilityDescription: "OpenShot") {
+            if let image = NSImage(systemSymbolName: "camera.fill", accessibilityDescription: "OneShot") {
                 button.image = image
                 button.imagePosition = .imageOnly
             } else {
-                button.title = "OpenShot"
+                button.title = "OneShot"
             }
         } else {
             NSLog("Status item button unavailable")
@@ -79,7 +79,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(
-            title: "Quit OpenShot",
+            title: "Quit OneShot",
             action: #selector(quit),
             keyEquivalent: "q"
         )

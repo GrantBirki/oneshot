@@ -9,7 +9,7 @@ require_macos error "Launch requires macOS."
 
 script/build
 
-APP_NAME="${APP_NAME:-OpenShot}"
+APP_NAME="${APP_NAME:-OneShot}"
 CONFIGURATION="${CONFIGURATION:-Debug}"
 DERIVED_DATA="${DERIVED_DATA:-$DIR/build/DerivedData}"
 APP_PATH="$DERIVED_DATA/Build/Products/$CONFIGURATION/$APP_NAME.app"
@@ -28,5 +28,5 @@ fi
 
 echo -e "${BLUE}Launching ${APP_NAME}...${OFF}"
 echo "Tip: you can stream logs with:"
-echo "log stream --predicate 'process == \"OpenShot\"' --style compact"
+echo "log stream --predicate 'process == \"OneShot\"' --style compact"
 open "$APP_PATH"

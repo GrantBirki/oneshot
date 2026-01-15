@@ -16,7 +16,7 @@ The mains goals of this project are:
 Once built, this project should be really easy to install. It should be installed via homebrew by doing something like:
 
 ```bash
-brew install --cask grantbirki/tap/openshot
+brew install --cask grantbirki/tap/oneshot
 ```
 
 ## Code Standards

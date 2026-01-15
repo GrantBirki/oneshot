@@ -1,11 +1,11 @@
 import Foundation
 import XCTest
-@testable import OpenShot
+@testable import OneShot
 
 final class SaveLocationResolverTests: XCTestCase {
     func testCustomPathExpandsTilde() {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        let relative = "openshot_test_\(UUID().uuidString)"
+        let relative = "oneshot_test_\(UUID().uuidString)"
         let custom = "~/" + relative
 
         let resolved = SaveLocationResolver.resolve(option: .custom, customPath: custom)

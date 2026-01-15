@@ -1,6 +1,6 @@
 import XCTest
 import Carbon.HIToolbox
-@testable import OpenShot
+@testable import OneShot
 
 final class HotkeyParserTests: XCTestCase {
     func testParsesControlKey() {

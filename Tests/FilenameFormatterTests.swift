@@ -1,5 +1,5 @@
 import XCTest
-@testable import OpenShot
+@testable import OneShot
 
 final class FilenameFormatterTests: XCTestCase {
     func testFilenameIncludesTimezoneMarker() {

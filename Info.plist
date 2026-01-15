@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>OpenShot</string>
+	<string>OneShot</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -25,6 +25,6 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSScreenCaptureUsageDescription</key>
-	<string>OpenShot needs screen recording access to capture screenshots.</string>
+	<string>OneShot needs screen recording access to capture screenshots.</string>
 </dict>
 </plist>

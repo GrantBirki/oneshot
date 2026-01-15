@@ -34,7 +34,7 @@ final class AppController {
     }
 
     func start() {
-        NSLog("OpenShot AppController start")
+        NSLog("OneShot AppController start")
         menuBarController.start()
         registerHotkeys()
         observeSettings()

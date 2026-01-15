@@ -1,5 +1,5 @@
 import XCTest
-@testable import OpenShot
+@testable import OneShot
 
 final class HotkeyStringParserTests: XCTestCase {
     func testParsesAndNormalizesHotkey() {

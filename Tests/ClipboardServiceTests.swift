@@ -1,6 +1,6 @@
 import AppKit
 import XCTest
-@testable import OpenShot
+@testable import OneShot
 
 final class ClipboardServiceTests: XCTestCase {
     func testCopyWritesPNGAndTIFF() {
