@@ -9,7 +9,7 @@ permissions: {}
 
 jobs:
   release:
-    if: github.repository == 'grantbirki/openshot' # change this to your repository
+    if: github.repository == 'grantbirki/oneshot' # change this to your repository
     permissions:
       contents: write
     runs-on: ubuntu-latest
