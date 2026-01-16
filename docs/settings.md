@@ -21,6 +21,8 @@ This document describes the settings available in OneShot.
   - `Save previous capture`: Saves the existing capture immediately and replaces the preview.
   - `Discard previous capture`: Cancels the existing capture and replaces the preview.
 
+Clicking the preview thumbnail saves immediately (if needed) and opens the saved file in Preview so edits apply to the same file on disk.
+
 When previews are disabled, screenshots are saved immediately and the save delay is ignored.
 
 ## Hotkeys

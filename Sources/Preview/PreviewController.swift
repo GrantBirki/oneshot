@@ -7,6 +7,7 @@ struct PreviewRequest {
     let timeout: TimeInterval?
     let onClose: () -> Void
     let onTrash: () -> Void
+    let onOpen: () -> Void
     let onReplace: () -> Void
     let onAutoDismiss: (() -> Void)?
     let anchorRect: CGRect?
@@ -83,6 +84,10 @@ final class PreviewController {
             },
             onTrash: { [weak self] in
                 request.onTrash()
+                self?.hide()
+            },
+            onOpen: { [weak self] in
+                request.onOpen()
                 self?.hide()
             },
             onHoverChanged: { [weak self] hovered in

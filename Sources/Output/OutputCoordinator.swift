@@ -63,14 +63,33 @@ final class OutputCoordinator {
         }
     }
 
-    func finalize(id: UUID) {
-        queue.async { [weak self] in
-            guard let self, var pending = pendingSaves[id] else { return }
+    func finalize(id: UUID, completion: ((URL?) -> Void)? = nil) {
+        let action = { [weak self] in
+            guard let self else { return }
+            guard var pending = pendingSaves[id] else {
+                if let completion {
+                    DispatchQueue.main.async {
+                        completion(nil)
+                    }
+                }
+                return
+            }
             pending.workItem.cancel()
             if pending.savedURL == nil {
                 pending.savedURL = saveNow(pngData: pending.pngData, id: id)
             }
+            let savedURL = pending.savedURL
             pendingSaves.removeValue(forKey: id)
+            if let completion {
+                DispatchQueue.main.async {
+                    completion(savedURL)
+                }
+            }
+        }
+        if DispatchQueue.getSpecific(key: queueKey) != nil {
+            action()
+        } else {
+            queue.async(execute: action)
         }
     }
 

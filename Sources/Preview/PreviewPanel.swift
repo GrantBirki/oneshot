@@ -21,6 +21,7 @@ final class PreviewPanel: NSPanel {
         filenamePrefix: String,
         onClose: @escaping () -> Void,
         onTrash: @escaping () -> Void,
+        onOpen: @escaping () -> Void,
         onHoverChanged: @escaping (Bool) -> Void,
         onDragChanged: @escaping (Bool) -> Void,
     ) {
@@ -48,6 +49,7 @@ final class PreviewPanel: NSPanel {
             filenamePrefix: filenamePrefix,
             onClose: onClose,
             onTrash: onTrash,
+            onOpen: onOpen,
             onHoverChanged: onHoverChanged,
             onDragChanged: onDragChanged,
         )
@@ -239,7 +241,6 @@ final class PreviewContentView: NSView {
         }
     #endif
 
-    private static let tempFileCleanupDelay: TimeInterval = 60
     private static var closeBackgroundColor: NSColor {
         NSColor.controlBackgroundColor.withAlphaComponent(0.8)
     }
@@ -404,6 +405,7 @@ final class PreviewContentView: NSView {
         filenamePrefix: String,
         onClose: @escaping () -> Void,
         onTrash: @escaping () -> Void,
+        onOpen: @escaping () -> Void,
         onHoverChanged: @escaping (Bool) -> Void,
         onDragChanged: @escaping (Bool) -> Void,
     ) {
@@ -426,7 +428,7 @@ final class PreviewContentView: NSView {
                     logDebug("Tile clicked -> open")
                 }
             #endif
-            self?.openImage(image)
+            onOpen()
         }
         imageView.onDragStateChanged = { [weak self] dragging in
             guard let self else { return }
@@ -454,28 +456,6 @@ final class PreviewContentView: NSView {
 
     func performTrash() {
         handleTrash()
-    }
-
-    private func openImage(_ image: NSImage) {
-        let filename = FilenameFormatter.makeFilename(prefix: "screenshot")
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-        do {
-            _ = try FileSaveService.save(image: image, to: tempURL.deletingLastPathComponent(), filename: filename)
-            let opened = NSWorkspace.shared.open(tempURL)
-            if !opened {
-                NSLog("Failed to open preview image at \(tempURL.path)")
-            }
-            scheduleTempCleanup(for: tempURL)
-        } catch {
-            NSLog("Failed to open preview image: \(error)")
-        }
-    }
-
-    private func scheduleTempCleanup(for url: URL) {
-        let delay = PreviewContentView.tempFileCleanupDelay
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + delay) {
-            try? FileManager.default.removeItem(at: url)
-        }
     }
 
     @objc private func handleClose() {

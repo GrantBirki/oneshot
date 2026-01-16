@@ -153,6 +153,40 @@ final class OutputCoordinatorTests: XCTestCase {
         wait(for: [saveExpectation], timeout: 2)
     }
 
+    func testFinalizeReturnsSavedURL() {
+        let settings = SettingsStore(defaults: defaults)
+        settings.saveLocationOption = .custom
+        settings.customSavePath = tempDirectory.path
+        settings.saveDelaySeconds = 60
+
+        let queue = DispatchQueue(label: "OutputCoordinatorTests.queue")
+        let saveExpectation = expectation(description: "Finalize completion")
+        var savedURL: URL?
+
+        let coordinator = OutputCoordinator(
+            settings: settings,
+            queue: queue,
+            dateProvider: { Date(timeIntervalSince1970: 0) },
+            clipboardCopy: { _ in },
+        )
+
+        let pngData = Self.makePNGData()
+        let id = coordinator.begin(pngData: pngData, scheduleSave: false)
+        coordinator.finalize(id: id) { url in
+            savedURL = url
+            saveExpectation.fulfill()
+        }
+
+        wait(for: [saveExpectation], timeout: 2)
+        guard let url = savedURL else {
+            XCTFail("Missing saved URL")
+            return
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        let savedData = try? Data(contentsOf: url)
+        XCTAssertEqual(savedData, pngData)
+    }
+
     private static func makePNGData() -> Data {
         let size = NSSize(width: 2, height: 2)
         let rep = NSBitmapImageRep(

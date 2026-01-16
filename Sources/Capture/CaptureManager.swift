@@ -65,6 +65,17 @@ final class CaptureManager {
                     onTrash: { [weak self] in
                         self?.outputCoordinator.cancel(id: saveID)
                     },
+                    onOpen: { [weak self] in
+                        self?.outputCoordinator.finalize(id: saveID) { url in
+                            guard let url else {
+                                NSLog("Failed to open saved screenshot: missing file URL")
+                                return
+                            }
+                            if !NSWorkspace.shared.open(url) {
+                                NSLog("Failed to open saved screenshot at \(url.path)")
+                            }
+                        }
+                    },
                     onReplace: { [weak self] in
                         guard let self else { return }
                         switch replacementBehavior {
