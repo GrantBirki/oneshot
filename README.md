@@ -37,3 +37,14 @@ You can also verify the checksum:
 ```bash
 shasum -a 256 OneShot.zip
 ```
+
+## Unsigned Builds
+
+OneShot releases are currently unsigned. macOS Gatekeeper may block the first launch.
+
+To open it:
+
+1) Right-click `OneShot.app` and choose Open.
+2) Or go to System Settings → Privacy & Security and click Open Anyway.
+
+> Why? Apple Developer ID certs cost $99/year, and I don't want to pay Apple.
