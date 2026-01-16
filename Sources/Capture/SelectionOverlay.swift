@@ -75,6 +75,13 @@ final class SelectionOverlayState {
             height: abs(start.y - current.y),
         )
     }
+
+    var selectionSizeText: String? {
+        guard let start, let current else { return nil }
+        let width = Int(abs(current.x - start.x).rounded())
+        let height = Int(abs(current.y - start.y).rounded())
+        return "\(width) x \(height)"
+    }
 }
 
 final class SelectionOverlayView: NSView {
@@ -93,6 +100,11 @@ final class SelectionOverlayView: NSView {
     }
 
     override var acceptsFirstResponder: Bool { true }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        addCursorRect(bounds, cursor: .crosshair)
+    }
 
     override func mouseDown(with event: NSEvent) {
         guard let window else { return }
@@ -146,17 +158,59 @@ final class SelectionOverlayView: NSView {
         NSColor.black.withAlphaComponent(0.35).setFill()
         dirtyRect.fill()
 
-        if let selection = selectionRect() {
-            guard let context = NSGraphicsContext.current?.cgContext else { return }
-            context.setBlendMode(.clear)
-            context.fill(selection)
-            context.setBlendMode(.normal)
+        drawSelectionOutline()
+        drawSelectionMetrics()
+    }
 
-            NSColor.systemBlue.setStroke()
-            let path = NSBezierPath(rect: selection)
-            path.lineWidth = 2
-            path.stroke()
-        }
+    private func drawSelectionOutline() {
+        guard let selection = selectionRect(),
+              let context = NSGraphicsContext.current?.cgContext
+        else { return }
+        context.setBlendMode(.clear)
+        context.fill(selection)
+        context.setBlendMode(.normal)
+
+        NSColor.systemBlue.setStroke()
+        let path = NSBezierPath(rect: selection)
+        path.lineWidth = 2
+        path.stroke()
+    }
+
+    private func drawSelectionMetrics() {
+        guard let window,
+              let current = state.current,
+              let text = state.selectionSizeText
+        else { return }
+
+        let anchor = window.convertPoint(fromScreen: current)
+        guard bounds.contains(anchor) else { return }
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
+            .foregroundColor: NSColor.white,
+        ]
+        let attributedText = NSAttributedString(string: text, attributes: attributes)
+        let textSize = attributedText.size()
+        let padding = CGSize(width: 6, height: 4)
+        let offset = CGPoint(x: 12, y: 12)
+        var bubbleRect = CGRect(
+            x: anchor.x + offset.x,
+            y: anchor.y + offset.y,
+            width: textSize.width + padding.width * 2,
+            height: textSize.height + padding.height * 2,
+        )
+        bubbleRect = clamp(bubbleRect, to: bounds, margin: 8)
+
+        NSColor.black.withAlphaComponent(0.75).setFill()
+        NSBezierPath(roundedRect: bubbleRect, xRadius: 6, yRadius: 6).fill()
+        attributedText.draw(at: CGPoint(x: bubbleRect.minX + padding.width, y: bubbleRect.minY + padding.height))
+    }
+
+    private func clamp(_ rect: CGRect, to bounds: CGRect, margin: CGFloat) -> CGRect {
+        var rect = rect
+        rect.origin.x = min(max(rect.origin.x, bounds.minX + margin), bounds.maxX - rect.width - margin)
+        rect.origin.y = min(max(rect.origin.y, bounds.minY + margin), bounds.maxY - rect.height - margin)
+        return rect
     }
 
     private func selectionRect() -> CGRect? {
