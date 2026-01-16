@@ -46,9 +46,13 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
+      - name: install xcodegen
+        run: |
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          export HOMEBREW_NO_INSTALL_CLEANUP=1
+          brew install xcodegen
+
       - name: package
-        env:
-          SKIP_UPDATE: 1
         run: script/package
 
       - name: attest build provenance
