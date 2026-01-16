@@ -13,10 +13,12 @@ targets:
       - Sources
     resources:
       - Sources/Resources/shutter.wav
+      - Sources/Resources/Assets.xcassets
     info:
       path: Info.plist
       properties:
         CFBundleDisplayName: OneShot
+        CFBundleIconName: AppIcon
         GIT_SHA: $(GIT_SHA)
         LSUIElement: true
         NSHighResolutionCapable: true
@@ -26,6 +28,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.grantbirki.oneshot
         MARKETING_VERSION: 0.0.0
         CURRENT_PROJECT_VERSION: 0.0.0
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   OneShotTests:
     type: bundle.unit-test
     platform: macOS
