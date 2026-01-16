@@ -18,7 +18,11 @@ enum PNGDataEncoder {
             )
         }
 
-        CGImageDestinationAddImage(destination, cgImage, nil)
+        let options: [CFString: Any] = [
+            kCGImagePropertyPNGCompressionLevel: 0,
+            kCGImagePropertyPNGCompressionFilter: 0,
+        ]
+        CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
         guard CGImageDestinationFinalize(destination) else {
             throw NSError(
                 domain: "OneShot.PNGDataEncoder",
