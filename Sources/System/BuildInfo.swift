@@ -1,8 +1,10 @@
 import Foundation
 
 enum BuildInfo {
+    static let gitSHA: String? = gitSHAValue()
+
     static let shortGitSHA: String = {
-        if let sha = gitSHAValue() {
+        if let sha = gitSHA {
             if sha.count >= 8 {
                 return String(sha.prefix(8))
             }
