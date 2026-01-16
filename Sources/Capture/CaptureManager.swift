@@ -64,12 +64,7 @@ final class CaptureManager {
         let previewTimeout = settings.previewTimeout
         let shouldAutoDismiss = previewTimeout != nil
         let autoDismissBehavior = settings.previewAutoDismissBehavior
-        let scheduleSave = switch autoDismissBehavior {
-        case .saveToDisk:
-            !shouldAutoDismiss
-        case .discard:
-            false
-        }
+        let scheduleSave = PreviewSaveScheduler.shouldScheduleSave(previewTimeout: previewTimeout)
         let saveID = outputCoordinator.begin(pngData: captured.pngData, scheduleSave: scheduleSave)
         let replacementBehavior = settings.previewReplacementBehavior
         let autoDismissHandler: (() -> Void)? = shouldAutoDismiss ? { [weak self] in
@@ -126,5 +121,11 @@ final class CaptureManager {
         case .clipboardOnly:
             ClipboardService.copy(pngData: captured.pngData)
         }
+    }
+}
+
+enum PreviewSaveScheduler {
+    static func shouldScheduleSave(previewTimeout: TimeInterval?) -> Bool {
+        previewTimeout == nil
     }
 }
