@@ -1,33 +1,45 @@
 import AppKit
 
 final class WindowCaptureOverlayController {
-    private var window: NSWindow?
+    private var windows: [OverlayWindow] = []
 
     func beginSelection(completion: @escaping (WindowInfo?) -> Void) {
-        guard let frame = ScreenFrameHelper.allScreensFrame() else {
+        guard windows.isEmpty else { return }
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else {
             completion(nil)
             return
         }
 
-        let window = OverlayWindow(contentRect: frame)
-        let view = WindowCaptureOverlayView(frame: window.contentView?.bounds ?? frame)
-        view.onSelection = { [weak self] windowInfo in
-            self?.end()
-            completion(windowInfo)
+        var didFinish = false
+        let finish: (WindowInfo?) -> Void = { [weak self] result in
+            guard let self, !didFinish else { return }
+            didFinish = true
+            end()
+            completion(result)
         }
-        view.onCancel = { [weak self] in
-            self?.end()
-            completion(nil)
+
+        for screen in screens {
+            let window = OverlayWindow(contentRect: screen.frame)
+            let view = WindowCaptureOverlayView(frame: window.contentView?.bounds ?? .zero)
+            view.onSelection = { windowInfo in
+                finish(windowInfo)
+            }
+            view.onCancel = {
+                finish(nil)
+            }
+            window.contentView = view
+            window.makeKeyAndOrderFront(nil)
+            window.makeFirstResponder(view)
+            windows.append(window)
         }
-        window.contentView = view
-        window.makeKeyAndOrderFront(nil)
-        window.makeFirstResponder(view)
-        self.window = window
     }
 
     private func end() {
-        window?.orderOut(nil)
-        window = nil
+        for window in windows {
+            window.orderOut(nil)
+        }
+        windows.removeAll()
     }
 }
 
@@ -118,7 +130,8 @@ enum WindowInfoProvider {
 
         for info in list {
             guard let boundsDict = info[kCGWindowBounds as String] as? [String: CGFloat],
-                  let bounds = CGRect(dictionaryRepresentation: boundsDict as CFDictionary),
+                  let cgBounds = CGRect(dictionaryRepresentation: boundsDict as CFDictionary),
+                  let bounds = appKitBounds(for: cgBounds),
                   bounds.contains(point),
                   let windowID = info[kCGWindowNumber as String] as? CGWindowID,
                   let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
@@ -138,6 +151,43 @@ enum WindowInfoProvider {
             return WindowInfo(id: windowID, bounds: bounds)
         }
 
+        return nil
+    }
+
+    private static func appKitBounds(for cgBounds: CGRect) -> CGRect? {
+        guard let screen = screen(for: cgBounds),
+              let displayID = displayID(for: screen)
+        else {
+            return nil
+        }
+        let cgScreenFrame = CGDisplayBounds(displayID)
+        let localX = cgBounds.origin.x - cgScreenFrame.origin.x
+        let localY = cgBounds.origin.y - cgScreenFrame.origin.y
+        let flippedY = cgScreenFrame.height - localY - cgBounds.height
+        return CGRect(
+            x: screen.frame.origin.x + localX,
+            y: screen.frame.origin.y + flippedY,
+            width: cgBounds.width,
+            height: cgBounds.height,
+        )
+    }
+
+    private static func screen(for cgBounds: CGRect) -> NSScreen? {
+        let center = CGPoint(x: cgBounds.midX, y: cgBounds.midY)
+        for screen in NSScreen.screens {
+            guard let displayID = displayID(for: screen) else { continue }
+            if CGDisplayBounds(displayID).contains(center) {
+                return screen
+            }
+        }
+        return NSScreen.main ?? NSScreen.screens.first
+    }
+
+    private static func displayID(for screen: NSScreen) -> CGDirectDisplayID? {
+        let key = NSDeviceDescriptionKey("NSScreenNumber")
+        if let number = screen.deviceDescription[key] as? NSNumber {
+            return CGDirectDisplayID(number.uint32Value)
+        }
         return nil
     }
 }

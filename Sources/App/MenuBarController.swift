@@ -124,7 +124,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         applyHotkey(selection, to: selectionItem)
         applyHotkey(fullScreen, to: fullScreenItem)
         applyHotkey(window, to: windowItem)
-        menu?.update()
     }
 
     private func applyHotkey(_ value: Hotkey?, to item: NSMenuItem) {
