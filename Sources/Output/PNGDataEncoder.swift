@@ -19,8 +19,9 @@ enum PNGDataEncoder {
         }
 
         let options: [CFString: Any] = [
-            kCGImagePropertyPNGCompressionLevel: 0,
-            kCGImagePropertyPNGCompressionFilter: 0,
+            kCGImagePropertyPNGDictionary: [
+                kCGImagePropertyPNGCompressionFilter: 0,
+            ],
         ]
         CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
         guard CGImageDestinationFinalize(destination) else {
