@@ -55,6 +55,24 @@ jobs:
       - name: package
         run: script/package
 
+      - name: scan artifact for tokens
+        run: |
+          artifact="dist/OneShot.zip"
+          if [[ ! -f "$artifact" ]]; then
+            echo "Expected artifact not found at $artifact"
+            exit 1
+          fi
+
+          scan_dir="$(mktemp -d)"
+          trap 'rm -rf "$scan_dir"' EXIT
+          ditto -x -k "$artifact" "$scan_dir"
+
+          if grep -R -a -E -n 'gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}' "$scan_dir" >/dev/null; then
+            echo "Potential token found in release artifact (file paths only):"
+            grep -R -a -E -l 'gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}' "$scan_dir"
+            exit 1
+          fi
+
       - name: attest build provenance
         uses: actions/attest-build-provenance@00014ed6ed5efc5b1ab7f7f34a39eb55d41aa4f8 # pin@v3.1.0
         with:
@@ -98,7 +116,7 @@ jobs:
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # pin@v2.5.0
         with:
           tag_name: ${{ needs.build.outputs.tag }}
-          name: OneShot v${{ needs.build.outputs.version }}
+          name: ${{ needs.build.outputs.tag }}
           target_commitish: ${{ github.sha }}
           files: |
             dist/OneShot.zip
