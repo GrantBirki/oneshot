@@ -11,6 +11,8 @@ targets:
     platform: macOS
     sources:
       - Sources
+    resources:
+      - Sources/Resources/shutter.wav
     info:
       path: Info.plist
       properties:
