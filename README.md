@@ -48,3 +48,7 @@ To open it:
 2) Or go to System Settings → Privacy & Security and click Open Anyway.
 
 > Why? Apple Developer ID certs cost $99/year, and I don't want to pay Apple.
+
+## Contributing 💻
+
+See the [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to this project.
