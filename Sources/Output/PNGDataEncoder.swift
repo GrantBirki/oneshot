@@ -18,11 +18,7 @@ enum PNGDataEncoder {
             )
         }
 
-        let options: [CFString: Any] = [
-            kCGImagePropertyPNGDictionary: [
-                kCGImagePropertyPNGCompressionFilter: 0,
-            ],
-        ]
+        let options = pngOptions(for: cgImage)
         CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
         guard CGImageDestinationFinalize(destination) else {
             throw NSError(
@@ -57,5 +53,57 @@ enum PNGDataEncoder {
 
         var rect = NSRect(origin: .zero, size: image.size)
         return image.cgImage(forProposedRect: &rect, context: nil, hints: nil)
+    }
+
+    private static func pngOptions(for cgImage: CGImage) -> [CFString: Any] {
+        var properties: [CFString: Any] = [
+            kCGImagePropertyPixelWidth: cgImage.width,
+            kCGImagePropertyPixelHeight: cgImage.height,
+            kCGImagePropertyDepth: cgImage.bitsPerComponent,
+            kCGImagePropertyOrientation: 1,
+            kCGImagePropertyHasAlpha: hasAlpha(for: cgImage),
+            kCGImagePropertyIsFloat: cgImage.bitmapInfo.contains(.floatComponents),
+            kCGImagePropertyIsIndexed: isIndexedColorSpace(for: cgImage),
+            kCGImagePropertyPNGDictionary: [
+                kCGImagePropertyPNGInterlaceType: 0,
+                kCGImagePropertyPNGCompressionFilter: IMAGEIO_PNG_NO_FILTERS,
+            ],
+        ]
+
+        if let colorModel = colorModelProperty(for: cgImage) {
+            properties[kCGImagePropertyColorModel] = colorModel
+        }
+
+        return properties
+    }
+
+    private static func colorModelProperty(for cgImage: CGImage) -> CFString? {
+        guard let colorSpace = cgImage.colorSpace else { return nil }
+        switch colorSpace.model {
+        case .rgb:
+            return kCGImagePropertyColorModelRGB
+        case .monochrome:
+            return kCGImagePropertyColorModelGray
+        case .cmyk:
+            return kCGImagePropertyColorModelCMYK
+        case .lab:
+            return kCGImagePropertyColorModelLab
+        default:
+            return nil
+        }
+    }
+
+    private static func hasAlpha(for cgImage: CGImage) -> Bool {
+        switch cgImage.alphaInfo {
+        case .none, .noneSkipFirst, .noneSkipLast:
+            return false
+        default:
+            return true
+        }
+    }
+
+    private static func isIndexedColorSpace(for cgImage: CGImage) -> Bool {
+        guard let colorSpace = cgImage.colorSpace else { return false }
+        return colorSpace.model == .indexed
     }
 }
