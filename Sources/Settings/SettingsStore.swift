@@ -20,6 +20,29 @@ enum SaveLocationOption: String, CaseIterable, Identifiable {
     }
 }
 
+enum PreviewDisabledOutputBehavior: String, CaseIterable, Identifiable {
+    case saveToDisk
+    case clipboardOnly
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .saveToDisk: "Save to disk"
+        case .clipboardOnly: "Copy to clipboard"
+        }
+    }
+
+    var helpText: String {
+        switch self {
+        case .saveToDisk:
+            "Save screenshots to the selected location."
+        case .clipboardOnly:
+            "Copy screenshots to the clipboard without saving to disk."
+        }
+    }
+}
+
 enum PreviewReplacementBehavior: String, CaseIterable, Identifiable {
     case saveImmediately
     case discard
@@ -45,6 +68,31 @@ enum PreviewReplacementBehavior: String, CaseIterable, Identifiable {
     }
 }
 
+enum PreviewAutoDismissBehavior: String, CaseIterable, Identifiable {
+    case saveToDisk
+    case discard
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .saveToDisk:
+            "Save to disk"
+        case .discard:
+            "Don't save to disk"
+        }
+    }
+
+    var helpText: String {
+        switch self {
+        case .saveToDisk:
+            "Save the capture when the preview timer ends."
+        case .discard:
+            "Discard the capture when the preview timer ends unless you save it manually."
+        }
+    }
+}
+
 final class SettingsStore: ObservableObject {
     @Published var autoLaunchEnabled: Bool {
         didSet { defaults.set(autoLaunchEnabled, forKey: Keys.autoLaunchEnabled) }
@@ -62,8 +110,16 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(previewEnabled, forKey: Keys.previewEnabled) }
     }
 
+    @Published var previewAutoDismissBehavior: PreviewAutoDismissBehavior {
+        didSet { defaults.set(previewAutoDismissBehavior.rawValue, forKey: Keys.previewAutoDismissBehavior) }
+    }
+
     @Published var previewReplacementBehavior: PreviewReplacementBehavior {
         didSet { defaults.set(previewReplacementBehavior.rawValue, forKey: Keys.previewReplacementBehavior) }
+    }
+
+    @Published var previewDisabledOutputBehavior: PreviewDisabledOutputBehavior {
+        didSet { defaults.set(previewDisabledOutputBehavior.rawValue, forKey: Keys.previewDisabledOutputBehavior) }
     }
 
     @Published var saveLocationOption: SaveLocationOption {
@@ -128,9 +184,15 @@ final class SettingsStore: ObservableObject {
         }
         previewTimeoutEnabled = defaults.object(forKey: Keys.previewTimeoutEnabled) as? Bool ?? true
         previewEnabled = defaults.object(forKey: Keys.previewEnabled) as? Bool ?? true
+        let autoDismissRaw = defaults.string(forKey: Keys.previewAutoDismissBehavior)
+            ?? PreviewAutoDismissBehavior.saveToDisk.rawValue
+        previewAutoDismissBehavior = PreviewAutoDismissBehavior(rawValue: autoDismissRaw) ?? .saveToDisk
         let replacementRaw = defaults.string(forKey: Keys.previewReplacementBehavior)
             ?? PreviewReplacementBehavior.saveImmediately.rawValue
         previewReplacementBehavior = PreviewReplacementBehavior(rawValue: replacementRaw) ?? .saveImmediately
+        let outputBehaviorRaw = defaults.string(forKey: Keys.previewDisabledOutputBehavior)
+            ?? PreviewDisabledOutputBehavior.saveToDisk.rawValue
+        previewDisabledOutputBehavior = PreviewDisabledOutputBehavior(rawValue: outputBehaviorRaw) ?? .saveToDisk
 
         let locationRaw = defaults.string(forKey: Keys.saveLocationOption) ?? SaveLocationOption.downloads.rawValue
         saveLocationOption = SaveLocationOption(rawValue: locationRaw) ?? .downloads
@@ -238,7 +300,9 @@ private enum Keys {
     static let saveDelaySeconds = "settings.saveDelaySeconds"
     static let previewTimeoutEnabled = "settings.previewTimeoutEnabled"
     static let previewEnabled = "settings.previewEnabled"
+    static let previewAutoDismissBehavior = "settings.previewAutoDismissBehavior"
     static let previewReplacementBehavior = "settings.previewReplacementBehavior"
+    static let previewDisabledOutputBehavior = "settings.previewDisabledOutputBehavior"
     static let saveLocationOption = "settings.saveLocationOption"
     static let customSavePath = "settings.customSavePath"
     static let filenamePrefix = "settings.filenamePrefix"

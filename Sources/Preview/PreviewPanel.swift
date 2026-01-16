@@ -261,12 +261,12 @@ final class PreviewContentView: NSView {
     private let imageView = PreviewImageView()
     private let actionOverlayView = PreviewActionOverlayView()
     private let closeButton = PreviewActionButton(
-        symbolName: "xmark",
+        symbolName: "checkmark",
         symbolPointSize: Layout.buttonSymbolPointSize,
         tintColor: .labelColor,
         backgroundColor: PreviewContentView.closeBackgroundColor,
         hoverBackgroundColor: PreviewContentView.closeHoverBackgroundColor,
-        accessibilityLabel: "Dismiss screenshot preview",
+        accessibilityLabel: "Save screenshot",
         identifier: "preview-close",
     )
     private let trashButton = PreviewActionButton(
@@ -461,7 +461,7 @@ final class PreviewContentView: NSView {
     @objc private func handleClose() {
         #if DEBUG
             if Debug.logActions {
-                logDebug("X clicked")
+                logDebug("Save clicked")
             }
         #endif
         onClose?()

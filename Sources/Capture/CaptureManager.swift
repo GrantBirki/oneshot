@@ -50,54 +50,82 @@ final class CaptureManager {
         do {
             let captured = try CapturedImage(cgImage: image, displaySize: displaySize)
             ScreenshotSoundPlayer.play()
-            let previewTimeout = settings.previewTimeout
-            let shouldAutoDismiss = previewTimeout != nil
-            let saveID = outputCoordinator.begin(pngData: captured.pngData, scheduleSave: !shouldAutoDismiss)
             if settings.previewEnabled {
-                let replacementBehavior = settings.previewReplacementBehavior
-                let request = PreviewRequest(
-                    image: captured.previewImage,
-                    pngData: captured.pngData,
-                    filenamePrefix: settings.filenamePrefix,
-                    timeout: previewTimeout,
-                    onClose: { [weak self] in
-                        self?.outputCoordinator.finalize(id: saveID)
-                    },
-                    onTrash: { [weak self] in
-                        self?.outputCoordinator.cancel(id: saveID)
-                    },
-                    onOpen: { [weak self] in
-                        self?.outputCoordinator.finalize(id: saveID) { url in
-                            guard let url else {
-                                NSLog("Failed to open saved screenshot: missing file URL")
-                                return
-                            }
-                            if !NSWorkspace.shared.open(url) {
-                                NSLog("Failed to open saved screenshot at \(url.path)")
-                            }
-                        }
-                    },
-                    onReplace: { [weak self] in
-                        guard let self else { return }
-                        switch replacementBehavior {
-                        case .saveImmediately:
-                            outputCoordinator.finalize(id: saveID)
-                        case .discard:
-                            outputCoordinator.cancel(id: saveID)
-                        }
-                    },
-                    onAutoDismiss: { [weak self] in
-                        // Auto-dismiss commits the save and closes the preview together.
-                        self?.outputCoordinator.finalize(id: saveID)
-                    },
-                    anchorRect: anchorRect,
-                )
-                previewController.show(request)
+                handleCaptureWithPreview(captured, anchorRect: anchorRect)
             } else {
-                outputCoordinator.finalize(id: saveID)
+                handleCaptureWithoutPreview(captured)
             }
         } catch {
             NSLog("Failed to encode screenshot: \(error)")
         }
+    }
+
+    private func handleCaptureWithPreview(_ captured: CapturedImage, anchorRect: CGRect?) {
+        let previewTimeout = settings.previewTimeout
+        let shouldAutoDismiss = previewTimeout != nil
+        let autoDismissBehavior = settings.previewAutoDismissBehavior
+        let scheduleSave = PreviewSaveScheduler.shouldScheduleSave(previewTimeout: previewTimeout)
+        let saveID = outputCoordinator.begin(pngData: captured.pngData, scheduleSave: scheduleSave)
+        let replacementBehavior = settings.previewReplacementBehavior
+        let autoDismissHandler: (() -> Void)? = shouldAutoDismiss ? { [weak self] in
+            guard let self else { return }
+            switch autoDismissBehavior {
+            case .saveToDisk:
+                outputCoordinator.finalize(id: saveID)
+            case .discard:
+                outputCoordinator.cancel(id: saveID)
+            }
+        } : nil
+        let request = PreviewRequest(
+            image: captured.previewImage,
+            pngData: captured.pngData,
+            filenamePrefix: settings.filenamePrefix,
+            timeout: previewTimeout,
+            onClose: { [weak self] in
+                self?.outputCoordinator.finalize(id: saveID)
+            },
+            onTrash: { [weak self] in
+                self?.outputCoordinator.cancel(id: saveID)
+            },
+            onOpen: { [weak self] in
+                self?.outputCoordinator.finalize(id: saveID) { url in
+                    guard let url else {
+                        NSLog("Failed to open saved screenshot: missing file URL")
+                        return
+                    }
+                    if !NSWorkspace.shared.open(url) {
+                        NSLog("Failed to open saved screenshot at \(url.path)")
+                    }
+                }
+            },
+            onReplace: { [weak self] in
+                guard let self else { return }
+                switch replacementBehavior {
+                case .saveImmediately:
+                    outputCoordinator.finalize(id: saveID)
+                case .discard:
+                    outputCoordinator.cancel(id: saveID)
+                }
+            },
+            onAutoDismiss: autoDismissHandler,
+            anchorRect: anchorRect,
+        )
+        previewController.show(request)
+    }
+
+    private func handleCaptureWithoutPreview(_ captured: CapturedImage) {
+        switch settings.previewDisabledOutputBehavior {
+        case .saveToDisk:
+            let saveID = outputCoordinator.begin(pngData: captured.pngData, scheduleSave: false)
+            outputCoordinator.finalize(id: saveID)
+        case .clipboardOnly:
+            ClipboardService.copy(pngData: captured.pngData)
+        }
+    }
+}
+
+enum PreviewSaveScheduler {
+    static func shouldScheduleSave(previewTimeout: TimeInterval?) -> Bool {
+        previewTimeout == nil
     }
 }

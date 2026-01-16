@@ -45,6 +45,17 @@ struct SettingsView: View {
                         }
                     }
                 }
+
+                if !settings.previewEnabled {
+                    Picker("Default output", selection: $settings.previewDisabledOutputBehavior) {
+                        ForEach(PreviewDisabledOutputBehavior.allCases) { behavior in
+                            Text(behavior.title)
+                                .tag(behavior)
+                                .help(behavior.helpText)
+                        }
+                    }
+                    .help("Choose what happens when previews are disabled.")
+                }
             }
 
             Section("Preview") {
@@ -57,6 +68,14 @@ struct SettingsView: View {
                             .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: 80)
                     }
+                    Picker("On preview timeout", selection: $settings.previewAutoDismissBehavior) {
+                        ForEach(PreviewAutoDismissBehavior.allCases) { behavior in
+                            Text(behavior.title)
+                                .tag(behavior)
+                                .help(behavior.helpText)
+                        }
+                    }
+                    .help("Choose what happens when the preview timer ends.")
                 }
                 Picker("On new screenshot", selection: $settings.previewReplacementBehavior) {
                     ForEach(PreviewReplacementBehavior.allCases) { behavior in
