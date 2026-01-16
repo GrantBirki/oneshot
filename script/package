@@ -11,15 +11,28 @@ require_tool ditto "ditto not found."
 
 CONFIGURATION="${CONFIGURATION:-Release}"
 
-script/update
+if [[ "${SKIP_UPDATE:-}" != "1" ]]; then
+  script/update
+fi
 set_xcodebuild_vars
+
+if [[ "$VERSION" == "unknown" ]]; then
+  echo -e "${RED}VERSION file missing or empty.${OFF}"
+  exit 1
+fi
+
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo -e "${RED}VERSION must be in X.Y.Z format; got ${VERSION}.${OFF}"
+  exit 1
+fi
 
 PROJECT_PATH=$(find_project)
 
 DIST_DIR="${DIST_DIR:-$DIR/dist}"
-STAGING_APP="$DIST_DIR/${APP_NAME}.app"
+STAGING_DIR="${STAGING_DIR:-$DIR/build/package}"
+STAGING_APP="$STAGING_DIR/${APP_NAME}.app"
 ZIP_PATH="$DIST_DIR/${APP_NAME}.zip"
-NOTARY_ZIP="$DIST_DIR/${APP_NAME}-notary.zip"
+NOTARY_ZIP="$STAGING_DIR/${APP_NAME}-notary.zip"
 
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
@@ -29,8 +42,8 @@ if [[ -z "$ENTITLEMENTS_PATH" && -f "$DIR/${APP_NAME}.entitlements" ]]; then
   ENTITLEMENTS_PATH="$DIR/${APP_NAME}.entitlements"
 fi
 
-rm -rf "$DIST_DIR"
-mkdir -p "$DIST_DIR"
+rm -rf "$DIST_DIR" "$STAGING_DIR"
+mkdir -p "$DIST_DIR" "$STAGING_DIR"
 
 echo -e "${BLUE}Packaging ${APP_NAME} (${CONFIGURATION})...${OFF}"
 
@@ -40,7 +53,9 @@ xcodebuild \
   -configuration "$CONFIGURATION" \
   -derivedDataPath "$DERIVED_DATA" \
   build \
-  CODE_SIGNING_ALLOWED=NO
+  CODE_SIGNING_ALLOWED=NO \
+  MARKETING_VERSION="$VERSION" \
+  CURRENT_PROJECT_VERSION="$VERSION"
 
 APP_PATH="$DERIVED_DATA/Build/Products/${CONFIGURATION}/${APP_NAME}.app"
 if [[ ! -d "$APP_PATH" ]]; then

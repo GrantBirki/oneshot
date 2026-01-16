@@ -18,6 +18,17 @@ export DIR
 REPO_NAME=$(basename "$PWD")
 export REPO_NAME
 
+VERSION_FILE="$DIR/VERSION"
+if [[ -f "$VERSION_FILE" ]]; then
+  VERSION=$(awk 'NF && $1 !~ /^#/ {print $1; exit}' "$VERSION_FILE")
+fi
+
+if [[ -z "${VERSION:-}" ]]; then
+  VERSION="unknown"
+fi
+
+export VERSION
+
 if [[ -z "${GIT_SHA:-}" ]]; then
   if command -v git >/dev/null 2>&1 && [[ -d "$DIR/.git" ]]; then
     GIT_SHA=$(git -C "$DIR" rev-parse --short=8 HEAD 2>/dev/null || true)

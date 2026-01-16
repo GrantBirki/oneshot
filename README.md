@@ -13,3 +13,27 @@ Homebrew (recommended):
 ```bash
 brew install --cask grantbirki/tap/oneshot
 ```
+
+## Verify Releases
+
+Release artifacts are published with SLSA provenance. After downloading `OneShot.zip`:
+
+```bash
+gh attestation verify OneShot.zip \
+  --repo grantbirki/oneshot \
+  --signer-workflow grantbirki/oneshot/.github/workflows/release.yml \
+  --source-ref refs/heads/main \
+  --deny-self-hosted-runners
+```
+
+Minimal verification by owner:
+
+```bash
+gh attestation verify OneShot.zip --owner grantbirki
+```
+
+You can also verify the checksum:
+
+```bash
+shasum -a 256 OneShot.zip
+```
