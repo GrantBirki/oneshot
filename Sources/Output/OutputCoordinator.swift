@@ -76,7 +76,20 @@ final class OutputCoordinator {
             }
             pending.workItem.cancel()
             if pending.savedURL == nil {
-                pending.savedURL = saveNow(pngData: pending.pngData, id: id)
+                guard let pngData = pending.pngData else {
+                    pendingSaves.removeValue(forKey: id)
+                    if let completion {
+                        DispatchQueue.main.async {
+                            completion(nil)
+                        }
+                    }
+                    return
+                }
+                let savedURL = saveNow(pngData: pngData, id: id)
+                pending.savedURL = savedURL
+                if savedURL != nil {
+                    pending.pngData = nil
+                }
             }
             let savedURL = pending.savedURL
             pendingSaves.removeValue(forKey: id)
@@ -112,7 +125,15 @@ final class OutputCoordinator {
         }
 
         if pending.savedURL == nil {
-            pending.savedURL = saveNow(pngData: pending.pngData, id: id)
+            guard let pngData = pending.pngData else {
+                pendingSaves.removeValue(forKey: id)
+                return
+            }
+            let savedURL = saveNow(pngData: pngData, id: id)
+            pending.savedURL = savedURL
+            if savedURL != nil {
+                pending.pngData = nil
+            }
         }
 
         if pending.releaseAfterSave {
@@ -149,7 +170,7 @@ final class OutputCoordinator {
 }
 
 private struct PendingSave {
-    let pngData: Data
+    var pngData: Data?
     var workItem: DispatchWorkItem
     var savedURL: URL?
     var releaseAfterSave: Bool

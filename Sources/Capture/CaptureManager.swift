@@ -50,7 +50,7 @@ final class CaptureManager {
         do {
             let captured = try CapturedImage(cgImage: image, displaySize: displaySize)
             let previewTimeout = settings.previewTimeout
-            let shouldAutoDismiss = previewTimeout.map { $0 > 0 } ?? false
+            let shouldAutoDismiss = previewTimeout != nil
             let saveID = outputCoordinator.begin(pngData: captured.pngData, scheduleSave: !shouldAutoDismiss)
             if settings.previewEnabled {
                 let replacementBehavior = settings.previewReplacementBehavior

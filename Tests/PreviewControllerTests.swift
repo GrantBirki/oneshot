@@ -45,6 +45,34 @@ final class PreviewControllerTests: XCTestCase {
         controller.hide()
     }
 
+    @MainActor
+    func testAutoDismissFiresWhenTimeoutIsZero() throws {
+        let controller = PreviewController()
+        let cgImage = makeCGImage(width: 1, height: 1)
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: 1, height: 1))
+        let pngData = try PNGDataEncoder.encode(cgImage: cgImage)
+
+        let didDismiss = expectation(description: "Auto-dismiss fires")
+        controller.show(
+            PreviewRequest(
+                image: image,
+                pngData: pngData,
+                filenamePrefix: "screenshot",
+                timeout: 0,
+                onClose: {},
+                onTrash: {},
+                onOpen: {},
+                onReplace: {},
+                onAutoDismiss: {
+                    didDismiss.fulfill()
+                },
+                anchorRect: nil,
+            ),
+        )
+
+        wait(for: [didDismiss], timeout: 1)
+    }
+
     private func makeCGImage(width: Int, height: Int) -> CGImage {
         makeBitmapRep(width: width, height: height).cgImage!
     }

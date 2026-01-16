@@ -105,7 +105,7 @@ final class PreviewController {
         }
         autoDismissAction = request.onAutoDismiss
 
-        if let timeout = request.timeout, timeout > 0 {
+        if let timeout = request.timeout, timeout >= 0 {
             autoDismissGate.reset(deadline: dateProvider().addingTimeInterval(timeout))
             let workItem = DispatchWorkItem { [weak self] in
                 self?.handleDismissDeadlineReached()
