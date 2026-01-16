@@ -17,6 +17,9 @@ let package = Package(
         .executableTarget(
             name: "OneShot",
             path: "Sources",
+            resources: [
+                .process("Resources"),
+            ],
         ),
         .testTarget(
             name: "OneShotTests",

@@ -49,6 +49,7 @@ final class CaptureManager {
     private func handleCapture(_ image: CGImage, displaySize: NSSize, anchorRect: CGRect?) {
         do {
             let captured = try CapturedImage(cgImage: image, displaySize: displaySize)
+            ScreenshotSoundPlayer.play()
             let previewTimeout = settings.previewTimeout
             let shouldAutoDismiss = previewTimeout != nil
             let saveID = outputCoordinator.begin(pngData: captured.pngData, scheduleSave: !shouldAutoDismiss)
