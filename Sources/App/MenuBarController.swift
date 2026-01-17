@@ -85,6 +85,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         NSLog("Menu bar item started")
     }
 
+    func setVisible(_ isVisible: Bool) {
+        statusItem.isVisible = isVisible
+    }
+
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
 
