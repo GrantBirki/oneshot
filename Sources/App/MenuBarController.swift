@@ -68,7 +68,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     func start() {
         if let button = statusItem.button {
-            if let image = NSImage(named: "MenuBarIcon") {
+            if let image = resolveMenuBarImage() {
                 image.isTemplate = true
                 button.image = image
                 button.imagePosition = .imageOnly
@@ -181,4 +181,23 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func quit() {
         onQuit()
     }
+
+    private func resolveMenuBarImage() -> NSImage? {
+        var bundles: [Bundle] = [
+            Bundle.main,
+            Bundle(for: BundleMarker.self),
+        ]
+        #if SWIFT_PACKAGE
+            bundles.append(Bundle.module)
+        #endif
+        let imageName = NSImage.Name("MenuBarIcon")
+        for bundle in bundles {
+            if let image = bundle.image(forResource: imageName) {
+                return image
+            }
+        }
+        return nil
+    }
+
+    private final class BundleMarker {}
 }
