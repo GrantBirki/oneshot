@@ -15,7 +15,9 @@ final class CaptureManager {
     func captureSelection() {
         guard ScreenCapturePermission.ensureAccess() else { return }
         NSApp.activate(ignoringOtherApps: true)
-        selectionOverlay.beginSelection { [weak self] selection in
+        selectionOverlay.beginSelection(
+            showSelectionCoordinates: settings.showSelectionCoordinates,
+        ) { [weak self] selection in
             guard let self, let selection else { return }
             capture(rect: selection.rect, excludingWindowID: selection.excludeWindowID)
         }

@@ -24,11 +24,11 @@ Use the menu bar icon (camera) or hotkeys to capture:
 - Window: click a window to capture it; press Esc to cancel
 - Full screen: capture all screens
 
-Default hotkeys:
+Default hotkeys: none. Set them in Settings > Hotkeys.
 
-- Selection: Control + P
-- Full screen: Control + Shift + P
-- Window: none (set one in Settings)
+Selection overlay:
+
+- The size label next to the crosshair can be toggled in Settings.
 
 ## Preview Tile
 

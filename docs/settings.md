@@ -6,6 +6,7 @@ This document describes the settings available in OneShot.
 
 - `Launch at login`: Start OneShot automatically when you sign in.
 - `Hide menu bar icon`: Remove the OneShot icon from the menu bar. To bring it back, open OneShot from Spotlight and disable this setting.
+- `Show selection coordinates`: Show the selection size next to the crosshair while selecting.
 
 ## Output
 
@@ -37,8 +38,8 @@ When previews are disabled, screenshots follow the `Default output` setting and 
 
 ## Hotkeys
 
-- `Selection`: Hotkey for selection capture (default: Control + P).
-- `Full screen`: Hotkey for full screen capture (default: Control + Shift + P).
+- `Selection`: Hotkey for selection capture (default: none).
+- `Full screen`: Hotkey for full screen capture (default: none).
 - `Window`: Hotkey for window capture (no default).
 
 Notes:

@@ -25,6 +25,8 @@ struct SettingsView: View {
                         }
                     }
                     .help("Hide the OneShot icon from the menu bar.")
+                Toggle("Show selection coordinates", isOn: $settings.showSelectionCoordinates)
+                    .help("Show the selection size next to the crosshair.")
             }
 
             Section("Output") {

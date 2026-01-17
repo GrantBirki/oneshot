@@ -1,5 +1,4 @@
 import AppKit
-import Carbon.HIToolbox
 import Foundation
 
 enum SaveLocationOption: String, CaseIterable, Identifiable {
@@ -102,6 +101,10 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(menuBarIconHidden, forKey: Keys.menuBarIconHidden) }
     }
 
+    @Published var showSelectionCoordinates: Bool {
+        didSet { defaults.set(showSelectionCoordinates, forKey: Keys.showSelectionCoordinates) }
+    }
+
     @Published var saveDelaySeconds: Double {
         didSet { defaults.set(saveDelaySeconds, forKey: Keys.saveDelaySeconds) }
     }
@@ -183,6 +186,7 @@ final class SettingsStore: ObservableObject {
 
         autoLaunchEnabled = defaults.object(forKey: Keys.autoLaunchEnabled) as? Bool ?? false
         menuBarIconHidden = defaults.object(forKey: Keys.menuBarIconHidden) as? Bool ?? false
+        showSelectionCoordinates = defaults.object(forKey: Keys.showSelectionCoordinates) as? Bool ?? true
         if let saveDelay = defaults.object(forKey: Keys.saveDelaySeconds) as? Double {
             saveDelaySeconds = saveDelay
         } else if let legacyDelay = defaults.object(forKey: LegacyKeys.previewTimeoutSeconds) as? Double {
@@ -215,13 +219,13 @@ final class SettingsStore: ObservableObject {
             keyCodeKey: Keys.hotkeySelectionKeyCode,
             modifiersKey: Keys.hotkeySelectionModifiers,
             legacyKey: LegacyKeys.hotkeySelection,
-            defaultValue: SettingsStore.defaultHotkeySelection,
+            defaultValue: nil,
         )
         hotkeyFullScreen = loadHotkey(
             keyCodeKey: Keys.hotkeyFullScreenKeyCode,
             modifiersKey: Keys.hotkeyFullScreenModifiers,
             legacyKey: LegacyKeys.hotkeyFullScreen,
-            defaultValue: SettingsStore.defaultHotkeyFullScreen,
+            defaultValue: nil,
         )
         hotkeyWindow = loadHotkey(
             keyCodeKey: Keys.hotkeyWindowKeyCode,
@@ -296,19 +300,12 @@ final class SettingsStore: ObservableObject {
     }
 
     private static let unsetKeyCodeSentinel = -1
-    private static let defaultHotkeySelection = Hotkey(
-        keyCode: UInt16(kVK_ANSI_P),
-        modifiers: [.control],
-    )
-    private static let defaultHotkeyFullScreen = Hotkey(
-        keyCode: UInt16(kVK_ANSI_P),
-        modifiers: [.control, .shift],
-    )
 }
 
 private enum Keys {
     static let autoLaunchEnabled = "settings.autoLaunchEnabled"
     static let menuBarIconHidden = "settings.menuBarIconHidden"
+    static let showSelectionCoordinates = "settings.showSelectionCoordinates"
     static let saveDelaySeconds = "settings.saveDelaySeconds"
     static let previewTimeoutEnabled = "settings.previewTimeoutEnabled"
     static let previewEnabled = "settings.previewEnabled"
