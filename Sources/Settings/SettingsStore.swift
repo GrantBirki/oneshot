@@ -122,6 +122,10 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(previewDisabledOutputBehavior.rawValue, forKey: Keys.previewDisabledOutputBehavior) }
     }
 
+    @Published var autoCopyToClipboard: Bool {
+        didSet { defaults.set(autoCopyToClipboard, forKey: Keys.autoCopyToClipboard) }
+    }
+
     @Published var saveLocationOption: SaveLocationOption {
         didSet { defaults.set(saveLocationOption.rawValue, forKey: Keys.saveLocationOption) }
     }
@@ -193,6 +197,8 @@ final class SettingsStore: ObservableObject {
         let outputBehaviorRaw = defaults.string(forKey: Keys.previewDisabledOutputBehavior)
             ?? PreviewDisabledOutputBehavior.saveToDisk.rawValue
         previewDisabledOutputBehavior = PreviewDisabledOutputBehavior(rawValue: outputBehaviorRaw) ?? .saveToDisk
+
+        autoCopyToClipboard = defaults.object(forKey: Keys.autoCopyToClipboard) as? Bool ?? true
 
         let locationRaw = defaults.string(forKey: Keys.saveLocationOption) ?? SaveLocationOption.downloads.rawValue
         saveLocationOption = SaveLocationOption(rawValue: locationRaw) ?? .downloads
@@ -303,6 +309,7 @@ private enum Keys {
     static let previewAutoDismissBehavior = "settings.previewAutoDismissBehavior"
     static let previewReplacementBehavior = "settings.previewReplacementBehavior"
     static let previewDisabledOutputBehavior = "settings.previewDisabledOutputBehavior"
+    static let autoCopyToClipboard = "settings.autoCopyToClipboard"
     static let saveLocationOption = "settings.saveLocationOption"
     static let customSavePath = "settings.customSavePath"
     static let filenamePrefix = "settings.filenamePrefix"

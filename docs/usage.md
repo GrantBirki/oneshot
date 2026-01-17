@@ -46,7 +46,7 @@ stays until you act, but the file still saves after the delay.
 
 ## Output Behavior
 
-- Every capture is copied to your clipboard.
+- Clipboard copy is optional; toggle it in Settings > Output.
 - Saved files are PNGs.
 - Save location and filename prefix are configurable in Settings.
 - When previews are disabled, use Default output to choose Save to disk or Clipboard only.

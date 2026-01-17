@@ -26,6 +26,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.previewAutoDismissBehavior, .saveToDisk)
         XCTAssertEqual(settings.previewReplacementBehavior, .saveImmediately)
         XCTAssertEqual(settings.previewDisabledOutputBehavior, .saveToDisk)
+        XCTAssertTrue(settings.autoCopyToClipboard)
         XCTAssertEqual(settings.saveLocationOption, .downloads)
         XCTAssertEqual(settings.filenamePrefix, "screenshot")
         XCTAssertEqual(settings.hotkeySelection, HotkeyParser.parse("ctrl+p"))
@@ -42,6 +43,7 @@ final class SettingsStoreTests: XCTestCase {
         settings.previewAutoDismissBehavior = .discard
         settings.previewReplacementBehavior = .discard
         settings.previewDisabledOutputBehavior = .clipboardOnly
+        settings.autoCopyToClipboard = false
         settings.saveLocationOption = .desktop
         settings.customSavePath = "/tmp"
         settings.filenamePrefix = "grab"
@@ -58,6 +60,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.previewAutoDismissBehavior, .discard)
         XCTAssertEqual(settings.previewReplacementBehavior, .discard)
         XCTAssertEqual(settings.previewDisabledOutputBehavior, .clipboardOnly)
+        XCTAssertFalse(settings.autoCopyToClipboard)
         XCTAssertEqual(settings.saveLocationOption, .desktop)
         XCTAssertEqual(settings.customSavePath, "/tmp")
         XCTAssertEqual(settings.filenamePrefix, "grab")

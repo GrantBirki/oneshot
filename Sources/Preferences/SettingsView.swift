@@ -25,6 +25,9 @@ struct SettingsView: View {
                         .textFieldStyle(.roundedBorder)
                 }
 
+                Toggle("Copy to clipboard automatically", isOn: $settings.autoCopyToClipboard)
+                    .help("Copy captures to the clipboard in addition to saving.")
+
                 LabeledContent("Save location") {
                     Picker("", selection: $settings.saveLocationOption) {
                         ForEach(SaveLocationOption.allCases) { option in
