@@ -237,7 +237,13 @@ final class SelectionOverlayView: NSView {
         metricsBackgroundLayer.frame = bounds
 
         let selection = selectionRect()
-        dimmingLayer.path = OverlayPathBuilder.dimmingPath(bounds: bounds, cutout: selection)
+        if let dimmingPath = OverlayPathBuilder.innerDimmingPath(for: selection) {
+            dimmingLayer.path = dimmingPath
+            dimmingLayer.isHidden = false
+        } else {
+            dimmingLayer.path = nil
+            dimmingLayer.isHidden = true
+        }
         if let selection {
             borderLayer.path = CGPath(rect: selection, transform: nil)
             borderLayer.isHidden = false
@@ -252,7 +258,6 @@ final class SelectionOverlayView: NSView {
     }
 
     private func configureLayers() {
-        dimmingLayer.fillRule = .evenOdd
         dimmingLayer.fillColor = NSColor.black.withAlphaComponent(0.35).cgColor
 
         borderLayer.fillColor = nil

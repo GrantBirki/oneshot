@@ -174,7 +174,6 @@ final class WindowCaptureOverlayView: NSView {
     }
 
     private func configureLayers() {
-        dimmingLayer.fillRule = .evenOdd
         dimmingLayer.fillColor = NSColor.black.withAlphaComponent(0.25).cgColor
 
         highlightLayer.fillColor = nil
@@ -203,7 +202,13 @@ final class WindowCaptureOverlayView: NSView {
         highlightLayer.frame = bounds
 
         let highlight = highlightRect()
-        dimmingLayer.path = OverlayPathBuilder.dimmingPath(bounds: bounds, cutout: highlight)
+        if let dimmingPath = OverlayPathBuilder.innerDimmingPath(for: highlight) {
+            dimmingLayer.path = dimmingPath
+            dimmingLayer.isHidden = false
+        } else {
+            dimmingLayer.path = nil
+            dimmingLayer.isHidden = true
+        }
         if let highlight {
             highlightLayer.path = CGPath(rect: highlight, transform: nil)
             highlightLayer.isHidden = false

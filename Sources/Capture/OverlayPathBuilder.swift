@@ -1,12 +1,8 @@
 import CoreGraphics
 
 enum OverlayPathBuilder {
-    static func dimmingPath(bounds: CGRect, cutout: CGRect?) -> CGPath {
-        let path = CGMutablePath()
-        path.addRect(bounds)
-        if let cutout {
-            path.addRect(cutout)
-        }
-        return path
+    static func innerDimmingPath(for rect: CGRect?) -> CGPath? {
+        guard let rect else { return nil }
+        return CGPath(rect: rect, transform: nil)
     }
 }
