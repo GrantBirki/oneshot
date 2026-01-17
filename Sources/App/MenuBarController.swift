@@ -68,7 +68,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     func start() {
         if let button = statusItem.button {
-            if let image = NSImage(systemSymbolName: "camera.fill", accessibilityDescription: "OneShot") {
+            if let image = NSImage(systemSymbolName: "camera.aperture", accessibilityDescription: "OneShot") {
                 button.image = image
                 button.imagePosition = .imageOnly
             } else {
