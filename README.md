@@ -4,9 +4,23 @@
 [![test](https://github.com/GrantBirki/oneshot/actions/workflows/test.yml/badge.svg)](https://github.com/GrantBirki/oneshot/actions/workflows/test.yml)
 [![lint](https://github.com/GrantBirki/oneshot/actions/workflows/lint.yml/badge.svg)](https://github.com/GrantBirki/oneshot/actions/workflows/lint.yml)
 
-Open source screenshot utility for MacOS with QoL improvements over the native Apple screenshot utility.
+Open source screenshot utility for macOS with QoL improvements over the native Apple screenshot utility.
 
-## Installation
+## 🎯 Goals
+
+- Keep the capture flow simple and familiar.
+- Add control over preview behavior, save timing, location, clipboard operations, and naming.
+- Stay lightweight and focused.
+
+## ✨ Features
+
+- Selection, window, and full-screen capture.
+- Floating preview with save/discard actions and drag-and-drop.
+- Clipboard copy + configurable save location and filename prefix.
+- Customizable hotkeys.
+- Optional auto-dismiss preview with save delay control.
+
+## 🚀 Installation
 
 Homebrew (recommended):
 
@@ -14,7 +28,12 @@ Homebrew (recommended):
 brew install --cask grantbirki/tap/oneshot
 ```
 
-## Verify Releases
+## 📖 Usage
+
+- End-user guide: [docs/usage.md](docs/usage.md)
+- Settings reference: [docs/settings.md](docs/settings.md)
+
+## 🔐 Verify Releases
 
 Release artifacts are published with SLSA provenance. After downloading `OneShot.zip`:
 
@@ -49,6 +68,6 @@ To open it:
 
 > Why? Apple Developer ID certs cost $99/year, and I don't want to pay Apple.
 
-## Contributing 💻
+## 👩‍💻 Contributing
 
 See the [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to this project.
