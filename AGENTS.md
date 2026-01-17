@@ -27,6 +27,8 @@ brew install --cask grantbirki/tap/oneshot
 - Lint: `script/lint`
 - Build: `script/build`
 
+You must ensure that all tests, linting, and build steps pass after making any changes to the codebase (except for documentation changes).
+
 ## Repository Structure
 
 - `script/`: Scripts for building, testing, linting, etc. These are "scripts to rule them all" and should be used for all CI/CD and local development tasks.

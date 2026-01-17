@@ -25,7 +25,9 @@ final class OutputCoordinator {
     }
 
     func begin(pngData: Data, scheduleSave: Bool = true) -> UUID {
-        clipboardCopy(pngData)
+        if settings.autoCopyToClipboard {
+            clipboardCopy(pngData)
+        }
 
         let id = UUID()
         let delay = settings.saveDelaySeconds

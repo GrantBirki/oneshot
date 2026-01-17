@@ -19,6 +19,8 @@ final class SettingsStoreTests: XCTestCase {
     func testDefaultsAreApplied() {
         let settings = SettingsStore(defaults: defaults)
         XCTAssertFalse(settings.autoLaunchEnabled)
+        XCTAssertFalse(settings.menuBarIconHidden)
+        XCTAssertTrue(settings.showSelectionCoordinates)
         XCTAssertEqual(settings.saveDelaySeconds, 7)
         XCTAssertTrue(settings.previewTimeoutEnabled)
         XCTAssertEqual(settings.previewTimeout, 7)
@@ -26,22 +28,26 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.previewAutoDismissBehavior, .saveToDisk)
         XCTAssertEqual(settings.previewReplacementBehavior, .saveImmediately)
         XCTAssertEqual(settings.previewDisabledOutputBehavior, .saveToDisk)
+        XCTAssertTrue(settings.autoCopyToClipboard)
         XCTAssertEqual(settings.saveLocationOption, .downloads)
         XCTAssertEqual(settings.filenamePrefix, "screenshot")
-        XCTAssertEqual(settings.hotkeySelection, HotkeyParser.parse("ctrl+p"))
-        XCTAssertEqual(settings.hotkeyFullScreen, HotkeyParser.parse("ctrl+shift+p"))
+        XCTAssertNil(settings.hotkeySelection)
+        XCTAssertNil(settings.hotkeyFullScreen)
         XCTAssertNil(settings.hotkeyWindow)
     }
 
     func testValuesPersistToDefaults() {
         var settings = SettingsStore(defaults: defaults)
         settings.autoLaunchEnabled = true
+        settings.menuBarIconHidden = true
+        settings.showSelectionCoordinates = false
         settings.saveDelaySeconds = 3
         settings.previewTimeoutEnabled = false
         settings.previewEnabled = false
         settings.previewAutoDismissBehavior = .discard
         settings.previewReplacementBehavior = .discard
         settings.previewDisabledOutputBehavior = .clipboardOnly
+        settings.autoCopyToClipboard = false
         settings.saveLocationOption = .desktop
         settings.customSavePath = "/tmp"
         settings.filenamePrefix = "grab"
@@ -51,6 +57,8 @@ final class SettingsStoreTests: XCTestCase {
 
         settings = SettingsStore(defaults: defaults)
         XCTAssertTrue(settings.autoLaunchEnabled)
+        XCTAssertTrue(settings.menuBarIconHidden)
+        XCTAssertFalse(settings.showSelectionCoordinates)
         XCTAssertEqual(settings.saveDelaySeconds, 3)
         XCTAssertFalse(settings.previewTimeoutEnabled)
         XCTAssertNil(settings.previewTimeout)
@@ -58,6 +66,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.previewAutoDismissBehavior, .discard)
         XCTAssertEqual(settings.previewReplacementBehavior, .discard)
         XCTAssertEqual(settings.previewDisabledOutputBehavior, .clipboardOnly)
+        XCTAssertFalse(settings.autoCopyToClipboard)
         XCTAssertEqual(settings.saveLocationOption, .desktop)
         XCTAssertEqual(settings.customSavePath, "/tmp")
         XCTAssertEqual(settings.filenamePrefix, "grab")

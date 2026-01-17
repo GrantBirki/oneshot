@@ -24,11 +24,11 @@ Use the menu bar icon (camera) or hotkeys to capture:
 - Window: click a window to capture it; press Esc to cancel
 - Full screen: capture all screens
 
-Default hotkeys:
+Default hotkeys: none. Set them in Settings > Hotkeys.
 
-- Selection: Control + P
-- Full screen: Control + Shift + P
-- Window: none (set one in Settings)
+Selection overlay:
+
+- The size label next to the crosshair can be toggled in Settings.
 
 ## Preview Tile
 
@@ -46,7 +46,7 @@ stays until you act, but the file still saves after the delay.
 
 ## Output Behavior
 
-- Every capture is copied to your clipboard.
+- Clipboard copy is optional; toggle it in Settings > Output.
 - Saved files are PNGs.
 - Save location and filename prefix are configurable in Settings.
 - When previews are disabled, use Default output to choose Save to disk or Clipboard only.
@@ -54,3 +54,9 @@ stays until you act, but the file still saves after the delay.
 ## Settings
 
 All preferences and defaults live in [`docs/settings.md`](settings.md).
+
+## Menu Bar Icon
+
+Opening OneShot from Spotlight always shows the Settings window. This is useful
+if you hide the menu bar icon in Settings; just search for OneShot and turn the
+icon back on.

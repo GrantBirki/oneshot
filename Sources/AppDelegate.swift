@@ -8,4 +8,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appController = AppController()
         appController?.start()
     }
+
+    func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows _: Bool) -> Bool {
+        appController?.showSettings()
+        return false
+    }
 }

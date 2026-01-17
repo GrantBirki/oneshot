@@ -5,17 +5,20 @@ This document describes the settings available in OneShot.
 ## General
 
 - `Launch at login`: Start OneShot automatically when you sign in.
+- `Hide menu bar icon`: Remove the OneShot icon from the menu bar. To bring it back, open OneShot from Spotlight and disable this setting.
+- `Show selection coordinates`: Show the selection size next to the crosshair while selecting.
 
 ## Output
 
 - `Filename prefix`: Prefix used when naming saved screenshots. Empty or invalid values fall back to `screenshot`.
+- `Copy to clipboard automatically`: Toggle whether captures are copied to the clipboard in addition to any saves.
 - `Save location`: Choose where screenshots are saved (`Downloads`, `Desktop`, `Documents`, or `Custom`).
 - `Custom folder`: Absolute path used when `Save location` is set to `Custom`. Empty or relative paths fall back to `Downloads`.
-- `Default output` (previews disabled): Choose whether screenshots save to disk (and copy to clipboard) or only copy to the clipboard.
+- `Default output` (previews disabled): Choose whether screenshots save to disk (clipboard copy depends on the auto-copy toggle) or only copy to the clipboard.
 
 Notes:
 
-- OneShot always copies screenshots to your clipboard.
+- When `Copy to clipboard automatically` is off, only the `Default output` option `Copy to clipboard` will place images on the clipboard.
 
 ## Preview
 
@@ -35,8 +38,8 @@ When previews are disabled, screenshots follow the `Default output` setting and 
 
 ## Hotkeys
 
-- `Selection`: Hotkey for selection capture (default: Control + P).
-- `Full screen`: Hotkey for full screen capture (default: Control + Shift + P).
+- `Selection`: Hotkey for selection capture (default: none).
+- `Full screen`: Hotkey for full screen capture (default: none).
 - `Window`: Hotkey for window capture (no default).
 
 Notes:

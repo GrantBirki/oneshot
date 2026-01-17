@@ -10,7 +10,7 @@ final class SelectionOverlayController {
         let excludeWindowID: CGWindowID?
     }
 
-    func beginSelection(completion: @escaping (SelectionResult?) -> Void) {
+    func beginSelection(showSelectionCoordinates: Bool, completion: @escaping (SelectionResult?) -> Void) {
         guard windows.isEmpty else { return }
         let screens = NSScreen.screens
         guard !screens.isEmpty else {
@@ -25,7 +25,7 @@ final class SelectionOverlayController {
             end()
             completion(result)
         }
-        let state = SelectionOverlayState()
+        let state = SelectionOverlayState(showSelectionCoordinates: showSelectionCoordinates)
         selectionState = state
         let refreshViews: () -> Void = { [weak self] in
             guard let self else { return }
@@ -65,6 +65,11 @@ final class SelectionOverlayController {
 final class SelectionOverlayState {
     var start: CGPoint?
     var current: CGPoint?
+    let showSelectionCoordinates: Bool
+
+    init(showSelectionCoordinates: Bool) {
+        self.showSelectionCoordinates = showSelectionCoordinates
+    }
 
     var rect: CGRect? {
         guard let start, let current else { return nil }
@@ -77,7 +82,7 @@ final class SelectionOverlayState {
     }
 
     var selectionSizeText: String? {
-        guard let start, let current else { return nil }
+        guard showSelectionCoordinates, let start, let current else { return nil }
         let width = Int(abs(current.x - start.x).rounded())
         let height = Int(abs(current.y - start.y).rounded())
         return "\(width) x \(height)"
@@ -170,9 +175,9 @@ final class SelectionOverlayView: NSView {
         context.fill(selection)
         context.setBlendMode(.normal)
 
-        NSColor.systemBlue.setStroke()
+        NSColor(calibratedWhite: 0.92, alpha: 1).setStroke()
         let path = NSBezierPath(rect: selection)
-        path.lineWidth = 2
+        path.lineWidth = 1
         path.stroke()
     }
 

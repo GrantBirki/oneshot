@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings: SettingsStore
+    @State private var showMenuBarHiddenAlert = false
 
     private let numberFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
@@ -17,6 +18,15 @@ struct SettingsView: View {
         Form {
             Section("General") {
                 Toggle("Launch at login", isOn: $settings.autoLaunchEnabled)
+                Toggle("Hide menu bar icon", isOn: $settings.menuBarIconHidden)
+                    .onChange(of: settings.menuBarIconHidden) { newValue in
+                        if newValue {
+                            showMenuBarHiddenAlert = true
+                        }
+                    }
+                    .help("Hide the OneShot icon from the menu bar.")
+                Toggle("Show selection coordinates", isOn: $settings.showSelectionCoordinates)
+                    .help("Show the selection size next to the crosshair.")
             }
 
             Section("Output") {
@@ -24,6 +34,9 @@ struct SettingsView: View {
                     TextField("", text: $settings.filenamePrefix)
                         .textFieldStyle(.roundedBorder)
                 }
+
+                Toggle("Copy to clipboard automatically", isOn: $settings.autoCopyToClipboard)
+                    .help("Copy captures to the clipboard in addition to saving.")
 
                 LabeledContent("Save location") {
                     Picker("", selection: $settings.saveLocationOption) {
@@ -130,6 +143,11 @@ struct SettingsView: View {
         .background(FocusClearView())
         .padding(20)
         .frame(minWidth: 560, minHeight: 480)
+        .alert("Menu Bar Icon Hidden", isPresented: $showMenuBarHiddenAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("To bring it back, open OneShot from Spotlight and turn this setting off.")
+        }
     }
 
     private func chooseFolder() {

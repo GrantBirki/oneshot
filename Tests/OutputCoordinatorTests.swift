@@ -122,6 +122,31 @@ final class OutputCoordinatorTests: XCTestCase {
         XCTAssertEqual(clipboardData, pngData)
     }
 
+    func testBeginSkipsClipboardWhenDisabled() {
+        let settings = SettingsStore(defaults: defaults)
+        settings.autoCopyToClipboard = false
+        settings.saveLocationOption = .custom
+        settings.customSavePath = tempDirectory.path
+        settings.saveDelaySeconds = 60
+
+        let queue = DispatchQueue(label: "OutputCoordinatorTests.queue")
+        let pngData = Self.makePNGData()
+        var clipboardData: Data?
+
+        let coordinator = OutputCoordinator(
+            settings: settings,
+            queue: queue,
+            clipboardCopy: { data in
+                clipboardData = data
+            },
+        )
+
+        let id = coordinator.begin(pngData: pngData)
+        coordinator.cancel(id: id)
+        queue.sync {}
+        XCTAssertNil(clipboardData)
+    }
+
     func testBeginWithoutSchedulingDefersSaveUntilFinalize() {
         let settings = SettingsStore(defaults: defaults)
         settings.saveLocationOption = .custom

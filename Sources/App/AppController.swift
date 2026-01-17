@@ -39,15 +39,27 @@ final class AppController {
     func start() {
         NSLog("OneShot AppController start")
         menuBarController.start()
+        menuBarController.setVisible(!settings.menuBarIconHidden)
         registerHotkeys()
         observeSettings()
         launchAtLoginManager.setEnabled(settings.autoLaunchEnabled)
+        maybeShowSettingsOnLaunch()
+    }
+
+    func showSettings() {
+        settingsWindowController.show()
     }
 
     private func observeSettings() {
         settings.$autoLaunchEnabled
             .sink { [weak self] enabled in
                 self?.launchAtLoginManager.setEnabled(enabled)
+            }
+            .store(in: &cancellables)
+
+        settings.$menuBarIconHidden
+            .sink { [weak self] hidden in
+                self?.menuBarController.setVisible(!hidden)
             }
             .store(in: &cancellables)
 
@@ -60,6 +72,20 @@ final class AppController {
         settings.$hotkeyWindow
             .sink { [weak self] _ in self?.registerHotkeys() }
             .store(in: &cancellables)
+    }
+
+    private func maybeShowSettingsOnLaunch() {
+        if settings.menuBarIconHidden {
+            settingsWindowController.show()
+            return
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if NSApp.isActive {
+                settingsWindowController.show()
+            }
+        }
     }
 
     private func registerHotkeys() {

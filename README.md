@@ -19,9 +19,10 @@ Open source screenshot utility for macOS with QoL improvements over the native A
 
 - Selection, window, and full-screen capture.
 - Floating preview with save/discard actions and drag-and-drop.
-- Clipboard copy + configurable save location and filename prefix.
+- Optional clipboard copy + configurable save location and filename prefix.
 - Customizable hotkeys.
 - Optional auto-dismiss preview with save delay control.
+- Optional menu bar icon hiding (restore via Spotlight).
 
 ## 🚀 Installation
 
