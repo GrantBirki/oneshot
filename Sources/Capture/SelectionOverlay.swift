@@ -6,9 +6,14 @@ final class SelectionOverlayController {
     private var selectionState: SelectionOverlayState?
     private var keyMonitor: Any?
     private var globalKeyMonitor: Any?
+    private let cursorStack: CursorStack
 
     private enum KeyCodes {
         static let escape: UInt16 = 53
+    }
+
+    init(cursorStack: CursorStack = CursorStack()) {
+        self.cursorStack = cursorStack
     }
 
     struct SelectionResult {
@@ -24,6 +29,9 @@ final class SelectionOverlayController {
             return
         }
 
+        if !NSApp.isActive { NSApp.activate(ignoringOtherApps: true) }
+        cursorStack.pushCrosshair()
+
         var didFinish = false
         let finish: (SelectionResult?) -> Void = { [weak self] result in
             guard let self, !didFinish else { return }
@@ -37,6 +45,8 @@ final class SelectionOverlayController {
             guard let self else { return }
             views.forEach { $0.updateOverlay() }
         }
+        let mouseLocation = NSEvent.mouseLocation
+        var didSetKeyWindow = false
 
         for screen in screens {
             let window = OverlayWindow(contentRect: screen.frame)
@@ -51,11 +61,17 @@ final class SelectionOverlayController {
             }
             window.contentView = view
             window.orderFrontRegardless()
+            if screen.frame.contains(mouseLocation) {
+                window.makeKeyAndOrderFront(nil)
+                didSetKeyWindow = true
+            }
             window.makeFirstResponder(view)
             windowID = CGWindowID(window.windowNumber)
             windows.append(window)
             views.append(view)
         }
+
+        if !didSetKeyWindow { windows.first?.makeKeyAndOrderFront(nil) }
 
         startKeyMonitor(onCancel: { finish(nil) })
     }
@@ -67,6 +83,7 @@ final class SelectionOverlayController {
         windows.removeAll()
         views.removeAll()
         selectionState = nil
+        cursorStack.pop()
         stopKeyMonitor()
     }
 
@@ -143,6 +160,7 @@ final class SelectionOverlayView: NSView {
     private let metricsBackgroundLayer = CAShapeLayer()
     private let metricsTextLayer = CATextLayer()
     private let metricsFont = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+    private var cursorTrackingArea: NSTrackingArea?
 
     init(frame frameRect: NSRect, state: SelectionOverlayState) {
         self.state = state
@@ -167,20 +185,49 @@ final class SelectionOverlayView: NSView {
         super.viewDidMoveToWindow()
         updateLayerScale()
         updateOverlay()
+        guard window != nil else { return }
+        window?.invalidateCursorRects(for: self)
+        NSCursor.crosshair.set()
     }
 
     override func layout() {
         super.layout()
         updateOverlay()
+        window?.invalidateCursorRects(for: self)
     }
 
     override func resetCursorRects() {
         super.resetCursorRects()
+        // Keep the selection overlay on the crosshair so AppKit doesn't revert to arrow.
         addCursorRect(bounds, cursor: .crosshair)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let cursorTrackingArea {
+            removeTrackingArea(cursorTrackingArea)
+        }
+        let options: NSTrackingArea.Options = [
+            .activeAlways,
+            .inVisibleRect,
+            .mouseEnteredAndExited,
+            .mouseMoved,
+            .cursorUpdate,
+        ]
+        let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
+        addTrackingArea(area)
+        cursorTrackingArea = area
+        window?.invalidateCursorRects(for: self)
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        super.cursorUpdate(with: event)
+        NSCursor.crosshair.set()
     }
 
     override func mouseDown(with event: NSEvent) {
         guard let window else { return }
+        NSCursor.crosshair.set()
         let point = convert(event.locationInWindow, from: nil)
         let screenPoint = window.convertPoint(toScreen: point)
         state.start = screenPoint
@@ -201,7 +248,6 @@ final class SelectionOverlayView: NSView {
             onCancel?()
             return
         }
-
         let point = convert(event.locationInWindow, from: nil)
         state.current = window.convertPoint(toScreen: point)
         onSelectionChanged?()
@@ -209,7 +255,6 @@ final class SelectionOverlayView: NSView {
             onCancel?()
             return
         }
-
         if rect.width < 2 || rect.height < 2 {
             onCancel?()
         } else {
@@ -351,36 +396,5 @@ final class SelectionOverlayView: NSView {
     private func selectionRect() -> CGRect? {
         guard let rect = state.rect, let window else { return nil }
         return window.convertFromScreen(rect)
-    }
-}
-
-final class OverlayWindow: NSPanel {
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
-
-    init(contentRect: CGRect) {
-        super.init(
-            contentRect: contentRect,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false,
-        )
-        isFloatingPanel = true
-        isOpaque = false
-        backgroundColor = .clear
-        level = .screenSaver
-        hasShadow = false
-        ignoresMouseEvents = false
-        acceptsMouseMovedEvents = true
-        hidesOnDeactivate = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-    }
-}
-
-enum ScreenFrameHelper {
-    static func allScreensFrame() -> CGRect? {
-        let screens = NSScreen.screens
-        guard !screens.isEmpty else { return nil }
-        return screens.reduce(CGRect.null) { $0.union($1.frame) }
     }
 }
