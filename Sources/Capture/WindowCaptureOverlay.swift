@@ -2,6 +2,12 @@ import AppKit
 
 final class WindowCaptureOverlayController {
     private var windows: [OverlayWindow] = []
+    private var keyMonitor: Any?
+    private var globalKeyMonitor: Any?
+
+    private enum KeyCodes {
+        static let escape: UInt16 = 53
+    }
 
     func beginSelection(completion: @escaping (WindowInfo?) -> Void) {
         guard windows.isEmpty else { return }
@@ -29,10 +35,12 @@ final class WindowCaptureOverlayController {
                 finish(nil)
             }
             window.contentView = view
-            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
             window.makeFirstResponder(view)
             windows.append(window)
         }
+
+        startKeyMonitor(onCancel: { finish(nil) })
     }
 
     private func end() {
@@ -40,6 +48,42 @@ final class WindowCaptureOverlayController {
             window.orderOut(nil)
         }
         windows.removeAll()
+        stopKeyMonitor()
+    }
+
+    private func startKeyMonitor(onCancel: @escaping () -> Void) {
+        if keyMonitor == nil {
+            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+                if event.keyCode == KeyCodes.escape {
+                    onCancel()
+                    return nil
+                }
+                return event
+            }
+        }
+
+        if globalKeyMonitor == nil {
+            globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { event in
+                DispatchQueue.main.async {
+                    guard !NSApp.isActive else { return }
+                    if event.keyCode == KeyCodes.escape {
+                        onCancel()
+                    }
+                }
+            }
+        }
+    }
+
+    private func stopKeyMonitor() {
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        keyMonitor = nil
+
+        if let monitor = globalKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        globalKeyMonitor = nil
     }
 }
 
@@ -48,12 +92,48 @@ final class WindowCaptureOverlayView: NSView {
     var onCancel: (() -> Void)?
 
     private var highlightedWindow: WindowInfo?
+    private var hoverTrackingArea: NSTrackingArea?
+    private let dimmingLayer = CAShapeLayer()
+    private let highlightLayer = CAShapeLayer()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer = CALayer()
+        layer?.backgroundColor = NSColor.clear.cgColor
+        configureLayers()
+    }
+
+    required init?(coder _: NSCoder) {
+        nil
+    }
 
     override var acceptsFirstResponder: Bool { true }
 
+    override func acceptsFirstMouse(for _: NSEvent?) -> Bool {
+        true
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        updateLayerScale()
         updateHighlight(at: NSEvent.mouseLocation)
+    }
+
+    override func layout() {
+        super.layout()
+        updateLayers()
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+        let options: NSTrackingArea.Options = [.mouseMoved, .activeAlways, .inVisibleRect]
+        let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
+        addTrackingArea(area)
+        hoverTrackingArea = area
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -88,27 +168,61 @@ final class WindowCaptureOverlayView: NSView {
         onCancel?()
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        NSColor.black.withAlphaComponent(0.25).setFill()
-        dirtyRect.fill()
-
-        if let highlight = highlightedWindow?.bounds, let window {
-            let localRect = window.convertFromScreen(highlight)
-            guard let context = NSGraphicsContext.current?.cgContext else { return }
-            context.setBlendMode(.clear)
-            context.fill(localRect)
-            context.setBlendMode(.normal)
-
-            NSColor.systemBlue.setStroke()
-            let path = NSBezierPath(rect: localRect)
-            path.lineWidth = 2
-            path.stroke()
-        }
-    }
-
     private func updateHighlight(at screenPoint: CGPoint) {
         highlightedWindow = WindowInfoProvider.window(at: screenPoint)
-        needsDisplay = true
+        updateLayers()
+    }
+
+    private func configureLayers() {
+        dimmingLayer.fillColor = NSColor.black.withAlphaComponent(0.25).cgColor
+
+        highlightLayer.fillColor = nil
+        highlightLayer.strokeColor = NSColor.systemBlue.cgColor
+        highlightLayer.lineWidth = 2
+        highlightLayer.isHidden = true
+
+        layer?.addSublayer(dimmingLayer)
+        layer?.addSublayer(highlightLayer)
+    }
+
+    private func updateLayerScale() {
+        let scale = window?.backingScaleFactor
+            ?? NSScreen.main?.backingScaleFactor
+            ?? 2.0
+        dimmingLayer.contentsScale = scale
+        highlightLayer.contentsScale = scale
+    }
+
+    private func updateLayers() {
+        guard layer != nil else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+
+        dimmingLayer.frame = bounds
+        highlightLayer.frame = bounds
+
+        let highlight = highlightRect()
+        if let dimmingPath = OverlayPathBuilder.dimmingPath(for: highlight, in: bounds, mode: .selectionOnly) {
+            dimmingLayer.path = dimmingPath
+            dimmingLayer.isHidden = false
+        } else {
+            dimmingLayer.path = nil
+            dimmingLayer.isHidden = true
+        }
+        if let highlight {
+            highlightLayer.path = CGPath(rect: highlight, transform: nil)
+            highlightLayer.isHidden = false
+        } else {
+            highlightLayer.path = nil
+            highlightLayer.isHidden = true
+        }
+
+        CATransaction.commit()
+    }
+
+    private func highlightRect() -> CGRect? {
+        guard let highlight = highlightedWindow?.bounds, let window else { return nil }
+        return window.convertFromScreen(highlight)
     }
 }
 

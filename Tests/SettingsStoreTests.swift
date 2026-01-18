@@ -28,6 +28,12 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.previewAutoDismissBehavior, .saveToDisk)
         XCTAssertEqual(settings.previewReplacementBehavior, .saveImmediately)
         XCTAssertEqual(settings.previewDisabledOutputBehavior, .saveToDisk)
+        XCTAssertEqual(settings.selectionDimmingMode, .fullScreen)
+        XCTAssertEqual(
+            settings.selectionDimmingColorHex,
+            ColorHexCodec.defaultSelectionDimmingColorHex,
+        )
+        XCTAssertEqual(settings.selectionVisualCue, .none)
         XCTAssertTrue(settings.autoCopyToClipboard)
         XCTAssertEqual(settings.saveLocationOption, .downloads)
         XCTAssertEqual(settings.filenamePrefix, "screenshot")
@@ -47,6 +53,9 @@ final class SettingsStoreTests: XCTestCase {
         settings.previewAutoDismissBehavior = .discard
         settings.previewReplacementBehavior = .discard
         settings.previewDisabledOutputBehavior = .clipboardOnly
+        settings.selectionDimmingMode = .selectionOnly
+        settings.selectionDimmingColorHex = "#336699CC"
+        settings.selectionVisualCue = .none
         settings.autoCopyToClipboard = false
         settings.saveLocationOption = .desktop
         settings.customSavePath = "/tmp"
@@ -66,6 +75,9 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.previewAutoDismissBehavior, .discard)
         XCTAssertEqual(settings.previewReplacementBehavior, .discard)
         XCTAssertEqual(settings.previewDisabledOutputBehavior, .clipboardOnly)
+        XCTAssertEqual(settings.selectionDimmingMode, .selectionOnly)
+        XCTAssertEqual(settings.selectionDimmingColorHex, "#336699CC")
+        XCTAssertEqual(settings.selectionVisualCue, .none)
         XCTAssertFalse(settings.autoCopyToClipboard)
         XCTAssertEqual(settings.saveLocationOption, .desktop)
         XCTAssertEqual(settings.customSavePath, "/tmp")

@@ -1,16 +1,31 @@
 import AppKit
+import os.log
 
 final class SelectionOverlayController {
     private var windows: [OverlayWindow] = []
     private var views: [SelectionOverlayView] = []
-    private var selectionState: SelectionOverlayState?
+    private var keyMonitor: Any?
+    private var globalKeyMonitor: Any?
+    private let log = OSLog(subsystem: "com.grantbirki.oneshot", category: "SelectionOverlay")
+
+    private enum KeyCodes {
+        static let escape: UInt16 = 53
+    }
+
+    init() {}
 
     struct SelectionResult {
         let rect: CGRect
         let excludeWindowID: CGWindowID?
     }
 
-    func beginSelection(showSelectionCoordinates: Bool, completion: @escaping (SelectionResult?) -> Void) {
+    func beginSelection(
+        showSelectionCoordinates: Bool,
+        visualCue: SelectionVisualCue,
+        dimmingMode: SelectionDimmingMode,
+        selectionDimmingColor: NSColor,
+        completion: @escaping (SelectionResult?) -> Void,
+    ) {
         guard windows.isEmpty else { return }
         let screens = NSScreen.screens
         guard !screens.isEmpty else {
@@ -25,12 +40,17 @@ final class SelectionOverlayController {
             end()
             completion(result)
         }
-        let state = SelectionOverlayState(showSelectionCoordinates: showSelectionCoordinates)
-        selectionState = state
+        let state = SelectionOverlayState(
+            showSelectionCoordinates: showSelectionCoordinates,
+            dimmingMode: dimmingMode,
+            selectionDimmingColor: selectionDimmingColor,
+        )
         let refreshViews: () -> Void = { [weak self] in
             guard let self else { return }
-            views.forEach { $0.needsDisplay = true }
+            views.forEach { $0.updateOverlay() }
         }
+        let mouseLocation = NSEvent.mouseLocation
+        var didSetKeyWindow = false
 
         for screen in screens {
             let window = OverlayWindow(contentRect: screen.frame)
@@ -44,11 +64,59 @@ final class SelectionOverlayController {
                 finish(nil)
             }
             window.contentView = view
-            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+            if screen.frame.contains(mouseLocation) {
+                window.makeKeyAndOrderFront(nil)
+                didSetKeyWindow = true
+                #if DEBUG
+                    os_log(
+                        "made key window %{public}d for screen %{public}@, appActive=%{public}@",
+                        log: log,
+                        type: .debug,
+                        window.windowNumber,
+                        "\(screen.frame)",
+                        "\(NSApp.isActive)",
+                    )
+                #endif
+            }
             window.makeFirstResponder(view)
             windowID = CGWindowID(window.windowNumber)
             windows.append(window)
             views.append(view)
+        }
+
+        if !didSetKeyWindow {
+            windows.first?.makeKeyAndOrderFront(nil)
+            #if DEBUG
+                if let window = windows.first, let screen = screens.first {
+                    os_log(
+                        "default key window %{public}d for screen %{public}@, appActive=%{public}@",
+                        log: log,
+                        type: .debug,
+                        window.windowNumber,
+                        "\(screen.frame)",
+                        "\(NSApp.isActive)",
+                    )
+                }
+            #endif
+        }
+        // Ensure a key window is set for event handling.
+        if let keyWindow = windows.first(where: { $0.isKeyWindow }) ?? windows.first {
+            keyWindow.makeKeyAndOrderFront(nil)
+            #if DEBUG
+                os_log(
+                    "reassert key window %{public}d appActive=%{public}@",
+                    log: log,
+                    type: .debug,
+                    keyWindow.windowNumber,
+                    "\(NSApp.isActive)",
+                )
+            #endif
+        }
+
+        startKeyMonitor(onCancel: { finish(nil) })
+        if visualCue == .pulse {
+            views.forEach { $0.showSelectionPulse(at: mouseLocation) }
         }
     }
 
@@ -58,34 +126,41 @@ final class SelectionOverlayController {
         }
         windows.removeAll()
         views.removeAll()
-        selectionState = nil
-    }
-}
-
-final class SelectionOverlayState {
-    var start: CGPoint?
-    var current: CGPoint?
-    let showSelectionCoordinates: Bool
-
-    init(showSelectionCoordinates: Bool) {
-        self.showSelectionCoordinates = showSelectionCoordinates
+        stopKeyMonitor()
     }
 
-    var rect: CGRect? {
-        guard let start, let current else { return nil }
-        return CGRect(
-            x: min(start.x, current.x),
-            y: min(start.y, current.y),
-            width: abs(start.x - current.x),
-            height: abs(start.y - current.y),
-        )
+    private func startKeyMonitor(onCancel: @escaping () -> Void) {
+        if keyMonitor == nil {
+            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+                if event.keyCode == KeyCodes.escape {
+                    onCancel()
+                    return nil
+                }
+                return event
+            }
+        }
+
+        if globalKeyMonitor == nil {
+            globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { event in
+                DispatchQueue.main.async {
+                    if event.keyCode == KeyCodes.escape {
+                        onCancel()
+                    }
+                }
+            }
+        }
     }
 
-    var selectionSizeText: String? {
-        guard showSelectionCoordinates, let start, let current else { return nil }
-        let width = Int(abs(current.x - start.x).rounded())
-        let height = Int(abs(current.y - start.y).rounded())
-        return "\(width) x \(height)"
+    private func stopKeyMonitor() {
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        keyMonitor = nil
+
+        if let monitor = globalKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        globalKeyMonitor = nil
     }
 }
 
@@ -94,10 +169,20 @@ final class SelectionOverlayView: NSView {
     var onCancel: (() -> Void)?
     var onSelectionChanged: (() -> Void)?
     private let state: SelectionOverlayState
+    private let dimmingLayer = CAShapeLayer()
+    private let borderLayer = CAShapeLayer()
+    private let metricsBackgroundLayer = CAShapeLayer()
+    private let metricsTextLayer = CATextLayer()
+    private let metricsFont = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+    private let log = OSLog(subsystem: "com.grantbirki.oneshot", category: "SelectionOverlayView")
 
     init(frame frameRect: NSRect, state: SelectionOverlayState) {
         self.state = state
         super.init(frame: frameRect)
+        wantsLayer = true
+        layer = CALayer()
+        layer?.backgroundColor = NSColor.clear.cgColor
+        configureLayers()
     }
 
     required init?(coder _: NSCoder) {
@@ -106,9 +191,29 @@ final class SelectionOverlayView: NSView {
 
     override var acceptsFirstResponder: Bool { true }
 
-    override func resetCursorRects() {
-        super.resetCursorRects()
-        addCursorRect(bounds, cursor: .crosshair)
+    override func acceptsFirstMouse(for _: NSEvent?) -> Bool {
+        true
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateLayerScale()
+        updateOverlay()
+        #if DEBUG
+            os_log(
+                "viewDidMoveToWindow window=%{public}@ key=%{public}@ main=%{public}@",
+                log: log,
+                type: .debug,
+                window?.description ?? "nil",
+                "\(window?.isKeyWindow ?? false)",
+                "\(window?.isMainWindow ?? false)",
+            )
+        #endif
+    }
+
+    override func layout() {
+        super.layout()
+        updateOverlay()
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -133,7 +238,6 @@ final class SelectionOverlayView: NSView {
             onCancel?()
             return
         }
-
         let point = convert(event.locationInWindow, from: nil)
         state.current = window.convertPoint(toScreen: point)
         onSelectionChanged?()
@@ -141,7 +245,6 @@ final class SelectionOverlayView: NSView {
             onCancel?()
             return
         }
-
         if rect.width < 2 || rect.height < 2 {
             onCancel?()
         } else {
@@ -159,41 +262,101 @@ final class SelectionOverlayView: NSView {
         onCancel?()
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        NSColor.black.withAlphaComponent(0.35).setFill()
-        dirtyRect.fill()
+    func updateOverlay() {
+        guard layer != nil else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
 
-        drawSelectionOutline()
-        drawSelectionMetrics()
+        dimmingLayer.frame = bounds
+        borderLayer.frame = bounds
+        metricsBackgroundLayer.frame = bounds
+
+        let selection = selectionRect()
+        dimmingLayer.fillRule = state.dimmingMode == .fullScreen ? .evenOdd : .nonZero
+        dimmingLayer.fillColor = dimmingFillColor(for: state.dimmingMode)
+        if let dimmingPath = OverlayPathBuilder.dimmingPath(for: selection, in: bounds, mode: state.dimmingMode) {
+            dimmingLayer.path = dimmingPath
+            dimmingLayer.isHidden = false
+        } else {
+            dimmingLayer.path = nil
+            dimmingLayer.isHidden = true
+        }
+        if let selection {
+            borderLayer.path = CGPath(rect: selection, transform: nil)
+            borderLayer.isHidden = false
+        } else {
+            borderLayer.path = nil
+            borderLayer.isHidden = true
+        }
+
+        updateMetrics()
+
+        CATransaction.commit()
     }
 
-    private func drawSelectionOutline() {
-        guard let selection = selectionRect(),
-              let context = NSGraphicsContext.current?.cgContext
-        else { return }
-        context.setBlendMode(.clear)
-        context.fill(selection)
-        context.setBlendMode(.normal)
+    private func configureLayers() {
+        dimmingLayer.fillColor = dimmingFillColor(for: state.dimmingMode)
 
-        NSColor(calibratedWhite: 0.92, alpha: 1).setStroke()
-        let path = NSBezierPath(rect: selection)
-        path.lineWidth = 1
-        path.stroke()
+        borderLayer.fillColor = nil
+        borderLayer.strokeColor = NSColor(calibratedWhite: 0.92, alpha: 1).cgColor
+        borderLayer.lineWidth = 1
+        borderLayer.isHidden = true
+
+        metricsBackgroundLayer.fillColor = NSColor.black.withAlphaComponent(0.75).cgColor
+        metricsBackgroundLayer.isHidden = true
+
+        metricsTextLayer.font = metricsFont
+        metricsTextLayer.fontSize = metricsFont.pointSize
+        metricsTextLayer.foregroundColor = NSColor.white.cgColor
+        metricsTextLayer.alignmentMode = .left
+        metricsTextLayer.isWrapped = false
+        metricsTextLayer.isHidden = true
+
+        layer?.addSublayer(dimmingLayer)
+        layer?.addSublayer(borderLayer)
+        layer?.addSublayer(metricsBackgroundLayer)
+        layer?.addSublayer(metricsTextLayer)
     }
 
-    private func drawSelectionMetrics() {
+    private func dimmingFillColor(for mode: SelectionDimmingMode) -> CGColor {
+        switch mode {
+        case .fullScreen:
+            NSColor.black.withAlphaComponent(0.35).cgColor
+        case .selectionOnly:
+            state.selectionDimmingColor.cgColor
+        }
+    }
+
+    private func updateLayerScale() {
+        let scale = window?.backingScaleFactor
+            ?? NSScreen.main?.backingScaleFactor
+            ?? 2.0
+        dimmingLayer.contentsScale = scale
+        borderLayer.contentsScale = scale
+        metricsBackgroundLayer.contentsScale = scale
+        metricsTextLayer.contentsScale = scale
+    }
+
+    private func updateMetrics() {
         guard let window,
               let current = state.current,
               let text = state.selectionSizeText
-        else { return }
+        else {
+            metricsBackgroundLayer.isHidden = true
+            metricsTextLayer.isHidden = true
+            metricsTextLayer.string = nil
+            return
+        }
 
         let anchor = window.convertPoint(fromScreen: current)
-        guard bounds.contains(anchor) else { return }
+        guard bounds.contains(anchor) else {
+            metricsBackgroundLayer.isHidden = true
+            metricsTextLayer.isHidden = true
+            metricsTextLayer.string = nil
+            return
+        }
 
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
-            .foregroundColor: NSColor.white,
-        ]
+        let attributes: [NSAttributedString.Key: Any] = [.font: metricsFont, .foregroundColor: NSColor.white]
         let attributedText = NSAttributedString(string: text, attributes: attributes)
         let textSize = attributedText.size()
         let padding = CGSize(width: 6, height: 4)
@@ -206,9 +369,22 @@ final class SelectionOverlayView: NSView {
         )
         bubbleRect = clamp(bubbleRect, to: bounds, margin: 8)
 
-        NSColor.black.withAlphaComponent(0.75).setFill()
-        NSBezierPath(roundedRect: bubbleRect, xRadius: 6, yRadius: 6).fill()
-        attributedText.draw(at: CGPoint(x: bubbleRect.minX + padding.width, y: bubbleRect.minY + padding.height))
+        metricsBackgroundLayer.path = CGPath(
+            roundedRect: bubbleRect,
+            cornerWidth: 6,
+            cornerHeight: 6,
+            transform: nil,
+        )
+        metricsBackgroundLayer.isHidden = false
+
+        metricsTextLayer.string = attributedText
+        metricsTextLayer.frame = CGRect(
+            x: bubbleRect.minX + padding.width,
+            y: bubbleRect.minY + padding.height,
+            width: textSize.width,
+            height: textSize.height,
+        )
+        metricsTextLayer.isHidden = false
     }
 
     private func clamp(_ rect: CGRect, to bounds: CGRect, margin: CGFloat) -> CGRect {
@@ -222,33 +398,47 @@ final class SelectionOverlayView: NSView {
         guard let rect = state.rect, let window else { return nil }
         return window.convertFromScreen(rect)
     }
-}
 
-final class OverlayWindow: NSWindow {
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
+    func showSelectionPulse(at screenPoint: CGPoint) {
+        guard let window else { return }
+        let point = window.convertPoint(fromScreen: screenPoint)
+        guard bounds.contains(point), let layer else { return }
 
-    init(contentRect: CGRect) {
-        super.init(
-            contentRect: contentRect,
-            styleMask: .borderless,
-            backing: .buffered,
-            defer: false,
+        let size: CGFloat = 18
+        let rect = CGRect(
+            x: point.x - size / 2,
+            y: point.y - size / 2,
+            width: size,
+            height: size,
         )
-        isOpaque = false
-        backgroundColor = .clear
-        level = .screenSaver
-        hasShadow = false
-        ignoresMouseEvents = false
-        acceptsMouseMovedEvents = true
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-    }
-}
 
-enum ScreenFrameHelper {
-    static func allScreensFrame() -> CGRect? {
-        let screens = NSScreen.screens
-        guard !screens.isEmpty else { return nil }
-        return screens.reduce(CGRect.null) { $0.union($1.frame) }
+        let circle = CAShapeLayer()
+        circle.frame = rect
+        circle.path = CGPath(ellipseIn: CGRect(origin: .zero, size: CGSize(width: size, height: size)), transform: nil)
+        circle.fillColor = NSColor.systemRed.withAlphaComponent(0.22).cgColor
+        circle.strokeColor = NSColor.systemRed.cgColor
+        circle.lineWidth = 1.5
+
+        let scale = CABasicAnimation(keyPath: "transform.scale")
+        scale.fromValue = 0.7
+        scale.toValue = 1.4
+
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1
+        fade.toValue = 0
+
+        let group = CAAnimationGroup()
+        group.animations = [scale, fade]
+        group.duration = 0.3
+        group.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        group.fillMode = .forwards
+        group.isRemovedOnCompletion = false
+
+        layer.addSublayer(circle)
+        circle.add(group, forKey: "pulse")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + group.duration) {
+            circle.removeFromSuperlayer()
+        }
     }
 }

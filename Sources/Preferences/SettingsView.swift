@@ -5,6 +5,13 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settings: SettingsStore
     @State private var showMenuBarHiddenAlert = false
+    @State private var selectionDimmingHexInput: String
+    @FocusState private var selectionDimmingHexFocused: Bool
+
+    init(settings: SettingsStore) {
+        self.settings = settings
+        _selectionDimmingHexInput = State(initialValue: settings.selectionDimmingColorHex)
+    }
 
     private let numberFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
@@ -25,8 +32,54 @@ struct SettingsView: View {
                         }
                     }
                     .help("Hide the OneShot icon from the menu bar.")
+            }
+
+            Section("Selection") {
                 Toggle("Show selection coordinates", isOn: $settings.showSelectionCoordinates)
-                    .help("Show the selection size next to the crosshair.")
+                    .help("Show the selection size next to the cursor.")
+                Picker("Selection dimming", selection: $settings.selectionDimmingMode) {
+                    ForEach(SelectionDimmingMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .help("Choose whether the overlay dims the full screen or only the selection.")
+                LabeledContent("Selection color") {
+                    HStack(spacing: 12) {
+                        ColorPicker(
+                            "",
+                            selection: selectionDimmingColorBinding,
+                            supportsOpacity: true,
+                        )
+                        .labelsHidden()
+                        TextField("", text: $selectionDimmingHexInput)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 120)
+                            .focused($selectionDimmingHexFocused)
+                            .onChange(of: selectionDimmingHexInput) { newValue in
+                                let sanitized = sanitizeHexInput(newValue)
+                                if sanitized != newValue {
+                                    selectionDimmingHexInput = sanitized
+                                    return
+                                }
+                                let digitsCount = sanitized.filter(\.isHexDigit).count
+                                guard digitsCount == 6 || digitsCount == 8 else { return }
+                                guard let normalized = ColorHexCodec.normalized(sanitized) else { return }
+                                if normalized != settings.selectionDimmingColorHex {
+                                    settings.selectionDimmingColorHex = normalized
+                                }
+                                if digitsCount == 8, normalized != selectionDimmingHexInput {
+                                    selectionDimmingHexInput = normalized
+                                }
+                            }
+                    }
+                }
+                .help("Choose the selection-only fill color (RGBA hex).")
+                Picker("Selection visual cue", selection: $settings.selectionVisualCue) {
+                    ForEach(SelectionVisualCue.allCases) { cue in
+                        Text(cue.title).tag(cue)
+                    }
+                }
+                .help("Choose a visual cue shown when selection mode starts.")
             }
 
             Section("Output") {
@@ -148,6 +201,16 @@ struct SettingsView: View {
         } message: {
             Text("To bring it back, open OneShot from Spotlight and turn this setting off.")
         }
+        .onChange(of: selectionDimmingHexFocused) { focused in
+            if !focused {
+                normalizeSelectionDimmingHexInput()
+            }
+        }
+        .onChange(of: settings.selectionDimmingColorHex) { newValue in
+            if !selectionDimmingHexFocused, selectionDimmingHexInput != newValue {
+                selectionDimmingHexInput = newValue
+            }
+        }
     }
 
     private func chooseFolder() {
@@ -186,6 +249,36 @@ struct SettingsView: View {
         Hotkey(keyCode: UInt16(kVK_ANSI_3), modifiers: [.command, .shift, .control]),
         Hotkey(keyCode: UInt16(kVK_ANSI_4), modifiers: [.command, .shift, .control]),
     ]
+
+    private func sanitizeHexInput(_ value: String) -> String {
+        let digits = value.filter(\.isHexDigit)
+        guard !digits.isEmpty else { return "" }
+        let limited = String(digits.prefix(8))
+        return "#\(limited.uppercased())"
+    }
+
+    private func normalizeSelectionDimmingHexInput() {
+        let sanitized = sanitizeHexInput(selectionDimmingHexInput)
+        guard let normalized = ColorHexCodec.normalized(sanitized) else {
+            if selectionDimmingHexInput != settings.selectionDimmingColorHex {
+                selectionDimmingHexInput = settings.selectionDimmingColorHex
+            }
+            return
+        }
+        if normalized != settings.selectionDimmingColorHex {
+            settings.selectionDimmingColorHex = normalized
+        }
+        if normalized != selectionDimmingHexInput {
+            selectionDimmingHexInput = normalized
+        }
+    }
+
+    private var selectionDimmingColorBinding: Binding<Color> {
+        Binding(
+            get: { Color(nsColor: settings.selectionDimmingColor) },
+            set: { settings.selectionDimmingColor = NSColor($0) },
+        )
+    }
 }
 
 private struct HotkeyRecorderRow: View {
