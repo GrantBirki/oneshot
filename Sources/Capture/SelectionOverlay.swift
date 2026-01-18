@@ -4,7 +4,6 @@ import os.log
 final class SelectionOverlayController {
     private var windows: [OverlayWindow] = []
     private var views: [SelectionOverlayView] = []
-    private var selectionState: SelectionOverlayState?
     private var keyMonitor: Any?
     private var globalKeyMonitor: Any?
     private let log = OSLog(subsystem: "com.grantbirki.oneshot", category: "SelectionOverlay")
@@ -23,7 +22,7 @@ final class SelectionOverlayController {
     func beginSelection(
         showSelectionCoordinates: Bool,
         visualCue: SelectionVisualCue,
-        completion: @escaping (SelectionResult?) -> Void
+        completion: @escaping (SelectionResult?) -> Void,
     ) {
         guard windows.isEmpty else { return }
         let screens = NSScreen.screens
@@ -40,7 +39,6 @@ final class SelectionOverlayController {
             completion(result)
         }
         let state = SelectionOverlayState(showSelectionCoordinates: showSelectionCoordinates)
-        selectionState = state
         let refreshViews: () -> Void = { [weak self] in
             guard let self else { return }
             views.forEach { $0.updateOverlay() }
@@ -65,14 +63,14 @@ final class SelectionOverlayController {
                 window.makeKeyAndOrderFront(nil)
                 didSetKeyWindow = true
                 #if DEBUG
-                os_log(
-                    "made key window %{public}d for screen %{public}@, appActive=%{public}@",
-                    log: log,
-                    type: .debug,
-                    window.windowNumber,
-                    "\(screen.frame)",
-                    "\(NSApp.isActive)"
-                )
+                    os_log(
+                        "made key window %{public}d for screen %{public}@, appActive=%{public}@",
+                        log: log,
+                        type: .debug,
+                        window.windowNumber,
+                        "\(screen.frame)",
+                        "\(NSApp.isActive)",
+                    )
                 #endif
             }
             window.makeFirstResponder(view)
@@ -84,29 +82,29 @@ final class SelectionOverlayController {
         if !didSetKeyWindow {
             windows.first?.makeKeyAndOrderFront(nil)
             #if DEBUG
-            if let window = windows.first, let screen = screens.first {
-                os_log(
-                    "default key window %{public}d for screen %{public}@, appActive=%{public}@",
-                    log: log,
-                    type: .debug,
-                    window.windowNumber,
-                    "\(screen.frame)",
-                    "\(NSApp.isActive)"
-                )
-            }
+                if let window = windows.first, let screen = screens.first {
+                    os_log(
+                        "default key window %{public}d for screen %{public}@, appActive=%{public}@",
+                        log: log,
+                        type: .debug,
+                        window.windowNumber,
+                        "\(screen.frame)",
+                        "\(NSApp.isActive)",
+                    )
+                }
             #endif
         }
         // Ensure a key window is set for event handling.
         if let keyWindow = windows.first(where: { $0.isKeyWindow }) ?? windows.first {
             keyWindow.makeKeyAndOrderFront(nil)
             #if DEBUG
-            os_log(
-                "reassert key window %{public}d appActive=%{public}@",
-                log: log,
-                type: .debug,
-                keyWindow.windowNumber,
-                "\(NSApp.isActive)"
-            )
+                os_log(
+                    "reassert key window %{public}d appActive=%{public}@",
+                    log: log,
+                    type: .debug,
+                    keyWindow.windowNumber,
+                    "\(NSApp.isActive)",
+                )
             #endif
         }
 
@@ -122,7 +120,6 @@ final class SelectionOverlayController {
         }
         windows.removeAll()
         views.removeAll()
-        selectionState = nil
         stopKeyMonitor()
     }
 
@@ -171,7 +168,6 @@ final class SelectionOverlayView: NSView {
     private let metricsBackgroundLayer = CAShapeLayer()
     private let metricsTextLayer = CATextLayer()
     private let metricsFont = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
-    private let pulseLayer = CALayer()
     private let log = OSLog(subsystem: "com.grantbirki.oneshot", category: "SelectionOverlayView")
 
     init(frame frameRect: NSRect, state: SelectionOverlayState) {
@@ -198,14 +194,14 @@ final class SelectionOverlayView: NSView {
         updateLayerScale()
         updateOverlay()
         #if DEBUG
-        os_log(
-            "viewDidMoveToWindow window=%{public}@ key=%{public}@ main=%{public}@",
-            log: log,
-            type: .debug,
-            window?.description ?? "nil",
-            "\(window?.isKeyWindow ?? false)",
-            "\(window?.isMainWindow ?? false)"
-        )
+            os_log(
+                "viewDidMoveToWindow window=%{public}@ key=%{public}@ main=%{public}@",
+                log: log,
+                type: .debug,
+                window?.description ?? "nil",
+                "\(window?.isKeyWindow ?? false)",
+                "\(window?.isMainWindow ?? false)",
+            )
         #endif
     }
 
@@ -312,7 +308,6 @@ final class SelectionOverlayView: NSView {
         layer?.addSublayer(borderLayer)
         layer?.addSublayer(metricsBackgroundLayer)
         layer?.addSublayer(metricsTextLayer)
-        layer?.addSublayer(pulseLayer)
     }
 
     private func updateLayerScale() {
@@ -323,7 +318,6 @@ final class SelectionOverlayView: NSView {
         borderLayer.contentsScale = scale
         metricsBackgroundLayer.contentsScale = scale
         metricsTextLayer.contentsScale = scale
-        pulseLayer.contentsScale = scale
     }
 
     private func updateMetrics() {
@@ -398,7 +392,7 @@ final class SelectionOverlayView: NSView {
             x: point.x - size / 2,
             y: point.y - size / 2,
             width: size,
-            height: size
+            height: size,
         )
 
         let circle = CAShapeLayer()

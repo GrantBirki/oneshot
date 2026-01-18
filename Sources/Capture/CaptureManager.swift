@@ -16,7 +16,7 @@ final class CaptureManager {
         guard ScreenCapturePermission.ensureAccess() else { return }
         selectionOverlay.beginSelection(
             showSelectionCoordinates: settings.showSelectionCoordinates,
-            visualCue: settings.selectionVisualCue
+            visualCue: settings.selectionVisualCue,
         ) { [weak self] selection in
             guard let self, let selection else { return }
             capture(rect: selection.rect, excludingWindowID: selection.excludeWindowID)
