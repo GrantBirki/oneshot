@@ -4,9 +4,11 @@ final class SelectionOverlayState {
     var start: CGPoint?
     var current: CGPoint?
     let showSelectionCoordinates: Bool
+    let dimmingMode: SelectionDimmingMode
 
-    init(showSelectionCoordinates: Bool) {
+    init(showSelectionCoordinates: Bool, dimmingMode: SelectionDimmingMode) {
         self.showSelectionCoordinates = showSelectionCoordinates
+        self.dimmingMode = dimmingMode
     }
 
     var rect: CGRect? {

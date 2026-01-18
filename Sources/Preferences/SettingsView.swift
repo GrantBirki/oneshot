@@ -26,7 +26,13 @@ struct SettingsView: View {
                     }
                     .help("Hide the OneShot icon from the menu bar.")
                 Toggle("Show selection coordinates", isOn: $settings.showSelectionCoordinates)
-                    .help("Show the selection size next to the crosshair.")
+                    .help("Show the selection size next to the cursor.")
+                Picker("Selection dimming", selection: $settings.selectionDimmingMode) {
+                    ForEach(SelectionDimmingMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .help("Choose whether the overlay dims the full screen or only the selection.")
                 Picker("Selection visual cue", selection: $settings.selectionVisualCue) {
                     ForEach(SelectionVisualCue.allCases) { cue in
                         Text(cue.title).tag(cue)

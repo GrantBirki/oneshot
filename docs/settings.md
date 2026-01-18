@@ -6,8 +6,9 @@ This document describes the settings available in OneShot.
 
 - `Launch at login`: Start OneShot automatically when you sign in.
 - `Hide menu bar icon`: Remove the OneShot icon from the menu bar. To bring it back, open OneShot from Spotlight and disable this setting.
-- `Show selection coordinates`: Show the selection size next to the crosshair while selecting.
-- `Selection visual cue`: Choose a visual cue when selection mode starts (`Red pulse` or `Disabled`). Default is `Red pulse`.
+- `Show selection coordinates`: Show the selection size next to the cursor while selecting.
+- `Selection dimming`: Choose how the overlay dims the screen (`Full screen` or `Selection only`). Default is `Full screen`.
+- `Selection visual cue`: Choose a visual cue when selection mode starts (`Red pulse` or `Disabled`). Default is `Disabled`.
 
 ## Output
 

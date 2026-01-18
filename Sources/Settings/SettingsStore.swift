@@ -92,6 +92,20 @@ enum PreviewAutoDismissBehavior: String, CaseIterable, Identifiable {
     }
 }
 
+enum SelectionDimmingMode: String, CaseIterable, Identifiable {
+    case fullScreen = "macosLike"
+    case selectionOnly = "inverse"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .fullScreen: "Full screen"
+        case .selectionOnly: "Selection only"
+        }
+    }
+}
+
 enum SelectionVisualCue: String, CaseIterable, Identifiable {
     case pulse
     case none
@@ -141,6 +155,10 @@ final class SettingsStore: ObservableObject {
 
     @Published var previewDisabledOutputBehavior: PreviewDisabledOutputBehavior {
         didSet { defaults.set(previewDisabledOutputBehavior.rawValue, forKey: Keys.previewDisabledOutputBehavior) }
+    }
+
+    @Published var selectionDimmingMode: SelectionDimmingMode {
+        didSet { defaults.set(selectionDimmingMode.rawValue, forKey: Keys.selectionDimmingMode) }
     }
 
     @Published var selectionVisualCue: SelectionVisualCue {
@@ -224,9 +242,12 @@ final class SettingsStore: ObservableObject {
         let outputBehaviorRaw = defaults.string(forKey: Keys.previewDisabledOutputBehavior)
             ?? PreviewDisabledOutputBehavior.saveToDisk.rawValue
         previewDisabledOutputBehavior = PreviewDisabledOutputBehavior(rawValue: outputBehaviorRaw) ?? .saveToDisk
+        let dimmingModeRaw = defaults.string(forKey: Keys.selectionDimmingMode)
+            ?? SelectionDimmingMode.fullScreen.rawValue
+        selectionDimmingMode = SelectionDimmingMode(rawValue: dimmingModeRaw) ?? .fullScreen
         let selectionCueRaw = defaults.string(forKey: Keys.selectionVisualCue)
-            ?? SelectionVisualCue.pulse.rawValue
-        selectionVisualCue = SelectionVisualCue(rawValue: selectionCueRaw) ?? .pulse
+            ?? SelectionVisualCue.none.rawValue
+        selectionVisualCue = SelectionVisualCue(rawValue: selectionCueRaw) ?? .none
 
         autoCopyToClipboard = defaults.object(forKey: Keys.autoCopyToClipboard) as? Bool ?? true
 
@@ -333,6 +354,7 @@ private enum Keys {
     static let previewAutoDismissBehavior = "settings.previewAutoDismissBehavior"
     static let previewReplacementBehavior = "settings.previewReplacementBehavior"
     static let previewDisabledOutputBehavior = "settings.previewDisabledOutputBehavior"
+    static let selectionDimmingMode = "settings.selectionDimmingMode"
     static let selectionVisualCue = "settings.selectionVisualCue"
     static let autoCopyToClipboard = "settings.autoCopyToClipboard"
     static let saveLocationOption = "settings.saveLocationOption"

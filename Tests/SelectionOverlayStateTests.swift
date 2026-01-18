@@ -4,7 +4,7 @@ import XCTest
 
 final class SelectionOverlayStateTests: XCTestCase {
     func testSelectionSizeTextRoundsAndFormats() {
-        let state = SelectionOverlayState(showSelectionCoordinates: true)
+        let state = SelectionOverlayState(showSelectionCoordinates: true, dimmingMode: .fullScreen)
         state.start = CGPoint(x: 10.2, y: 20.6)
         state.current = CGPoint(x: 30.6, y: 50.2)
 
@@ -12,7 +12,7 @@ final class SelectionOverlayStateTests: XCTestCase {
     }
 
     func testSelectionSizeTextHandlesReverseDrag() {
-        let state = SelectionOverlayState(showSelectionCoordinates: true)
+        let state = SelectionOverlayState(showSelectionCoordinates: true, dimmingMode: .fullScreen)
         state.start = CGPoint(x: 80, y: 120)
         state.current = CGPoint(x: 30, y: 50)
 
@@ -20,7 +20,7 @@ final class SelectionOverlayStateTests: XCTestCase {
     }
 
     func testSelectionSizeTextNilWithoutPoints() {
-        let state = SelectionOverlayState(showSelectionCoordinates: true)
+        let state = SelectionOverlayState(showSelectionCoordinates: true, dimmingMode: .fullScreen)
 
         XCTAssertNil(state.selectionSizeText)
         state.start = CGPoint(x: 10, y: 10)
@@ -31,7 +31,7 @@ final class SelectionOverlayStateTests: XCTestCase {
     }
 
     func testSelectionSizeTextHiddenWhenDisabled() {
-        let state = SelectionOverlayState(showSelectionCoordinates: false)
+        let state = SelectionOverlayState(showSelectionCoordinates: false, dimmingMode: .fullScreen)
         state.start = CGPoint(x: 10, y: 20)
         state.current = CGPoint(x: 30, y: 50)
 

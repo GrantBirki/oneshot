@@ -22,6 +22,7 @@ final class SelectionOverlayController {
     func beginSelection(
         showSelectionCoordinates: Bool,
         visualCue: SelectionVisualCue,
+        dimmingMode: SelectionDimmingMode,
         completion: @escaping (SelectionResult?) -> Void,
     ) {
         guard windows.isEmpty else { return }
@@ -38,7 +39,10 @@ final class SelectionOverlayController {
             end()
             completion(result)
         }
-        let state = SelectionOverlayState(showSelectionCoordinates: showSelectionCoordinates)
+        let state = SelectionOverlayState(
+            showSelectionCoordinates: showSelectionCoordinates,
+            dimmingMode: dimmingMode,
+        )
         let refreshViews: () -> Void = { [weak self] in
             guard let self else { return }
             views.forEach { $0.updateOverlay() }
@@ -266,7 +270,8 @@ final class SelectionOverlayView: NSView {
         metricsBackgroundLayer.frame = bounds
 
         let selection = selectionRect()
-        if let dimmingPath = OverlayPathBuilder.innerDimmingPath(for: selection) {
+        dimmingLayer.fillRule = state.dimmingMode == .fullScreen ? .evenOdd : .nonZero
+        if let dimmingPath = OverlayPathBuilder.dimmingPath(for: selection, in: bounds, mode: state.dimmingMode) {
             dimmingLayer.path = dimmingPath
             dimmingLayer.isHidden = false
         } else {

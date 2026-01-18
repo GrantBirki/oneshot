@@ -202,7 +202,7 @@ final class WindowCaptureOverlayView: NSView {
         highlightLayer.frame = bounds
 
         let highlight = highlightRect()
-        if let dimmingPath = OverlayPathBuilder.innerDimmingPath(for: highlight) {
+        if let dimmingPath = OverlayPathBuilder.dimmingPath(for: highlight, in: bounds, mode: .selectionOnly) {
             dimmingLayer.path = dimmingPath
             dimmingLayer.isHidden = false
         } else {

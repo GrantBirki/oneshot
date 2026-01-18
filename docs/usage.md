@@ -28,7 +28,7 @@ Default hotkeys: none. Set them in Settings > Hotkeys.
 
 Selection overlay:
 
-- The size label next to the crosshair can be toggled in Settings.
+- The size label next to the cursor can be toggled in Settings.
 
 ## Preview Tile
 
