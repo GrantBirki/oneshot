@@ -26,7 +26,7 @@ struct SettingsView: View {
             Section("General") {
                 Toggle("Launch at login", isOn: $settings.autoLaunchEnabled)
                 Toggle("Hide menu bar icon", isOn: $settings.menuBarIconHidden)
-                    .onChange(of: settings.menuBarIconHidden) { newValue in
+                    .onChange(of: settings.menuBarIconHidden) { _, newValue in
                         if newValue {
                             showMenuBarHiddenAlert = true
                         }
@@ -55,7 +55,7 @@ struct SettingsView: View {
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 120)
                             .focused($selectionDimmingHexFocused)
-                            .onChange(of: selectionDimmingHexInput) { newValue in
+                            .onChange(of: selectionDimmingHexInput) { _, newValue in
                                 let sanitized = sanitizeHexInput(newValue)
                                 if sanitized != newValue {
                                     selectionDimmingHexInput = sanitized
@@ -201,19 +201,21 @@ struct SettingsView: View {
         } message: {
             Text("To bring it back, open OneShot from Spotlight and turn this setting off.")
         }
-        .onChange(of: selectionDimmingHexFocused) { focused in
+        .onChange(of: selectionDimmingHexFocused) { _, focused in
             if !focused {
                 normalizeSelectionDimmingHexInput()
             }
         }
-        .onChange(of: settings.selectionDimmingColorHex) { newValue in
+        .onChange(of: settings.selectionDimmingColorHex) { _, newValue in
             if !selectionDimmingHexFocused, selectionDimmingHexInput != newValue {
                 selectionDimmingHexInput = newValue
             }
         }
     }
+}
 
-    private func chooseFolder() {
+private extension SettingsView {
+    func chooseFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -225,7 +227,7 @@ struct SettingsView: View {
         }
     }
 
-    private func conflictMessage(for hotkey: Hotkey?, against others: [Hotkey?]) -> String? {
+    func conflictMessage(for hotkey: Hotkey?, against others: [Hotkey?]) -> String? {
         guard let hotkey, hotkey.isValid else {
             return nil
         }
@@ -241,7 +243,7 @@ struct SettingsView: View {
         return nil
     }
 
-    private static let reservedSystemHotkeys: Set<Hotkey> = [
+    static let reservedSystemHotkeys: Set<Hotkey> = [
         Hotkey(keyCode: UInt16(kVK_ANSI_3), modifiers: [.command, .shift]),
         Hotkey(keyCode: UInt16(kVK_ANSI_4), modifiers: [.command, .shift]),
         Hotkey(keyCode: UInt16(kVK_ANSI_5), modifiers: [.command, .shift]),
@@ -250,14 +252,14 @@ struct SettingsView: View {
         Hotkey(keyCode: UInt16(kVK_ANSI_4), modifiers: [.command, .shift, .control]),
     ]
 
-    private func sanitizeHexInput(_ value: String) -> String {
+    func sanitizeHexInput(_ value: String) -> String {
         let digits = value.filter(\.isHexDigit)
         guard !digits.isEmpty else { return "" }
         let limited = String(digits.prefix(8))
         return "#\(limited.uppercased())"
     }
 
-    private func normalizeSelectionDimmingHexInput() {
+    func normalizeSelectionDimmingHexInput() {
         let sanitized = sanitizeHexInput(selectionDimmingHexInput)
         guard let normalized = ColorHexCodec.normalized(sanitized) else {
             if selectionDimmingHexInput != settings.selectionDimmingColorHex {
@@ -273,7 +275,7 @@ struct SettingsView: View {
         }
     }
 
-    private var selectionDimmingColorBinding: Binding<Color> {
+    var selectionDimmingColorBinding: Binding<Color> {
         Binding(
             get: { Color(nsColor: settings.selectionDimmingColor) },
             set: { settings.selectionDimmingColor = NSColor($0) },

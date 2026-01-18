@@ -1,125 +1,6 @@
 import AppKit
 import Foundation
 
-enum SaveLocationOption: String, CaseIterable, Identifiable {
-    case downloads
-    case desktop
-    case documents
-    case custom
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .downloads: "Downloads"
-        case .desktop: "Desktop"
-        case .documents: "Documents"
-        case .custom: "Custom"
-        }
-    }
-}
-
-enum PreviewDisabledOutputBehavior: String, CaseIterable, Identifiable {
-    case saveToDisk
-    case clipboardOnly
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .saveToDisk: "Save to disk"
-        case .clipboardOnly: "Copy to clipboard"
-        }
-    }
-
-    var helpText: String {
-        switch self {
-        case .saveToDisk:
-            "Save screenshots to the selected location."
-        case .clipboardOnly:
-            "Copy screenshots to the clipboard without saving to disk."
-        }
-    }
-}
-
-enum PreviewReplacementBehavior: String, CaseIterable, Identifiable {
-    case saveImmediately
-    case discard
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .saveImmediately:
-            "Save previous capture"
-        case .discard:
-            "Discard previous capture"
-        }
-    }
-
-    var helpText: String {
-        switch self {
-        case .saveImmediately:
-            "Save the previous capture to disk immediately, then replace the preview."
-        case .discard:
-            "Cancel the previous capture without saving, then replace the preview."
-        }
-    }
-}
-
-enum PreviewAutoDismissBehavior: String, CaseIterable, Identifiable {
-    case saveToDisk
-    case discard
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .saveToDisk:
-            "Save to disk"
-        case .discard:
-            "Don't save to disk"
-        }
-    }
-
-    var helpText: String {
-        switch self {
-        case .saveToDisk:
-            "Save the capture when the preview timer ends."
-        case .discard:
-            "Discard the capture when the preview timer ends unless you save it manually."
-        }
-    }
-}
-
-enum SelectionDimmingMode: String, CaseIterable, Identifiable {
-    case fullScreen = "macosLike"
-    case selectionOnly = "inverse"
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .fullScreen: "Full screen"
-        case .selectionOnly: "Selection only"
-        }
-    }
-}
-
-enum SelectionVisualCue: String, CaseIterable, Identifiable {
-    case pulse
-    case none
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .pulse: "Red pulse"
-        case .none: "Disabled"
-        }
-    }
-}
-
 final class SettingsStore: ObservableObject {
     @Published var autoLaunchEnabled: Bool {
         didSet { defaults.set(autoLaunchEnabled, forKey: Keys.autoLaunchEnabled) }
@@ -236,40 +117,17 @@ final class SettingsStore: ObservableObject {
         autoLaunchEnabled = defaults.object(forKey: Keys.autoLaunchEnabled) as? Bool ?? false
         menuBarIconHidden = defaults.object(forKey: Keys.menuBarIconHidden) as? Bool ?? false
         showSelectionCoordinates = defaults.object(forKey: Keys.showSelectionCoordinates) as? Bool ?? true
-        if let saveDelay = defaults.object(forKey: Keys.saveDelaySeconds) as? Double {
-            saveDelaySeconds = saveDelay
-        } else if let legacyDelay = defaults.object(forKey: LegacyKeys.previewTimeoutSeconds) as? Double {
-            saveDelaySeconds = legacyDelay
-            defaults.removeObject(forKey: LegacyKeys.previewTimeoutSeconds)
-        } else {
-            saveDelaySeconds = 7
-        }
+        saveDelaySeconds = Self.loadSaveDelaySeconds(from: defaults)
         previewTimeoutEnabled = defaults.object(forKey: Keys.previewTimeoutEnabled) as? Bool ?? true
         previewEnabled = defaults.object(forKey: Keys.previewEnabled) as? Bool ?? true
-        let autoDismissRaw = defaults.string(forKey: Keys.previewAutoDismissBehavior)
-            ?? PreviewAutoDismissBehavior.saveToDisk.rawValue
-        previewAutoDismissBehavior = PreviewAutoDismissBehavior(rawValue: autoDismissRaw) ?? .saveToDisk
-        let replacementRaw = defaults.string(forKey: Keys.previewReplacementBehavior)
-            ?? PreviewReplacementBehavior.saveImmediately.rawValue
-        previewReplacementBehavior = PreviewReplacementBehavior(rawValue: replacementRaw) ?? .saveImmediately
-        let outputBehaviorRaw = defaults.string(forKey: Keys.previewDisabledOutputBehavior)
-            ?? PreviewDisabledOutputBehavior.saveToDisk.rawValue
-        previewDisabledOutputBehavior = PreviewDisabledOutputBehavior(rawValue: outputBehaviorRaw) ?? .saveToDisk
-        let dimmingModeRaw = defaults.string(forKey: Keys.selectionDimmingMode)
-            ?? SelectionDimmingMode.fullScreen.rawValue
-        selectionDimmingMode = SelectionDimmingMode(rawValue: dimmingModeRaw) ?? .fullScreen
-        let dimmingColorRaw = defaults.string(forKey: Keys.selectionDimmingColorHex) ?? ""
-        selectionDimmingColorHex = ColorHexCodec.normalized(dimmingColorRaw)
-            ?? ColorHexCodec.defaultSelectionDimmingColorHex
-        let selectionCueRaw = defaults.string(forKey: Keys.selectionVisualCue)
-            ?? SelectionVisualCue.none.rawValue
-        selectionVisualCue = SelectionVisualCue(rawValue: selectionCueRaw) ?? .none
-
+        previewAutoDismissBehavior = Self.loadPreviewAutoDismissBehavior(from: defaults)
+        previewReplacementBehavior = Self.loadPreviewReplacementBehavior(from: defaults)
+        previewDisabledOutputBehavior = Self.loadPreviewDisabledOutputBehavior(from: defaults)
+        selectionDimmingMode = Self.loadSelectionDimmingMode(from: defaults)
+        selectionDimmingColorHex = Self.loadSelectionDimmingColorHex(from: defaults)
+        selectionVisualCue = Self.loadSelectionVisualCue(from: defaults)
         autoCopyToClipboard = defaults.object(forKey: Keys.autoCopyToClipboard) as? Bool ?? true
-
-        let locationRaw = defaults.string(forKey: Keys.saveLocationOption) ?? SaveLocationOption.downloads.rawValue
-        saveLocationOption = SaveLocationOption(rawValue: locationRaw) ?? .downloads
-
+        saveLocationOption = Self.loadSaveLocationOption(from: defaults)
         customSavePath = defaults.string(forKey: Keys.customSavePath) ?? ""
         filenamePrefix = defaults.string(forKey: Keys.filenamePrefix) ?? "screenshot"
 
@@ -292,8 +150,92 @@ final class SettingsStore: ObservableObject {
             defaultValue: nil,
         )
     }
+}
 
-    private func loadHotkey(
+private extension SettingsStore {
+    typealias PreviewDisabledBehavior = PreviewDisabledOutputBehavior
+
+    static func loadSaveDelaySeconds(from defaults: UserDefaults) -> Double {
+        if let saveDelay = defaults.object(forKey: Keys.saveDelaySeconds) as? Double {
+            return saveDelay
+        }
+        if let legacyDelay = defaults.object(forKey: LegacyKeys.previewTimeoutSeconds) as? Double {
+            defaults.removeObject(forKey: LegacyKeys.previewTimeoutSeconds)
+            return legacyDelay
+        }
+        return 7
+    }
+
+    static func loadSelectionDimmingColorHex(from defaults: UserDefaults) -> String {
+        let dimmingColorRaw = defaults.string(forKey: Keys.selectionDimmingColorHex) ?? ""
+        return ColorHexCodec.normalized(dimmingColorRaw) ?? ColorHexCodec.defaultSelectionDimmingColorHex
+    }
+
+    static func loadPreviewAutoDismissBehavior(from defaults: UserDefaults) -> PreviewAutoDismissBehavior {
+        loadEnum(
+            PreviewAutoDismissBehavior.self,
+            from: defaults,
+            key: Keys.previewAutoDismissBehavior,
+            defaultValue: .saveToDisk,
+        )
+    }
+
+    static func loadPreviewReplacementBehavior(from defaults: UserDefaults) -> PreviewReplacementBehavior {
+        loadEnum(
+            PreviewReplacementBehavior.self,
+            from: defaults,
+            key: Keys.previewReplacementBehavior,
+            defaultValue: .saveImmediately,
+        )
+    }
+
+    static func loadPreviewDisabledOutputBehavior(from defaults: UserDefaults) -> PreviewDisabledBehavior {
+        loadEnum(
+            PreviewDisabledOutputBehavior.self,
+            from: defaults,
+            key: Keys.previewDisabledOutputBehavior,
+            defaultValue: .saveToDisk,
+        )
+    }
+
+    static func loadSelectionDimmingMode(from defaults: UserDefaults) -> SelectionDimmingMode {
+        loadEnum(
+            SelectionDimmingMode.self,
+            from: defaults,
+            key: Keys.selectionDimmingMode,
+            defaultValue: .fullScreen,
+        )
+    }
+
+    static func loadSelectionVisualCue(from defaults: UserDefaults) -> SelectionVisualCue {
+        loadEnum(
+            SelectionVisualCue.self,
+            from: defaults,
+            key: Keys.selectionVisualCue,
+            defaultValue: .none,
+        )
+    }
+
+    static func loadSaveLocationOption(from defaults: UserDefaults) -> SaveLocationOption {
+        loadEnum(
+            SaveLocationOption.self,
+            from: defaults,
+            key: Keys.saveLocationOption,
+            defaultValue: .downloads,
+        )
+    }
+
+    static func loadEnum<T: RawRepresentable>(
+        _: T.Type,
+        from defaults: UserDefaults,
+        key: String,
+        defaultValue: T,
+    ) -> T where T.RawValue == String {
+        let rawValue = defaults.string(forKey: key) ?? defaultValue.rawValue
+        return T(rawValue: rawValue) ?? defaultValue
+    }
+
+    func loadHotkey(
         keyCodeKey: String,
         modifiersKey: String,
         legacyKey: String?,
@@ -315,7 +257,7 @@ final class SettingsStore: ObservableObject {
         return defaultValue
     }
 
-    private func storedHotkey(keyCodeKey: String, modifiersKey: String) -> Hotkey? {
+    func storedHotkey(keyCodeKey: String, modifiersKey: String) -> Hotkey? {
         guard let keyCodeValue = defaults.object(forKey: keyCodeKey) else {
             return nil
         }
@@ -337,7 +279,7 @@ final class SettingsStore: ObservableObject {
         return Hotkey(keyCode: keyCode, modifiers: NSEvent.ModifierFlags(rawValue: rawValue))
     }
 
-    private func modifierRawValue(forKey key: String) -> UInt {
+    func modifierRawValue(forKey key: String) -> UInt {
         if let value = defaults.object(forKey: key) as? UInt {
             return value
         }
@@ -347,7 +289,7 @@ final class SettingsStore: ObservableObject {
         return UInt(defaults.integer(forKey: key))
     }
 
-    private func persistHotkey(_ hotkey: Hotkey?, keyCodeKey: String, modifiersKey: String) {
+    func persistHotkey(_ hotkey: Hotkey?, keyCodeKey: String, modifiersKey: String) {
         if let hotkey {
             defaults.set(Int(hotkey.keyCode), forKey: keyCodeKey)
             defaults.set(Int(hotkey.modifiers.rawValue), forKey: modifiersKey)
@@ -357,7 +299,7 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    private static let unsetKeyCodeSentinel = -1
+    static let unsetKeyCodeSentinel = -1
 }
 
 private enum Keys {

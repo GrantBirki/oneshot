@@ -169,7 +169,9 @@ final class WindowCaptureOverlayView: NSView {
     }
 
     private func updateHighlight(at screenPoint: CGPoint) {
-        highlightedWindow = WindowInfoProvider.window(at: screenPoint)
+        let nextWindow = WindowInfoProvider.window(at: screenPoint)
+        guard nextWindow != highlightedWindow else { return }
+        highlightedWindow = nextWindow
         updateLayers()
     }
 
@@ -226,7 +228,7 @@ final class WindowCaptureOverlayView: NSView {
     }
 }
 
-struct WindowInfo {
+struct WindowInfo: Equatable {
     let id: CGWindowID
     let bounds: CGRect
 }
