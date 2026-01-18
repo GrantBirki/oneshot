@@ -23,6 +23,7 @@ final class SelectionOverlayController {
         showSelectionCoordinates: Bool,
         visualCue: SelectionVisualCue,
         dimmingMode: SelectionDimmingMode,
+        selectionDimmingColor: NSColor,
         completion: @escaping (SelectionResult?) -> Void,
     ) {
         guard windows.isEmpty else { return }
@@ -42,6 +43,7 @@ final class SelectionOverlayController {
         let state = SelectionOverlayState(
             showSelectionCoordinates: showSelectionCoordinates,
             dimmingMode: dimmingMode,
+            selectionDimmingColor: selectionDimmingColor,
         )
         let refreshViews: () -> Void = { [weak self] in
             guard let self else { return }
@@ -271,6 +273,7 @@ final class SelectionOverlayView: NSView {
 
         let selection = selectionRect()
         dimmingLayer.fillRule = state.dimmingMode == .fullScreen ? .evenOdd : .nonZero
+        dimmingLayer.fillColor = dimmingFillColor(for: state.dimmingMode)
         if let dimmingPath = OverlayPathBuilder.dimmingPath(for: selection, in: bounds, mode: state.dimmingMode) {
             dimmingLayer.path = dimmingPath
             dimmingLayer.isHidden = false
@@ -292,7 +295,7 @@ final class SelectionOverlayView: NSView {
     }
 
     private func configureLayers() {
-        dimmingLayer.fillColor = NSColor.black.withAlphaComponent(0.35).cgColor
+        dimmingLayer.fillColor = dimmingFillColor(for: state.dimmingMode)
 
         borderLayer.fillColor = nil
         borderLayer.strokeColor = NSColor(calibratedWhite: 0.92, alpha: 1).cgColor
@@ -313,6 +316,15 @@ final class SelectionOverlayView: NSView {
         layer?.addSublayer(borderLayer)
         layer?.addSublayer(metricsBackgroundLayer)
         layer?.addSublayer(metricsTextLayer)
+    }
+
+    private func dimmingFillColor(for mode: SelectionDimmingMode) -> CGColor {
+        switch mode {
+        case .fullScreen:
+            NSColor.black.withAlphaComponent(0.35).cgColor
+        case .selectionOnly:
+            state.selectionDimmingColor.cgColor
+        }
     }
 
     private func updateLayerScale() {

@@ -18,6 +18,7 @@ final class CaptureManager {
             showSelectionCoordinates: settings.showSelectionCoordinates,
             visualCue: settings.selectionVisualCue,
             dimmingMode: settings.selectionDimmingMode,
+            selectionDimmingColor: settings.selectionDimmingColor,
         ) { [weak self] selection in
             guard let self, let selection else { return }
             capture(rect: selection.rect, excludingWindowID: selection.excludeWindowID)

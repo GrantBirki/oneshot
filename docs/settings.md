@@ -8,6 +8,7 @@ This document describes the settings available in OneShot.
 - `Hide menu bar icon`: Remove the OneShot icon from the menu bar. To bring it back, open OneShot from Spotlight and disable this setting.
 - `Show selection coordinates`: Show the selection size next to the cursor while selecting.
 - `Selection dimming`: Choose how the overlay dims the screen (`Full screen` or `Selection only`). Default is `Full screen`.
+- `Selection color`: Selection-only fill color as RGBA hex (example: `#00000059`). Default matches the built-in dim.
 - `Selection visual cue`: Choose a visual cue when selection mode starts (`Red pulse` or `Disabled`). Default is `Disabled`.
 
 ## Output

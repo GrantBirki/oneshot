@@ -1,14 +1,16 @@
-import CoreGraphics
+import AppKit
 
 final class SelectionOverlayState {
     var start: CGPoint?
     var current: CGPoint?
     let showSelectionCoordinates: Bool
     let dimmingMode: SelectionDimmingMode
+    let selectionDimmingColor: NSColor
 
-    init(showSelectionCoordinates: Bool, dimmingMode: SelectionDimmingMode) {
+    init(showSelectionCoordinates: Bool, dimmingMode: SelectionDimmingMode, selectionDimmingColor: NSColor) {
         self.showSelectionCoordinates = showSelectionCoordinates
         self.dimmingMode = dimmingMode
+        self.selectionDimmingColor = selectionDimmingColor
     }
 
     var rect: CGRect? {

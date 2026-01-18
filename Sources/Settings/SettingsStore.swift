@@ -161,6 +161,10 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(selectionDimmingMode.rawValue, forKey: Keys.selectionDimmingMode) }
     }
 
+    @Published var selectionDimmingColorHex: String {
+        didSet { defaults.set(selectionDimmingColorHex, forKey: Keys.selectionDimmingColorHex) }
+    }
+
     @Published var selectionVisualCue: SelectionVisualCue {
         didSet { defaults.set(selectionVisualCue.rawValue, forKey: Keys.selectionVisualCue) }
     }
@@ -215,6 +219,15 @@ final class SettingsStore: ObservableObject {
         previewTimeoutEnabled ? saveDelaySeconds : nil
     }
 
+    var selectionDimmingColor: NSColor {
+        get {
+            ColorHexCodec.nsColor(from: selectionDimmingColorHex) ?? ColorHexCodec.defaultSelectionDimmingColor
+        }
+        set {
+            selectionDimmingColorHex = ColorHexCodec.hex(from: newValue)
+        }
+    }
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -245,6 +258,9 @@ final class SettingsStore: ObservableObject {
         let dimmingModeRaw = defaults.string(forKey: Keys.selectionDimmingMode)
             ?? SelectionDimmingMode.fullScreen.rawValue
         selectionDimmingMode = SelectionDimmingMode(rawValue: dimmingModeRaw) ?? .fullScreen
+        let dimmingColorRaw = defaults.string(forKey: Keys.selectionDimmingColorHex) ?? ""
+        selectionDimmingColorHex = ColorHexCodec.normalized(dimmingColorRaw)
+            ?? ColorHexCodec.defaultSelectionDimmingColorHex
         let selectionCueRaw = defaults.string(forKey: Keys.selectionVisualCue)
             ?? SelectionVisualCue.none.rawValue
         selectionVisualCue = SelectionVisualCue(rawValue: selectionCueRaw) ?? .none
@@ -355,6 +371,7 @@ private enum Keys {
     static let previewReplacementBehavior = "settings.previewReplacementBehavior"
     static let previewDisabledOutputBehavior = "settings.previewDisabledOutputBehavior"
     static let selectionDimmingMode = "settings.selectionDimmingMode"
+    static let selectionDimmingColorHex = "settings.selectionDimmingColorHex"
     static let selectionVisualCue = "settings.selectionVisualCue"
     static let autoCopyToClipboard = "settings.autoCopyToClipboard"
     static let saveLocationOption = "settings.saveLocationOption"
