@@ -71,6 +71,10 @@ struct SettingsView: View {
                                     selectionDimmingHexInput = normalized
                                 }
                             }
+                        Button("Reset") {
+                            resetSelectionDimmingColor()
+                        }
+                        .help("Reset to the default selection color.")
                     }
                 }
                 .help("Choose the selection-only fill color (RGBA hex).")
@@ -273,6 +277,12 @@ private extension SettingsView {
         if normalized != selectionDimmingHexInput {
             selectionDimmingHexInput = normalized
         }
+    }
+
+    func resetSelectionDimmingColor() {
+        let defaultHex = ColorHexCodec.defaultSelectionDimmingColorHex
+        settings.selectionDimmingColorHex = defaultHex
+        selectionDimmingHexInput = defaultHex
     }
 
     var selectionDimmingColorBinding: Binding<Color> {

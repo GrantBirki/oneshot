@@ -2,8 +2,8 @@ import AppKit
 import Foundation
 
 enum ColorHexCodec {
-    static let defaultSelectionDimmingColorHex = "#00000059"
-    static let defaultSelectionDimmingColor = NSColor.black.withAlphaComponent(0.35)
+    static let defaultSelectionDimmingColorHex = "#FFFFFF1E"
+    static let defaultSelectionDimmingColor = NSColor.white.withAlphaComponent(30.0 / 255.0)
 
     static func normalized(_ value: String) -> String? {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
