@@ -32,7 +32,9 @@ if [[ ! -d "$APP_PATH" ]]; then
   exit 1
 fi
 
-echo -e "${BLUE}Launching ${APP_NAME}...${OFF}"
 echo "Tip: you can stream logs with:"
 echo "log stream --predicate 'process == \"OneShot\"' --style compact"
+echo "Or you can use:"
+echo "log stream --level debug --predicate 'subsystem == \"com.grantbirki.oneshot\"'"
+echo -e "${GREEN}Launching ${APP_NAME}...${OFF}"
 open "$APP_PATH"

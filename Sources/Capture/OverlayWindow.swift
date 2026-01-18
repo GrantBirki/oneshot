@@ -11,7 +11,6 @@ final class OverlayWindow: NSPanel {
             backing: .buffered,
             defer: false,
         )
-        isFloatingPanel = true
         isOpaque = false
         backgroundColor = .clear
         level = .screenSaver
@@ -19,6 +18,7 @@ final class OverlayWindow: NSPanel {
         ignoresMouseEvents = false
         acceptsMouseMovedEvents = true
         hidesOnDeactivate = false
+        becomesKeyOnlyIfNeeded = true
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
     }
 }

@@ -8,7 +8,7 @@ final class OverlayWindowTests: XCTestCase {
 
         XCTAssertTrue(window.styleMask.contains(.borderless))
         XCTAssertTrue(window.styleMask.contains(.nonactivatingPanel))
-        XCTAssertTrue(window.isFloatingPanel)
+        XCTAssertFalse(window.isFloatingPanel)
         XCTAssertEqual(window.level, .screenSaver)
         XCTAssertFalse(window.isOpaque)
         XCTAssertEqual(window.backgroundColor, .clear)
@@ -20,5 +20,6 @@ final class OverlayWindowTests: XCTestCase {
         XCTAssertTrue(window.collectionBehavior.contains(.fullScreenAuxiliary))
         XCTAssertTrue(window.canBecomeKey)
         XCTAssertFalse(window.canBecomeMain)
+        XCTAssertTrue(window.becomesKeyOnlyIfNeeded)
     }
 }

@@ -1,4 +1,5 @@
 import AppKit
+import os.log
 
 final class SelectionOverlayController {
     private var windows: [OverlayWindow] = []
@@ -6,15 +7,13 @@ final class SelectionOverlayController {
     private var selectionState: SelectionOverlayState?
     private var keyMonitor: Any?
     private var globalKeyMonitor: Any?
-    private let cursorStack: CursorStack
+    private let log = OSLog(subsystem: "com.grantbirki.oneshot", category: "SelectionOverlay")
 
     private enum KeyCodes {
         static let escape: UInt16 = 53
     }
 
-    init(cursorStack: CursorStack = CursorStack()) {
-        self.cursorStack = cursorStack
-    }
+    init() {}
 
     struct SelectionResult {
         let rect: CGRect
@@ -28,9 +27,6 @@ final class SelectionOverlayController {
             completion(nil)
             return
         }
-
-        cursorStack.pushCrosshair()
-        NSApp.activate(ignoringOtherApps: true)
 
         var didFinish = false
         let finish: (SelectionResult?) -> Void = { [weak self] result in
@@ -64,6 +60,16 @@ final class SelectionOverlayController {
             if screen.frame.contains(mouseLocation) {
                 window.makeKeyAndOrderFront(nil)
                 didSetKeyWindow = true
+                #if DEBUG
+                os_log(
+                    "made key window %{public}d for screen %{public}@, appActive=%{public}@",
+                    log: log,
+                    type: .debug,
+                    window.windowNumber,
+                    "\(screen.frame)",
+                    "\(NSApp.isActive)"
+                )
+                #endif
             }
             window.makeFirstResponder(view)
             windowID = CGWindowID(window.windowNumber)
@@ -71,12 +77,36 @@ final class SelectionOverlayController {
             views.append(view)
         }
 
-        if !didSetKeyWindow { windows.first?.makeKeyAndOrderFront(nil) }
+        if !didSetKeyWindow {
+            windows.first?.makeKeyAndOrderFront(nil)
+            #if DEBUG
+            if let window = windows.first, let screen = screens.first {
+                os_log(
+                    "default key window %{public}d for screen %{public}@, appActive=%{public}@",
+                    log: log,
+                    type: .debug,
+                    window.windowNumber,
+                    "\(screen.frame)",
+                    "\(NSApp.isActive)"
+                )
+            }
+            #endif
+        }
+        // Ensure a key window is set for event handling.
+        if let keyWindow = windows.first(where: { $0.isKeyWindow }) ?? windows.first {
+            keyWindow.makeKeyAndOrderFront(nil)
+            #if DEBUG
+            os_log(
+                "reassert key window %{public}d appActive=%{public}@",
+                log: log,
+                type: .debug,
+                keyWindow.windowNumber,
+                "\(NSApp.isActive)"
+            )
+            #endif
+        }
 
         startKeyMonitor(onCancel: { finish(nil) })
-        DispatchQueue.main.async { [weak self] in
-            self?.forceCrosshairCursor()
-        }
     }
 
     private func end() {
@@ -86,7 +116,6 @@ final class SelectionOverlayController {
         windows.removeAll()
         views.removeAll()
         selectionState = nil
-        cursorStack.pop()
         stopKeyMonitor()
     }
 
@@ -123,12 +152,6 @@ final class SelectionOverlayController {
         }
         globalKeyMonitor = nil
     }
-
-    private func forceCrosshairCursor() {
-        guard !views.isEmpty else { return }
-        views.forEach { $0.window?.invalidateCursorRects(for: $0) }
-        NSCursor.crosshair.set()
-    }
 }
 
 final class SelectionOverlayView: NSView {
@@ -141,7 +164,7 @@ final class SelectionOverlayView: NSView {
     private let metricsBackgroundLayer = CAShapeLayer()
     private let metricsTextLayer = CATextLayer()
     private let metricsFont = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
-    private var cursorTrackingArea: NSTrackingArea?
+    private let log = OSLog(subsystem: "com.grantbirki.oneshot", category: "SelectionOverlayView")
 
     init(frame frameRect: NSRect, state: SelectionOverlayState) {
         self.state = state
@@ -166,49 +189,25 @@ final class SelectionOverlayView: NSView {
         super.viewDidMoveToWindow()
         updateLayerScale()
         updateOverlay()
-        guard window != nil else { return }
-        window?.invalidateCursorRects(for: self)
-        NSCursor.crosshair.set()
+        #if DEBUG
+        os_log(
+            "viewDidMoveToWindow window=%{public}@ key=%{public}@ main=%{public}@",
+            log: log,
+            type: .debug,
+            window?.description ?? "nil",
+            "\(window?.isKeyWindow ?? false)",
+            "\(window?.isMainWindow ?? false)"
+        )
+        #endif
     }
 
     override func layout() {
         super.layout()
         updateOverlay()
-        window?.invalidateCursorRects(for: self)
-    }
-
-    override func resetCursorRects() {
-        super.resetCursorRects()
-        // Keep the selection overlay on the crosshair so AppKit doesn't revert to arrow.
-        addCursorRect(bounds, cursor: .crosshair)
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let cursorTrackingArea {
-            removeTrackingArea(cursorTrackingArea)
-        }
-        let options: NSTrackingArea.Options = [
-            .activeAlways,
-            .inVisibleRect,
-            .mouseEnteredAndExited,
-            .mouseMoved,
-            .cursorUpdate,
-        ]
-        let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-        addTrackingArea(area)
-        cursorTrackingArea = area
-        window?.invalidateCursorRects(for: self)
-    }
-
-    override func cursorUpdate(with event: NSEvent) {
-        super.cursorUpdate(with: event)
-        NSCursor.crosshair.set()
     }
 
     override func mouseDown(with event: NSEvent) {
         guard let window else { return }
-        NSCursor.crosshair.set()
         let point = convert(event.locationInWindow, from: nil)
         let screenPoint = window.convertPoint(toScreen: point)
         state.start = screenPoint
