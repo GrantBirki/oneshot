@@ -4,38 +4,40 @@ This document describes the settings available in OneShot.
 
 ## General
 
-- `Launch at login`: Start OneShot automatically when you sign in.
-- `Hide menu bar icon`: Remove the OneShot icon from the menu bar. To bring it back, open OneShot from Spotlight and disable this setting.
-- `Show selection coordinates`: Show the selection size next to the cursor while selecting.
-- `Selection dimming`: Choose how the overlay dims the screen (`Full screen` or `Selection only`). Default is `Full screen`.
-- `Selection color`: Selection-only fill color as RGBA hex (example: `#FFFFFF1E`). Default is `#FFFFFF1E` and can be restored with `Reset`.
-- `Selection visual cue`: Choose a visual cue when selection mode starts (`Red pulse` or `Disabled`). Default is `Disabled`.
+- `Launch at login` (default: off): Start OneShot automatically when you sign in.
+- `Hide menu bar icon` (default: off): Remove the OneShot icon from the menu bar. To bring it back, open OneShot from Spotlight and disable this setting.
+
+## Selection
+
+- `Show selection coordinates` (default: on): Show the selection size next to the cursor while selecting.
+- `Selection dimming` (default: `Full screen`): Choose how the overlay dims the screen (`Full screen` or `Selection only`).
+- `Selection color` (default: `#FFFFFF1E`): Selection-only fill color as RGBA hex (example: `#FFFFFF1E`). Used when `Selection dimming` is `Selection only`. Six-digit values are treated as fully opaque.
+- `Selection visual cue` (default: `Disabled`): Visual cue shown when selection mode starts (`Red pulse` or `Disabled`).
 
 ## Output
 
-- `Filename prefix`: Prefix used when naming saved screenshots. Empty or invalid values fall back to `screenshot`.
-- `Copy to clipboard automatically`: Toggle whether captures are copied to the clipboard in addition to any saves.
-- `Save location`: Choose where screenshots are saved (`Downloads`, `Desktop`, `Documents`, or `Custom`).
-- `Custom folder`: Absolute path used when `Save location` is set to `Custom`. Empty or relative paths fall back to `Downloads`.
-- `Default output` (previews disabled): Choose whether screenshots save to disk (clipboard copy depends on the auto-copy toggle) or only copy to the clipboard.
+- `Filename prefix` (default: `screenshot`): Prefix used when naming saved screenshots. Invalid filename characters are stripped; empty results fall back to `screenshot`.
+- `Copy to clipboard automatically` (default: on): Copy captures to the clipboard immediately, even if you later discard the preview.
+- `Save location` (default: `Downloads`): Choose where screenshots are saved (`Downloads`, `Desktop`, `Documents`, or `Custom`).
+- `Custom folder`: Path used when `Save location` is set to `Custom`. `~` expands to your home folder. Empty or relative paths fall back to `Downloads`.
+- `Default output` (previews disabled) (default: `Save to disk`): Choose whether screenshots save to disk or only copy to the clipboard.
 
 Notes:
 
 - When `Copy to clipboard automatically` is off, only the `Default output` option `Copy to clipboard` will place images on the clipboard.
+- When `Default output` is `Copy to clipboard`, nothing is saved to disk and the save location/filename prefix are ignored.
 
 ## Preview
 
-- `Show floating preview`: Show the thumbnail preview after capture.
-- `Auto-dismiss preview`: Automatically dismiss the preview after the save delay. Hovering or dragging pauses the dismissal (and any timed save) until interaction ends.
-- `Save delay (seconds)`: Time to wait before applying the preview timeout or background save when previews are enabled.
-- `On preview timeout`: Choose whether the capture saves to disk or is discarded when the preview timer ends.
-- `On new screenshot`: Behavior when another capture happens while a preview is still visible.
-  - `Save previous capture`: Saves the existing capture immediately and replaces the preview.
-  - `Discard previous capture`: Cancels the existing capture and replaces the preview.
+- `Show floating preview` (default: on): Show the thumbnail preview after capture.
+- `Auto-dismiss preview` (default: on): Automatically dismiss the preview after the save delay. Hovering or dragging pauses the dismissal.
+- `Save delay (seconds)` (default: `7`): Time to wait before the preview timeout or background save when previews are enabled.
+- `On preview timeout` (default: `Save to disk`): Choose whether the capture saves to disk or is discarded when the preview timer ends. Only applies when `Auto-dismiss preview` is on.
+- `On new screenshot` (default: `Save previous capture`): Choose whether a visible preview is saved immediately or discarded when a new capture happens.
 
 Click the checkmark to save immediately or the trash icon to discard.
-Clicking the preview thumbnail saves (if needed) and opens the saved file in Preview so edits apply to the same file on disk.
-When Auto-dismiss is off, the preview stays visible until you act, but the file still saves after the delay.
+Clicking the preview thumbnail saves (if needed) and opens the saved file in your default image app (typically Preview).
+When Auto-dismiss is off, the preview stays visible until you act; if you do nothing, the file still saves after the delay.
 
 When previews are disabled, screenshots follow the `Default output` setting and the save delay is ignored.
 

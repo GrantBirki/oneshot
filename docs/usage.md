@@ -36,17 +36,17 @@ When enabled, a floating preview appears after capture:
 
 - Checkmark button saves immediately
 - Trash button discards the capture
-- Click the preview image to save (if needed) and open in Preview
+- Click the preview image to save (if needed) and open in your default image app (typically Preview)
 - Drag the preview into other apps to drop the image
 - Esc saves, Command+Delete discards
 
 If Auto-dismiss is enabled, the preview waits for the Save delay timer, then follows
 the chosen timeout behavior (save or discard). If Auto-dismiss is disabled, the preview
-stays until you act, but the file still saves after the delay.
+stays until you act; if you do nothing, the file still saves after the delay.
 
 ## Output Behavior
 
-- Clipboard copy is optional; toggle it in Settings > Output.
+- Clipboard copy is optional; toggle it in Settings > Output. When enabled, copies happen immediately even if you later discard the preview.
 - Saved files are PNGs.
 - Save location and filename prefix are configurable in Settings.
 - When previews are disabled, use Default output to choose Save to disk or Clipboard only.

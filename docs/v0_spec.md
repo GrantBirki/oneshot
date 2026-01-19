@@ -9,8 +9,8 @@ This document outlines the specifications for version 0 (v0) of the OneShot macO
 - Build as a macOS app bundle, unsigned for MVP; optional codesign + notary supported via env flags.
 - Distribute via Homebrew cask.
 - Users will need to approve the app on first run (Gatekeeper).
-- Provide an extemely simple and easy to use screenshot utility that works in a similar way to the built-in macOS screenshot tool.
-- Extend the MacOS screenshot tool with additional features such as:
+- Provide an extremely simple and easy to use screenshot utility that works in a similar way to the built-in macOS screenshot tool.
+- Extend the macOS screenshot tool with additional features such as:
   - Disabling the post-capture overlay image preview/hover tile.
   - Custom save locations including the ability to automatically save to clipboard, desktop, documents, or a user specified folder.
   - Custom file naming conventions.
@@ -37,21 +37,18 @@ This document outlines the specifications for version 0 (v0) of the OneShot macO
 ## Capture & Hotkeys
 
 - Capture modes: drag-to-select area (default), full screen, window capture.
-- Default global hotkeys (no external deps):
-  - `ctrl+p` => drag selection capture. This is the default and golden path for capturing screenshots. At least for me personally!
-  - `ctrl+shift+p` => full screen capture. I don't use this as much but I'm sure others do so we need it as a feature.
-- Default hotkey for window capture: TBD.
-- Hotkeys should be user-configurable in settings.
-- No capture delay for v0 (always instant).
+- Default hotkeys: none.
+- Hotkeys should be user-configurable in settings and registered globally.
+- Captures start immediately; save timing is controlled by preview settings.
 - Use a custom selection overlay with CG APIs / ScreenCaptureKit for capture.
 
 ## Floating Preview
 
 - Show a floating preview tile after capture (supports drag/drop into other apps and click-to-open).
-- Preview timeout is configurable; include a "never timeout" mode that keeps the tile until the user closes it.
+- Preview timeout is configurable; auto-dismiss can be disabled so the preview stays until you act (the file may still save after the delay).
 - Preview actions:
-  - Upper-left "X" closes the preview and immediately saves to disk (ends any delay early).
-  - Upper-right red trash icon cancels the delayed save and deletes the pending capture.
+  - Upper-left checkmark saves immediately (ends any delay early).
+  - Upper-right red trash icon discards the pending capture.
 
 ## Output & Storage
 
