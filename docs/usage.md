@@ -55,6 +55,25 @@ stays until you act; if you do nothing, the file still saves after the delay.
 
 All preferences and defaults live in [`docs/settings.md`](settings.md).
 
+## Update
+
+```bash
+brew update
+brew upgrade --cask oneshot
+```
+
+## Uninstall
+
+```bash
+brew uninstall --cask oneshot
+```
+
+To remove settings and state:
+
+```bash
+brew uninstall --zap oneshot
+```
+
 ## Menu Bar Icon
 
 Opening OneShot from Spotlight always shows the Settings window. This is useful
