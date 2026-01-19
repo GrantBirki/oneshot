@@ -21,19 +21,14 @@ If you change `project.yml`, run `script/update` to regenerate the Xcode project
 
 ## Release Flow
 
-Versioning is driven by the `VERSION` file. Do not edit it directly.
+Versioning is driven by the `VERSION` file. Bump it manually (X.Y.Z) in a commit to `main`.
 
-```bash
-script/release
-```
+Releases are created by GitHub Actions when `VERSION` changes on `main`. The workflow:
 
-`script/release`:
+- Builds the release zip via `script/package`
+- Creates the GitHub release + tag
 
-- Updates `VERSION`
-- Builds a release zip via `script/package`
-- Updates the Homebrew cask `sha256`
-
-Releases are created by GitHub Actions when `VERSION` changes on `main`. No manual tag push is required.
+Update the Homebrew cask manually in `grantbirki/homebrew-tap` after each release.
 
 ## Permissions (Dev Build)
 
