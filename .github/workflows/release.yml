@@ -214,28 +214,3 @@ jobs:
             app "OneShot.app"
           end
           RUBY
-
-          {
-            echo "## Homebrew tap update details"
-            echo
-            echo "- version: \`${VERSION}\`"
-            echo "- sha256: \`${sha}\`"
-            echo
-            echo "Cask snippet:"
-            echo
-            echo '```rb'
-            cat <<RUBY
-cask "oneshot" do
-  version "${VERSION}"
-  sha256 "${sha}"
-
-  url "https://github.com/grantbirki/oneshot/releases/download/v#{version}/OneShot.zip"
-  name "OneShot"
-  desc "Open source screenshot utility for macOS"
-  homepage "https://github.com/grantbirki/oneshot"
-
-  app "OneShot.app"
-end
-RUBY
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
