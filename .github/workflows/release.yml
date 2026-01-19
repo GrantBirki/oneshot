@@ -202,15 +202,15 @@ jobs:
           echo
           echo -e "${yellow}Cask snippet:${off}"
           cat <<RUBY
-cask "oneshot" do
-  version "${VERSION}"
-  sha256 "${sha}"
+          cask "oneshot" do
+            version "${VERSION}"
+            sha256 "${sha}"
 
-  url "https://github.com/grantbirki/oneshot/releases/download/v#{version}/OneShot.zip"
-  name "OneShot"
-  desc "Open source screenshot utility for macOS"
-  homepage "https://github.com/grantbirki/oneshot"
+            url "https://github.com/grantbirki/oneshot/releases/download/v#{version}/OneShot.zip"
+            name "OneShot"
+            desc "Open source screenshot utility for macOS"
+            homepage "https://github.com/grantbirki/oneshot"
 
-  app "OneShot.app"
-end
-RUBY
+            app "OneShot.app"
+          end
+          RUBY
