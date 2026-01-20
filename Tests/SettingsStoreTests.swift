@@ -41,6 +41,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertNil(settings.hotkeySelection)
         XCTAssertNil(settings.hotkeyFullScreen)
         XCTAssertNil(settings.hotkeyWindow)
+        XCTAssertNil(settings.hotkeyScrolling)
     }
 
     func testValuesPersistToDefaults() {
@@ -64,6 +65,7 @@ final class SettingsStoreTests: XCTestCase {
         settings.hotkeySelection = HotkeyParser.parse("ctrl+z")
         settings.hotkeyFullScreen = HotkeyParser.parse("ctrl+shift+z")
         settings.hotkeyWindow = HotkeyParser.parse("ctrl+w")
+        settings.hotkeyScrolling = HotkeyParser.parse("ctrl+shift+s")
 
         settings = SettingsStore(defaults: defaults)
         XCTAssertTrue(settings.autoLaunchEnabled)
@@ -86,6 +88,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.hotkeySelection, HotkeyParser.parse("ctrl+z"))
         XCTAssertEqual(settings.hotkeyFullScreen, HotkeyParser.parse("ctrl+shift+z"))
         XCTAssertEqual(settings.hotkeyWindow, HotkeyParser.parse("ctrl+w"))
+        XCTAssertEqual(settings.hotkeyScrolling, HotkeyParser.parse("ctrl+shift+s"))
     }
 
     func testPreviewTimeoutUsesSaveDelay() {

@@ -6,6 +6,10 @@ final class CaptureManager {
     private let windowOverlay = WindowCaptureOverlayController()
     private let outputCoordinator: OutputCoordinator
     private let previewController = PreviewController()
+    private let scrollingCaptureSession = ScrollingCaptureSession()
+    private let scrollingOverlay = ScrollingCaptureOverlayController()
+
+    var onScrollingCaptureStateChange: ((Bool) -> Void)?
 
     init(settings: SettingsStore) {
         self.settings = settings
@@ -39,6 +43,36 @@ final class CaptureManager {
             guard let self, let windowInfo else { return }
             if let image = ScreenCaptureService.capture(windowID: windowInfo.id) {
                 handleCapture(image, displaySize: windowInfo.bounds.size, anchorRect: windowInfo.bounds)
+            }
+        }
+    }
+
+    func captureScrolling() {
+        guard ScreenCapturePermission.ensureAccess() else { return }
+        if scrollingCaptureSession.isActive {
+            scrollingCaptureSession.stop()
+            return
+        }
+
+        selectionOverlay.beginSelection(
+            showSelectionCoordinates: settings.showSelectionCoordinates,
+            visualCue: settings.selectionVisualCue,
+            dimmingMode: settings.selectionDimmingMode,
+            selectionDimmingColor: settings.selectionDimmingColor,
+        ) { [weak self] selection in
+            guard let self, let selection else { return }
+            let anchorRect = selection.rect.integral
+            updateScrollingCaptureState(isActive: true)
+            scrollingOverlay.show(selectionRect: anchorRect) { [weak self] in
+                self?.scrollingCaptureSession.stop()
+            }
+            scrollingCaptureSession.start(rect: anchorRect) { [weak self] image in
+                guard let self else { return }
+                scrollingOverlay.hide()
+                updateScrollingCaptureState(isActive: false)
+                guard let image else { return }
+                let displaySize = displaySize(for: image, baseRect: anchorRect)
+                handleCapture(image, displaySize: displaySize, anchorRect: anchorRect)
             }
         }
     }
@@ -123,6 +157,21 @@ final class CaptureManager {
             outputCoordinator.finalize(id: saveID)
         case .clipboardOnly:
             ClipboardService.copy(pngData: captured.pngData)
+        }
+    }
+
+    private func displaySize(for image: CGImage, baseRect: CGRect) -> NSSize {
+        guard baseRect.width > 0 else {
+            return NSSize(width: image.width, height: image.height)
+        }
+        let scale = CGFloat(image.width) / baseRect.width
+        let height = scale > 0 ? CGFloat(image.height) / scale : CGFloat(image.height)
+        return NSSize(width: baseRect.width, height: height)
+    }
+
+    private func updateScrollingCaptureState(isActive: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            self?.onScrollingCaptureStateChange?(isActive)
         }
     }
 }

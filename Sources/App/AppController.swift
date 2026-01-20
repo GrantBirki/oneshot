@@ -23,6 +23,7 @@ final class AppController {
             onCaptureSelection: { [weak captureManager] in captureManager?.captureSelection() },
             onCaptureFullScreen: { [weak captureManager] in captureManager?.captureFullScreen() },
             onCaptureWindow: { [weak captureManager] in captureManager?.captureWindow() },
+            onCaptureScrolling: { [weak captureManager] in captureManager?.captureScrolling() },
             onAbout: { [weak aboutWindowController] in aboutWindowController?.show() },
             onSettings: { [weak settingsWindowController] in settingsWindowController?.show() },
             onQuit: { NSApp.terminate(nil) },
@@ -31,9 +32,14 @@ final class AppController {
                     selection: settings?.hotkeySelection,
                     fullScreen: settings?.hotkeyFullScreen,
                     window: settings?.hotkeyWindow,
+                    scrolling: settings?.hotkeyScrolling,
                 )
             },
         )
+
+        captureManager.onScrollingCaptureStateChange = { [weak menuBarController] isActive in
+            menuBarController?.setScrollingCaptureActive(isActive)
+        }
     }
 
     func start() {
@@ -70,6 +76,9 @@ final class AppController {
             .sink { [weak self] _ in self?.registerHotkeys() }
             .store(in: &cancellables)
         settings.$hotkeyWindow
+            .sink { [weak self] _ in self?.registerHotkeys() }
+            .store(in: &cancellables)
+        settings.$hotkeyScrolling
             .sink { [weak self] _ in self?.registerHotkeys() }
             .store(in: &cancellables)
     }
@@ -116,6 +125,15 @@ final class AppController {
             }
         } else {
             NSLog("Window hotkey not set or invalid")
+        }
+
+        if let scrollingHotkey = settings.hotkeyScrolling, scrollingHotkey.isValid {
+            NSLog("Registering scrolling hotkey: \(scrollingHotkey.displayString)")
+            hotkeyManager.register(hotkey: scrollingHotkey) { [weak self] in
+                self?.captureManager.captureScrolling()
+            }
+        } else {
+            NSLog("Scrolling hotkey not set or invalid")
         }
 
         menuBarController.refreshHotkeys()

@@ -44,6 +44,7 @@ When previews are disabled, screenshots follow the `Default output` setting and 
 ## Hotkeys
 
 - `Selection`: Hotkey for selection capture (default: none).
+- `Scrolling`: Hotkey for scrolling capture (default: none).
 - `Full screen`: Hotkey for full screen capture (default: none).
 - `Window`: Hotkey for window capture (no default).
 

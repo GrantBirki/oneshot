@@ -5,26 +5,31 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let selection: Hotkey?
         let fullScreen: Hotkey?
         let window: Hotkey?
+        let scrolling: Hotkey?
     }
 
     private let statusItem: NSStatusItem
     private let onCaptureSelection: () -> Void
     private let onCaptureFullScreen: () -> Void
     private let onCaptureWindow: () -> Void
+    private let onCaptureScrolling: () -> Void
     private let onAbout: () -> Void
     private let onSettings: () -> Void
     private let onQuit: () -> Void
     private let hotkeyProvider: () -> HotkeyBindings
     private var menu: NSMenu?
     private let selectionItem: NSMenuItem
+    private let scrollingItem: NSMenuItem
     private let windowItem: NSMenuItem
     private let fullScreenItem: NSMenuItem
     private let aboutItem: NSMenuItem
+    private var isScrollingCaptureActive = false
 
     init(
         onCaptureSelection: @escaping () -> Void,
         onCaptureFullScreen: @escaping () -> Void,
         onCaptureWindow: @escaping () -> Void,
+        onCaptureScrolling: @escaping () -> Void,
         onAbout: @escaping () -> Void,
         onSettings: @escaping () -> Void,
         onQuit: @escaping () -> Void,
@@ -33,6 +38,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         self.onCaptureSelection = onCaptureSelection
         self.onCaptureFullScreen = onCaptureFullScreen
         self.onCaptureWindow = onCaptureWindow
+        self.onCaptureScrolling = onCaptureScrolling
         self.onAbout = onAbout
         self.onSettings = onSettings
         self.onQuit = onQuit
@@ -41,6 +47,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         selectionItem = NSMenuItem(
             title: "Capture Selection",
             action: #selector(captureSelection),
+            keyEquivalent: "",
+        )
+        scrollingItem = NSMenuItem(
+            title: "Capture Scrolling",
+            action: #selector(captureScrolling),
             keyEquivalent: "",
         )
         windowItem = NSMenuItem(
@@ -61,6 +72,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         super.init()
 
         selectionItem.target = self
+        scrollingItem.target = self
         windowItem.target = self
         fullScreenItem.target = self
         aboutItem.target = self
@@ -81,6 +93,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.delegate = self
         statusItem.menu = menu
         self.menu = menu
+        updateScrollingTitle()
         refreshHotkeys()
         NSLog("Menu bar item started")
     }
@@ -93,6 +106,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let menu = NSMenu()
 
         menu.addItem(selectionItem)
+
+        menu.addItem(scrollingItem)
 
         menu.addItem(windowItem)
 
@@ -129,6 +144,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             selection: values.selection,
             fullScreen: values.fullScreen,
             window: values.window,
+            scrolling: values.scrolling,
         )
     }
 
@@ -136,10 +152,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         refreshHotkeys()
     }
 
-    private func updateHotkeys(selection: Hotkey?, fullScreen: Hotkey?, window: Hotkey?) {
+    private func updateHotkeys(selection: Hotkey?, fullScreen: Hotkey?, window: Hotkey?, scrolling: Hotkey?) {
         applyHotkey(selection, to: selectionItem)
         applyHotkey(fullScreen, to: fullScreenItem)
         applyHotkey(window, to: windowItem)
+        applyHotkey(scrolling, to: scrollingItem)
     }
 
     private func applyHotkey(_ value: Hotkey?, to item: NSMenuItem) {
@@ -162,6 +179,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         onCaptureWindow()
     }
 
+    @objc private func captureScrolling() {
+        onCaptureScrolling()
+    }
+
     @objc private func captureFullScreen() {
         onCaptureFullScreen()
     }
@@ -176,5 +197,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func quit() {
         onQuit()
+    }
+
+    func setScrollingCaptureActive(_ isActive: Bool) {
+        isScrollingCaptureActive = isActive
+        updateScrollingTitle()
+    }
+
+    private func updateScrollingTitle() {
+        let title = isScrollingCaptureActive ? "Stop Scrolling Capture" : "Capture Scrolling"
+        scrollingItem.title = title
+        scrollingItem.state = isScrollingCaptureActive ? .on : .off
     }
 }

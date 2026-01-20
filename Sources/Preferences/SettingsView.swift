@@ -167,15 +167,15 @@ struct SettingsView: View {
                     hotkey: $settings.hotkeySelection,
                     conflictMessage: conflictMessage(
                         for: settings.hotkeySelection,
-                        against: [settings.hotkeyFullScreen, settings.hotkeyWindow],
+                        against: [settings.hotkeyScrolling, settings.hotkeyFullScreen, settings.hotkeyWindow],
                     ),
                 )
                 HotkeyRecorderRow(
-                    title: "Full screen",
-                    hotkey: $settings.hotkeyFullScreen,
+                    title: "Scrolling",
+                    hotkey: $settings.hotkeyScrolling,
                     conflictMessage: conflictMessage(
-                        for: settings.hotkeyFullScreen,
-                        against: [settings.hotkeySelection, settings.hotkeyWindow],
+                        for: settings.hotkeyScrolling,
+                        against: [settings.hotkeySelection, settings.hotkeyFullScreen, settings.hotkeyWindow],
                     ),
                 )
                 HotkeyRecorderRow(
@@ -183,7 +183,15 @@ struct SettingsView: View {
                     hotkey: $settings.hotkeyWindow,
                     conflictMessage: conflictMessage(
                         for: settings.hotkeyWindow,
-                        against: [settings.hotkeySelection, settings.hotkeyFullScreen],
+                        against: [settings.hotkeySelection, settings.hotkeyFullScreen, settings.hotkeyScrolling],
+                    ),
+                )
+                HotkeyRecorderRow(
+                    title: "Full screen",
+                    hotkey: $settings.hotkeyFullScreen,
+                    conflictMessage: conflictMessage(
+                        for: settings.hotkeyFullScreen,
+                        against: [settings.hotkeySelection, settings.hotkeyWindow, settings.hotkeyScrolling],
                     ),
                 )
                 Text("Click a field and press the shortcut. Press Esc to cancel.")

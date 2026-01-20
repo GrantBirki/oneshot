@@ -96,6 +96,16 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    @Published var hotkeyScrolling: Hotkey? {
+        didSet {
+            persistHotkey(
+                hotkeyScrolling,
+                keyCodeKey: Keys.hotkeyScrollingKeyCode,
+                modifiersKey: Keys.hotkeyScrollingModifiers,
+            )
+        }
+    }
+
     var previewTimeout: TimeInterval? {
         previewTimeoutEnabled ? saveDelaySeconds : nil
     }
@@ -147,6 +157,12 @@ final class SettingsStore: ObservableObject {
             keyCodeKey: Keys.hotkeyWindowKeyCode,
             modifiersKey: Keys.hotkeyWindowModifiers,
             legacyKey: LegacyKeys.hotkeyWindow,
+            defaultValue: nil,
+        )
+        hotkeyScrolling = loadHotkey(
+            keyCodeKey: Keys.hotkeyScrollingKeyCode,
+            modifiersKey: Keys.hotkeyScrollingModifiers,
+            legacyKey: nil,
             defaultValue: nil,
         )
     }
@@ -325,6 +341,8 @@ private enum Keys {
     static let hotkeyFullScreenModifiers = "settings.hotkeyFullScreen.modifiers"
     static let hotkeyWindowKeyCode = "settings.hotkeyWindow.keyCode"
     static let hotkeyWindowModifiers = "settings.hotkeyWindow.modifiers"
+    static let hotkeyScrollingKeyCode = "settings.hotkeyScrolling.keyCode"
+    static let hotkeyScrollingModifiers = "settings.hotkeyScrolling.modifiers"
 }
 
 private enum LegacyKeys {
