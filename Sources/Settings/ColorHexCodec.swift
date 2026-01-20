@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 enum ColorHexCodec {
-    static let defaultSelectionDimmingColorHex = "#FFFFFF1E"
+    static let defaultSelectionDimmingColorHex = "#5151513F"
     static let defaultSelectionDimmingColor = NSColor.white.withAlphaComponent(30.0 / 255.0)
 
     static func normalized(_ value: String) -> String? {
