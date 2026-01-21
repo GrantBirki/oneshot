@@ -42,7 +42,9 @@ enum ScreenCaptureService {
         guard let display = await scDisplay(for: screenTarget.displayID) else { return nil }
         let currentApp = await currentApplication()
 
-        let integralRect = rect.integral
+        let clampedRect = rect.intersection(screenTarget.frame)
+        guard !clampedRect.isNull, !clampedRect.isEmpty else { return nil }
+        let integralRect = clampedRect.integral
         let adjustedRect = ScreenCaptureCoordinateConverter.adjustedRect(
             for: integralRect,
             screenFrame: screenTarget.frame,
