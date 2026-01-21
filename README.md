@@ -14,15 +14,18 @@ Open source screenshot utility for macOS with QoL improvements over the native A
 - Keep the capture flow simple and familiar.
 - Add control over preview behavior, save timing, location, clipboard operations, and naming.
 - Stay lightweight and focused.
+- Add features I’ve always wished the native utility had.
 
 ## ✨ Features
 
 - Selection, window, and full-screen capture.
+- Scrolling screenshots.
 - Floating preview with save/discard actions and drag-and-drop.
 - Optional clipboard copy + configurable save location and filename prefix.
 - Customizable hotkeys.
 - Optional auto-dismiss preview with save delay control.
 - Optional menu bar icon hiding (restore via Spotlight).
+- The ability to customize screenshot selection windows.
 
 ## 🚀 Installation
 
@@ -44,15 +47,15 @@ xattr -dr com.apple.quarantine /Applications/OneShot.app
 
 ### Area Selection
 
-https://github.com/user-attachments/assets/4690d728-9f7f-42df-897e-9499c429ee84
+<https://github.com/user-attachments/assets/4690d728-9f7f-42df-897e-9499c429ee84>
 
 ## Scrolling Selection
 
-https://github.com/user-attachments/assets/13024d4d-faf4-4778-ab92-02847ba71e52
+<https://github.com/user-attachments/assets/13024d4d-faf4-4778-ab92-02847ba71e52>
 
 ## Settings
 
-https://github.com/user-attachments/assets/0a693a06-e0c8-4cb9-bc99-64d9f086ef1c
+<https://github.com/user-attachments/assets/0a693a06-e0c8-4cb9-bc99-64d9f086ef1c>
 
 ## 📖 Usage
 
