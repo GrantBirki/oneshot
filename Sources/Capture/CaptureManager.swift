@@ -25,15 +25,30 @@ final class CaptureManager {
             selectionDimmingColor: settings.selectionDimmingColor,
         ) { [weak self] selection in
             guard let self, let selection else { return }
-            capture(rect: selection.rect, excludingWindowID: selection.excludeWindowID)
+            Task { [weak self] in
+                guard let self else { return }
+                if let image = await ScreenCaptureService.capture(
+                    rect: selection.rect,
+                    excludingWindowID: selection.excludeWindowID,
+                ) {
+                    await MainActor.run {
+                        self.handleCapture(image, displaySize: selection.rect.size, anchorRect: selection.rect)
+                    }
+                }
+            }
         }
     }
 
     func captureFullScreen() {
         guard ScreenCapturePermission.ensureAccess() else { return }
-        if let image = ScreenCaptureService.captureFullScreen() {
-            let size = ScreenFrameHelper.allScreensFrame()?.size ?? NSSize(width: image.width, height: image.height)
-            handleCapture(image, displaySize: size, anchorRect: ScreenFrameHelper.allScreensFrame())
+        Task { [weak self] in
+            guard let self else { return }
+            guard let image = await ScreenCaptureService.captureFullScreen() else { return }
+            await MainActor.run {
+                let frame = ScreenFrameHelper.allScreensFrame()
+                let size = frame?.size ?? NSSize(width: image.width, height: image.height)
+                self.handleCapture(image, displaySize: size, anchorRect: frame)
+            }
         }
     }
 
@@ -41,8 +56,13 @@ final class CaptureManager {
         guard ScreenCapturePermission.ensureAccess() else { return }
         windowOverlay.beginSelection { [weak self] windowInfo in
             guard let self, let windowInfo else { return }
-            if let image = ScreenCaptureService.capture(windowID: windowInfo.id) {
-                handleCapture(image, displaySize: windowInfo.bounds.size, anchorRect: windowInfo.bounds)
+            Task { [weak self] in
+                guard let self else { return }
+                if let image = await ScreenCaptureService.capture(windowID: windowInfo.id) {
+                    await MainActor.run {
+                        self.handleCapture(image, displaySize: windowInfo.bounds.size, anchorRect: windowInfo.bounds)
+                    }
+                }
             }
         }
     }
@@ -74,12 +94,6 @@ final class CaptureManager {
                 let displaySize = displaySize(for: image, baseRect: anchorRect)
                 handleCapture(image, displaySize: displaySize, anchorRect: anchorRect)
             }
-        }
-    }
-
-    private func capture(rect: CGRect, excludingWindowID: CGWindowID?) {
-        if let image = ScreenCaptureService.capture(rect: rect, excludingWindowID: excludingWindowID) {
-            handleCapture(image, displaySize: rect.size, anchorRect: rect)
         }
     }
 
