@@ -46,6 +46,10 @@ xattr -dr com.apple.quarantine /Applications/OneShot.app
 
 https://github.com/user-attachments/assets/4690d728-9f7f-42df-897e-9499c429ee84
 
+## Scrolling Selection
+
+https://github.com/user-attachments/assets/13024d4d-faf4-4778-ab92-02847ba71e52
+
 ## 📖 Usage
 
 - End-user guide: [docs/usage.md](docs/usage.md)
