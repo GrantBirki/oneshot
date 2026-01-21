@@ -118,3 +118,23 @@ enum SelectionVisualCue: String, CaseIterable, Identifiable {
         }
     }
 }
+
+enum ShutterSoundOption: String, CaseIterable, Identifiable {
+    case shutter
+    case canon70d
+    case sonyA7II = "sony_a7ii"
+    case popPopCanonAE1 = "pop-pop_canon_ae-1"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .shutter: "Default shutter"
+        case .canon70d: "Grant's camera"
+        case .sonyA7II: "Leah's camera"
+        case .popPopCanonAE1: "Norm's camera"
+        }
+    }
+
+    var resourceName: String { rawValue }
+}

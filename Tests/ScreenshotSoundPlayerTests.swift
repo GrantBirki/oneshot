@@ -9,7 +9,11 @@ final class ScreenshotSoundPlayerTests: XCTestCase {
         let hit = StubBundle(result: expected)
         let skipped = StubBundle(result: URL(fileURLWithPath: "/tmp/other.wav"))
 
-        let url = ScreenshotSoundPlayer.resolveSoundURL(bundles: [missing, hit, skipped])
+        let url = ScreenshotSoundPlayer.resolveSoundURL(
+            soundName: "shutter",
+            soundExtension: "wav",
+            bundles: [missing, hit, skipped],
+        )
 
         XCTAssertEqual(url, expected)
         XCTAssertEqual(missing.requests.first, StubBundle.Request(name: "shutter", ext: "wav"))
@@ -21,7 +25,11 @@ final class ScreenshotSoundPlayerTests: XCTestCase {
         let first = StubBundle(result: nil)
         let second = StubBundle(result: nil)
 
-        let url = ScreenshotSoundPlayer.resolveSoundURL(bundles: [first, second])
+        let url = ScreenshotSoundPlayer.resolveSoundURL(
+            soundName: "shutter",
+            soundExtension: "wav",
+            bundles: [first, second],
+        )
 
         XCTAssertNil(url)
         XCTAssertEqual(first.requests.first, StubBundle.Request(name: "shutter", ext: "wav"))

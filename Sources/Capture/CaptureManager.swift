@@ -100,7 +100,11 @@ final class CaptureManager {
     private func handleCapture(_ image: CGImage, displaySize: NSSize, anchorRect: CGRect?) {
         do {
             let captured = try CapturedImage(cgImage: image, displaySize: displaySize)
-            ScreenshotSoundPlayer.play()
+            ScreenshotSoundPlayer.play(
+                sound: settings.shutterSound,
+                volume: settings.shutterSoundVolume,
+                isEnabled: settings.shutterSoundEnabled,
+            )
             if settings.previewEnabled {
                 handleCaptureWithPreview(captured, anchorRect: anchorRect)
             } else {

@@ -27,6 +27,12 @@ Notes:
 - When `Copy to clipboard automatically` is off, only the `Default output` option `Copy to clipboard` will place images on the clipboard.
 - When `Default output` is `Copy to clipboard`, nothing is saved to disk and the save location/filename prefix are ignored.
 
+## Sound
+
+- `Play shutter sound` (default: on): Play a sound when a screenshot is captured.
+- `Shutter sound` (default: `Default shutter`): Choose the capture sound (`Default shutter`, `Grant's camera`, `Leah's camera`, or `Norm's camera`).
+- `Volume` (default: `100%`): Set the shutter sound volume between 0% and 100%.
+
 ## Preview
 
 - `Show floating preview` (default: on): Show the thumbnail preview after capture.

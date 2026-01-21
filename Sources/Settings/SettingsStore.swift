@@ -66,6 +66,18 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(filenamePrefix, forKey: Keys.filenamePrefix) }
     }
 
+    @Published var shutterSoundEnabled: Bool {
+        didSet { defaults.set(shutterSoundEnabled, forKey: Keys.shutterSoundEnabled) }
+    }
+
+    @Published var shutterSound: ShutterSoundOption {
+        didSet { defaults.set(shutterSound.rawValue, forKey: Keys.shutterSound) }
+    }
+
+    @Published var shutterSoundVolume: Double {
+        didSet { persistShutterSoundVolume() }
+    }
+
     @Published var hotkeySelection: Hotkey? {
         didSet {
             persistHotkey(
@@ -140,6 +152,9 @@ final class SettingsStore: ObservableObject {
         saveLocationOption = Self.loadSaveLocationOption(from: defaults)
         customSavePath = defaults.string(forKey: Keys.customSavePath) ?? ""
         filenamePrefix = defaults.string(forKey: Keys.filenamePrefix) ?? "screenshot"
+        shutterSoundEnabled = defaults.object(forKey: Keys.shutterSoundEnabled) as? Bool ?? true
+        shutterSound = Self.loadShutterSoundOption(from: defaults)
+        shutterSoundVolume = Self.loadShutterSoundVolume(from: defaults)
 
         hotkeySelection = loadHotkey(
             keyCodeKey: Keys.hotkeySelectionKeyCode,
@@ -232,6 +247,20 @@ private extension SettingsStore {
         )
     }
 
+    static func loadShutterSoundOption(from defaults: UserDefaults) -> ShutterSoundOption {
+        loadEnum(
+            ShutterSoundOption.self,
+            from: defaults,
+            key: Keys.shutterSound,
+            defaultValue: .shutter,
+        )
+    }
+
+    static func loadShutterSoundVolume(from defaults: UserDefaults) -> Double {
+        let value = defaults.object(forKey: Keys.shutterSoundVolume) as? Double ?? 1.0
+        return clampVolume(value)
+    }
+
     static func loadSaveLocationOption(from defaults: UserDefaults) -> SaveLocationOption {
         loadEnum(
             SaveLocationOption.self,
@@ -315,6 +344,19 @@ private extension SettingsStore {
         }
     }
 
+    func persistShutterSoundVolume() {
+        let clamped = Self.clampVolume(shutterSoundVolume)
+        if clamped != shutterSoundVolume {
+            shutterSoundVolume = clamped
+            return
+        }
+        defaults.set(clamped, forKey: Keys.shutterSoundVolume)
+    }
+
+    static func clampVolume(_ value: Double) -> Double {
+        min(max(value, 0), 1)
+    }
+
     static let unsetKeyCodeSentinel = -1
 }
 
@@ -335,6 +377,9 @@ private enum Keys {
     static let saveLocationOption = "settings.saveLocationOption"
     static let customSavePath = "settings.customSavePath"
     static let filenamePrefix = "settings.filenamePrefix"
+    static let shutterSoundEnabled = "settings.shutterSoundEnabled"
+    static let shutterSound = "settings.shutterSound"
+    static let shutterSoundVolume = "settings.shutterSoundVolume"
     static let hotkeySelectionKeyCode = "settings.hotkeySelection.keyCode"
     static let hotkeySelectionModifiers = "settings.hotkeySelection.modifiers"
     static let hotkeyFullScreenKeyCode = "settings.hotkeyFullScreen.keyCode"

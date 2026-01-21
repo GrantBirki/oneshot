@@ -38,6 +38,9 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(settings.autoCopyToClipboard)
         XCTAssertEqual(settings.saveLocationOption, .downloads)
         XCTAssertEqual(settings.filenamePrefix, "screenshot")
+        XCTAssertTrue(settings.shutterSoundEnabled)
+        XCTAssertEqual(settings.shutterSound, .shutter)
+        XCTAssertEqual(settings.shutterSoundVolume, 1.0)
         XCTAssertNil(settings.hotkeySelection)
         XCTAssertNil(settings.hotkeyFullScreen)
         XCTAssertNil(settings.hotkeyWindow)
@@ -62,6 +65,9 @@ final class SettingsStoreTests: XCTestCase {
         settings.saveLocationOption = .desktop
         settings.customSavePath = "/tmp"
         settings.filenamePrefix = "grab"
+        settings.shutterSoundEnabled = false
+        settings.shutterSound = .sonyA7II
+        settings.shutterSoundVolume = 0.35
         settings.hotkeySelection = HotkeyParser.parse("ctrl+z")
         settings.hotkeyFullScreen = HotkeyParser.parse("ctrl+shift+z")
         settings.hotkeyWindow = HotkeyParser.parse("ctrl+w")
@@ -85,6 +91,9 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.saveLocationOption, .desktop)
         XCTAssertEqual(settings.customSavePath, "/tmp")
         XCTAssertEqual(settings.filenamePrefix, "grab")
+        XCTAssertFalse(settings.shutterSoundEnabled)
+        XCTAssertEqual(settings.shutterSound, .sonyA7II)
+        XCTAssertEqual(settings.shutterSoundVolume, 0.35, accuracy: 0.0001)
         XCTAssertEqual(settings.hotkeySelection, HotkeyParser.parse("ctrl+z"))
         XCTAssertEqual(settings.hotkeyFullScreen, HotkeyParser.parse("ctrl+shift+z"))
         XCTAssertEqual(settings.hotkeyWindow, HotkeyParser.parse("ctrl+w"))
@@ -154,5 +163,13 @@ final class SettingsStoreTests: XCTestCase {
             settings.selectionDimmingColorHex,
             ColorHexCodec.defaultSelectionDimmingColorHex,
         )
+    }
+
+    func testShutterSoundVolumeClampsToRange() {
+        let settings = SettingsStore(defaults: defaults)
+        settings.shutterSoundVolume = 1.5
+        XCTAssertEqual(settings.shutterSoundVolume, 1.0)
+        settings.shutterSoundVolume = -0.2
+        XCTAssertEqual(settings.shutterSoundVolume, 0.0)
     }
 }
