@@ -139,12 +139,13 @@ struct SettingsView: View {
                 .disabled(!settings.shutterSoundEnabled)
                 LabeledContent("Volume") {
                     HStack(spacing: 8) {
-                        Slider(value: $settings.shutterSoundVolume, in: 0 ... 1, step: 0.01)
+                        Slider(value: shutterSoundVolumeBinding, in: 0 ... 1)
                         Text("\(Int((settings.shutterSoundVolume * 100).rounded()))%")
                             .frame(width: 48, alignment: .trailing)
                     }
                 }
                 .disabled(!settings.shutterSoundEnabled)
+                .listRowSeparator(.hidden)
                 .help("Set the shutter sound volume.")
             }
 
@@ -313,10 +314,22 @@ private extension SettingsView {
         selectionDimmingHexInput = defaultHex
     }
 
+    var shutterSoundVolumeBinding: Binding<Double> {
+        Binding(
+            get: { settings.shutterSoundVolume },
+            set: { settings.shutterSoundVolume = roundedVolume($0) },
+        )
+    }
+
     var selectionDimmingColorBinding: Binding<Color> {
         Binding(
             get: { Color(nsColor: settings.selectionDimmingColor) },
             set: { settings.selectionDimmingColor = NSColor($0) },
         )
+    }
+
+    func roundedVolume(_ value: Double) -> Double {
+        let clamped = min(max(value, 0), 1)
+        return (clamped * 100).rounded() / 100
     }
 }
