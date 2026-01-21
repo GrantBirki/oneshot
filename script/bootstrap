@@ -22,6 +22,7 @@ export HOMEBREW_NO_INSTALL_CLEANUP=1
 
 XCODEGEN_VERSION="${XCODEGEN_VERSION:-2.44.1}"
 SWIFTLINT_VERSION="${SWIFTLINT_VERSION:-0.63.1}"
+SWIFTLINT_COMPAT_PREFIX="${SWIFTLINT_COMPAT_PREFIX:-0.63.}"
 SWIFTFORMAT_VERSION="${SWIFTFORMAT_VERSION:-0.58.7}"
 
 deps=(
@@ -34,6 +35,11 @@ versions=(
   "$SWIFTLINT_VERSION"
   "$SWIFTFORMAT_VERSION"
 )
+compat_prefixes=(
+  ""
+  "$SWIFTLINT_COMPAT_PREFIX"
+  ""
+)
 
 installed_version() {
   brew list --versions "$1" 2>/dev/null | awk '{print $2}'
@@ -42,6 +48,7 @@ installed_version() {
 ensure_brew_dep() {
   local dep="$1"
   local required_version="$2"
+  local compatible_prefix="${3:-}"
   local current_version=""
 
   if brew list --formula "$dep" >/dev/null 2>&1; then
@@ -50,10 +57,17 @@ ensure_brew_dep() {
       echo -e "${GREEN}OK${OFF} - $dep $current_version"
       return 0
     fi
+    if [[ -n "$compatible_prefix" && "$current_version" == "$compatible_prefix"* ]]; then
+      echo -e "${YELLOW}OK${OFF} - $dep $current_version (compatible with ${compatible_prefix}*)"
+      return 0
+    fi
 
     echo -e "${RED}Version mismatch for ${dep}.${OFF}"
     echo "Installed: $current_version"
     echo "Required:  $required_version"
+    if [[ -n "$compatible_prefix" ]]; then
+      echo "Compatible: ${compatible_prefix}*"
+    fi
     echo "Run: brew upgrade $dep (or update pinned versions in script/bootstrap)."
     exit 1
   fi
@@ -63,16 +77,22 @@ ensure_brew_dep() {
 
   current_version="$(installed_version "$dep")"
   if [[ "$current_version" != "$required_version" ]]; then
+    if [[ -n "$compatible_prefix" && "$current_version" == "$compatible_prefix"* ]]; then
+      return 0
+    fi
     echo -e "${RED}Version mismatch for ${dep}.${OFF}"
     echo "Installed: $current_version"
     echo "Required:  $required_version"
+    if [[ -n "$compatible_prefix" ]]; then
+      echo "Compatible: ${compatible_prefix}*"
+    fi
     echo "Update pinned versions in script/bootstrap."
     exit 1
   fi
 }
 
 for index in "${!deps[@]}"; do
-  ensure_brew_dep "${deps[$index]}" "${versions[$index]}"
+  ensure_brew_dep "${deps[$index]}" "${versions[$index]}" "${compat_prefixes[$index]}"
 done
 
 generate_xcodeproj
