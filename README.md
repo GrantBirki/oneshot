@@ -40,6 +40,12 @@ xattr -dr com.apple.quarantine /Applications/OneShot.app
 
 > Sadly, the app is unsigned, so Apple Gatekeeper quarantines the first launch. See [Unsigned Builds](#unsigned-builds) for details. The TL;DR is that I don't want to pay Apple $99/year for a Developer ID certificate.
 
+## Demos 📹
+
+### Area Selection
+
+https://github.com/user-attachments/assets/4690d728-9f7f-42df-897e-9499c429ee84
+
 ## 📖 Usage
 
 - End-user guide: [docs/usage.md](docs/usage.md)
