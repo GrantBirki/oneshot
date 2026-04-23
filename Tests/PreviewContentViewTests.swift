@@ -50,6 +50,37 @@ final class PreviewContentViewTests: XCTestCase {
         XCTAssertTrue(hitImage is PreviewImageView)
     }
 
+    func testActionButtonsKeepStableScaleWhenPreviewActionsHide() throws {
+        let sut = try makeSUT()
+
+        sut.view.setActionsVisibleForTesting(true)
+        sut.view.setActionsVisibleForTesting(false)
+
+        XCTAssertEqual(sut.closeButton.layer?.transform.m11 ?? 0, 1, accuracy: 0.001)
+        XCTAssertEqual(sut.trashButton.layer?.transform.m11 ?? 0, 1, accuracy: 0.001)
+    }
+
+    func testTrashActionUsesRedSymbolTint() throws {
+        let sut = try makeSUT()
+
+        XCTAssertEqual(sut.trashButton.contentTintColor, .systemRed)
+    }
+
+    func testPreviewImageIsAccessibleAndPerformPressOpensScreenshot() throws {
+        let sut = try makeSUT()
+        var didOpen = false
+        sut.imageView.onOpen = {
+            didOpen = true
+        }
+
+        XCTAssertEqual(sut.imageView.accessibilityRole(), .button)
+        XCTAssertEqual(sut.imageView.accessibilityLabel(), "Screenshot preview")
+        XCTAssertEqual(sut.imageView.accessibilityHelp(), "Open the screenshot, or drag it to another app.")
+
+        XCTAssertTrue(sut.imageView.accessibilityPerformPress())
+        XCTAssertTrue(didOpen)
+    }
+
     private func makeSUT() throws -> PreviewContentSUT {
         let view = PreviewContentView(frame: NSRect(x: 0, y: 0, width: 200, height: 120))
         view.layout()

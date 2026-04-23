@@ -146,6 +146,8 @@ final class HotkeyRecorderView: NSControl {
         clearButton.target = self
         clearButton.action = #selector(clearHotkey)
         clearButton.toolTip = "Clear"
+        clearButton.setAccessibilityLabel("Clear hotkey")
+        clearButton.setAccessibilityHelp("Remove this hotkey.")
         clearButton.setButtonType(.momentaryChange)
         if clearButton.image != nil {
             clearButton.imagePosition = .imageOnly

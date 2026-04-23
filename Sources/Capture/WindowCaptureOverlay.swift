@@ -7,7 +7,10 @@ final class WindowCaptureOverlayController {
     private var globalKeyMonitor: EventMonitor?
 
     func beginSelection(completion: @escaping (WindowInfo?) -> Void) {
-        guard windows.isEmpty else { return }
+        guard windows.isEmpty else {
+            completion(nil)
+            return
+        }
         let screens = NSScreen.screens
         guard !screens.isEmpty else {
             completion(nil)
@@ -101,6 +104,7 @@ final class WindowCaptureOverlayView: NSView {
         layer = CALayer()
         layer?.backgroundColor = NSColor.clear.cgColor
         configureLayers()
+        configureAccessibility()
     }
 
     required init?(coder _: NSCoder) {
@@ -174,6 +178,7 @@ final class WindowCaptureOverlayView: NSView {
         guard nextWindow != highlightedWindow else { return }
         highlightedWindow = nextWindow
         updateLayers()
+        updateAccessibilityValue()
     }
 
     private func configureLayers() {
@@ -187,6 +192,14 @@ final class WindowCaptureOverlayView: NSView {
 
         layer?.addSublayer(dimmingLayer)
         layer?.addSublayer(highlightLayer)
+    }
+
+    private func configureAccessibility() {
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("Window capture overlay")
+        setAccessibilityHelp("Move the pointer over a window and click to capture it. Press Escape to cancel.")
+        updateAccessibilityValue()
     }
 
     private func updateLayerScale() {
@@ -227,6 +240,10 @@ final class WindowCaptureOverlayView: NSView {
     private func highlightRect() -> CGRect? {
         guard let highlight = highlightedWindow?.bounds, let window else { return nil }
         return window.convertFromScreen(highlight)
+    }
+
+    private func updateAccessibilityValue() {
+        setAccessibilityValue(highlightedWindow == nil ? "No window selected" : "Window selected")
     }
 }
 

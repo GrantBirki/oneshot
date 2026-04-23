@@ -8,6 +8,16 @@ final class PreviewImageView: NSImageView, NSDraggingSource {
     private var didDrag = false
     private var draggingSessionStarted = false
 
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        configureAccessibility()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configureAccessibility()
+    }
+
     override func mouseDown(with event: NSEvent) {
         didDrag = false
         draggingSessionStarted = false
@@ -42,7 +52,19 @@ final class PreviewImageView: NSImageView, NSDraggingSource {
         dragPayload?.rescheduleCleanup()
     }
 
+    override func accessibilityPerformPress() -> Bool {
+        onOpen?()
+        return true
+    }
+
     private func shouldIgnore(_ event: NSEvent) -> Bool {
         shouldIgnoreEvent?(event) ?? false
+    }
+
+    private func configureAccessibility() {
+        setAccessibilityElement(true)
+        setAccessibilityRole(.button)
+        setAccessibilityLabel("Screenshot preview")
+        setAccessibilityHelp("Open the screenshot, or drag it to another app.")
     }
 }

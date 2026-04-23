@@ -21,7 +21,7 @@ final class PreviewContentView: NSView {
         static let buttonOverlap: CGFloat = 4
         static let buttonSymbolPointSize: CGFloat = 12
         static let hoverFadeDuration: TimeInterval = 0.12
-        static let hoverScale: CGFloat = 0.95
+        static let actionButtonScale: CGFloat = 1
     }
 
     #if DEBUG
@@ -56,7 +56,7 @@ final class PreviewContentView: NSView {
     private let trashButton = PreviewActionButton(
         symbolName: "trash",
         symbolPointSize: Layout.buttonSymbolPointSize,
-        tintColor: .white,
+        tintColor: .systemRed,
         backgroundColor: PreviewContentView.transparentBackgroundColor,
         hoverBackgroundColor: PreviewContentView.transparentBackgroundColor,
         accessibilityLabel: "Delete screenshot",
@@ -292,8 +292,8 @@ private extension PreviewContentView {
         if hovered {
             actionOverlayView.isHidden = false
             actionOverlayView.alphaValue = 0
-            closeButton.setBaseScale(Layout.hoverScale, duration: 0)
-            trashButton.setBaseScale(Layout.hoverScale, duration: 0)
+            closeButton.setBaseScale(Layout.actionButtonScale, duration: 0)
+            trashButton.setBaseScale(Layout.actionButtonScale, duration: 0)
         }
 
         NSAnimationContext.runAnimationGroup { context in
@@ -309,9 +309,8 @@ private extension PreviewContentView {
             }
         }
 
-        let targetScale: CGFloat = hovered ? 1 : Layout.hoverScale
-        closeButton.setBaseScale(targetScale, duration: duration)
-        trashButton.setBaseScale(targetScale, duration: duration)
+        closeButton.setBaseScale(Layout.actionButtonScale, duration: duration)
+        trashButton.setBaseScale(Layout.actionButtonScale, duration: duration)
     }
 }
 

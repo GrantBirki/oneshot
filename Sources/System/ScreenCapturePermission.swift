@@ -2,6 +2,10 @@ import AppKit
 
 @MainActor
 enum ScreenCapturePermission {
+    static let screenRecordingSettingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+    )!
+
     static func ensureAccess() -> Bool {
         if CGPreflightScreenCaptureAccess() {
             return true
@@ -20,7 +24,10 @@ enum ScreenCapturePermission {
         alert.informativeText = "Enable screen recording access for OneShot in System Settings > " +
             "Privacy & Security > Screen Recording."
         alert.alertStyle = .warning
+        alert.addButton(withTitle: "Open System Settings")
         alert.addButton(withTitle: "OK")
-        alert.runModal()
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(screenRecordingSettingsURL)
+        }
     }
 }

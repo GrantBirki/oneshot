@@ -21,7 +21,10 @@ final class SelectionOverlayController {
         selectionDimmingColor: NSColor,
         completion: @escaping (SelectionResult?) -> Void,
     ) {
-        guard windows.isEmpty else { return }
+        guard windows.isEmpty else {
+            completion(nil)
+            return
+        }
         let screens = NSScreen.screens
         guard !screens.isEmpty else {
             completion(nil)

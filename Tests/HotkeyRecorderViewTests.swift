@@ -33,6 +33,18 @@ final class HotkeyRecorderViewTests: XCTestCase {
         XCTAssertEqual(view.accessibilityValue() as? String, "Type shortcut...")
     }
 
+    func testClearButtonHasSpecificAccessibilityCopy() throws {
+        let view = HotkeyRecorderView(frame: NSRect(x: 0, y: 0, width: 240, height: 28))
+        view.hotkey = Hotkey(keyCode: UInt16(kVK_ANSI_D), modifiers: [.control])
+        view.layout()
+
+        let clearButton = try XCTUnwrap(view.recursiveSubviews.compactMap { $0 as? NSButton }.first)
+
+        XCTAssertFalse(clearButton.isHidden)
+        XCTAssertEqual(clearButton.accessibilityLabel(), "Clear hotkey")
+        XCTAssertEqual(clearButton.accessibilityHelp(), "Remove this hotkey.")
+    }
+
     func testEscapeCancelsRecordingAndRestoresInitialHotkey() {
         let view = HotkeyRecorderView()
         view.hotkey = Hotkey(keyCode: UInt16(kVK_ANSI_D), modifiers: [.control])
@@ -139,5 +151,11 @@ final class HotkeyRecorderViewTests: XCTestCase {
             isARepeat: false,
             keyCode: keyCode,
         )!
+    }
+}
+
+private extension NSView {
+    var recursiveSubviews: [NSView] {
+        subviews + subviews.flatMap(\.recursiveSubviews)
     }
 }
