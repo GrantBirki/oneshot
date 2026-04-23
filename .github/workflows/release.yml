@@ -74,12 +74,12 @@ jobs:
           fi
 
       - name: attest build provenance
-        uses: actions/attest-build-provenance@00014ed6ed5efc5b1ab7f7f34a39eb55d41aa4f8 # pin@v3.1.0
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # pin@v4.1.0
         with:
           subject-path: "dist/OneShot.zip"
 
       - name: upload artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # pin@v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # pin@v7.0.1
         id: upload-artifact
         with:
           name: dist
@@ -98,7 +98,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # pin@7.0.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@8.0.1
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: "dist/"
@@ -113,7 +113,7 @@ jobs:
           fi
 
       - name: create release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # pin@v2.5.0
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # pin@v3.0.0
         with:
           tag_name: ${{ needs.build.outputs.tag }}
           name: ${{ needs.build.outputs.tag }}
@@ -128,7 +128,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build, release]
     steps:
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # pin@7.0.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@8.0.1
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: "dist/"
@@ -170,7 +170,7 @@ jobs:
     needs: [build, release, verify]
     if: ${{ always() }}
     steps:
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # pin@7.0.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@8.0.1
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: "dist/"
