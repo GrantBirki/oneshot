@@ -63,3 +63,7 @@ Notes:
 - Use the clear button (or Delete while recording) to set the shortcut to `None`.
 - A warning appears if the shortcut may conflict with system shortcuts.
 - Some hotkey changes require quitting and reopening OneShot.
+
+## About
+
+- `Check for Updates`: Manually check GitHub Releases for a newer stable OneShot release. This only runs when clicked, downloads or installs nothing, and opens the GitHub release page only when you choose `Open Release`.
