@@ -19,6 +19,7 @@ final class SelectionOverlayView: NSView {
         layer = CALayer()
         layer?.backgroundColor = NSColor.clear.cgColor
         configureLayers()
+        configureAccessibility()
     }
 
     required init?(coder _: NSCoder) {
@@ -129,6 +130,7 @@ final class SelectionOverlayView: NSView {
         }
 
         updateMetrics()
+        updateAccessibilityValue()
 
         CATransaction.commit()
     }
@@ -279,5 +281,19 @@ final class SelectionOverlayView: NSView {
     private func selectionRect() -> CGRect? {
         guard let rect = state.rect, let window else { return nil }
         return window.convertFromScreen(rect)
+    }
+}
+
+private extension SelectionOverlayView {
+    func configureAccessibility() {
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("Screenshot selection area")
+        setAccessibilityHelp("Drag to select an area. Press Escape to cancel.")
+        updateAccessibilityValue()
+    }
+
+    func updateAccessibilityValue() {
+        setAccessibilityValue(state.selectionSizeText ?? "No selection")
     }
 }

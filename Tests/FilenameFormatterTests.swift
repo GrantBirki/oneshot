@@ -15,12 +15,14 @@ final class FilenameFormatterTests: XCTestCase {
 
     func testFilenameSanitizesPrefix() {
         let date = Date(timeIntervalSince1970: 0)
-        let filename = FilenameFormatter.makeFilename(prefix: "../foo/bar:..", date: date)
+        let filename = FilenameFormatter.makeFilename(prefix: "../foo/bar:..\n\t", date: date)
 
         XCTAssertTrue(filename.hasPrefix("foobar_"))
         XCTAssertFalse(filename.contains(".."))
         XCTAssertFalse(filename.contains("/"))
         XCTAssertFalse(filename.contains(":"))
+        XCTAssertFalse(filename.contains("\n"))
+        XCTAssertFalse(filename.contains("\t"))
     }
 
     func testFilenameUsesDefaultPrefixWhenSanitizedEmpty() {

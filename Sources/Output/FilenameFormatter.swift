@@ -28,6 +28,8 @@ enum FilenameFormatter {
 
         let withoutTraversal = trimmed.replacingOccurrences(of: "..", with: "")
         let forbidden = CharacterSet(charactersIn: "/:\\")
+            .union(.controlCharacters)
+            .union(.illegalCharacters)
         let filteredScalars = withoutTraversal.unicodeScalars.filter { !forbidden.contains($0) }
         let sanitized = String(String.UnicodeScalarView(filteredScalars))
 

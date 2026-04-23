@@ -86,6 +86,11 @@ final class ScrollingSelectionOverlayView: NSView {
         super.init(frame: frameRect)
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("Scrolling capture region")
+        setAccessibilityHelp("This region is being captured while you scroll. Use Stop Scrolling Capture to finish.")
+        setAccessibilityValue("\(Int(selectionRect.width.rounded())) by \(Int(selectionRect.height.rounded()))")
     }
 
     required init?(coder _: NSCoder) {
@@ -121,6 +126,7 @@ final class StopCapturePanel: NSPanel {
         hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         contentView = StopCaptureButtonView(onStop: onStop)
+        setAccessibilityElement(false)
     }
 }
 
@@ -151,8 +157,11 @@ final class StopCaptureButtonView: NSView {
         }
         button.target = self
         button.action = #selector(stopPressed)
+        button.setAccessibilityLabel("Stop scrolling capture")
+        button.setAccessibilityHelp("Finish scrolling capture and create the stitched screenshot.")
 
         addSubview(button)
+        setAccessibilityElement(false)
     }
 
     required init?(coder _: NSCoder) {

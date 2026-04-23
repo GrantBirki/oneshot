@@ -80,6 +80,8 @@ struct SettingsTabStrip: View {
             .padding(Layout.railPadding)
         }
         .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Settings section")
     }
 }
 
