@@ -55,6 +55,7 @@ struct SettingsTabStrip: View {
         static let selectedGlassID = "selected-settings-tab"
         static let animation = Animation.snappy(duration: 0.30, extraBounce: 0.05)
         static let glassSpacing: CGFloat = 24
+        static let itemSpacing: CGFloat = 8
         static let itemHeight: CGFloat = 36
         static let itemWidth: CGFloat = 88
         static let horizontalPadding: CGFloat = 14
@@ -63,7 +64,7 @@ struct SettingsTabStrip: View {
 
     var body: some View {
         GlassEffectContainer(spacing: Layout.glassSpacing) {
-            HStack(spacing: 0) {
+            HStack(spacing: Layout.itemSpacing) {
                 ForEach(SettingsTab.allCases) { tab in
                     SettingsTabButton(
                         tab: tab,
