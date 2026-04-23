@@ -40,6 +40,13 @@ struct AboutView: View {
 
     var body: some View {
         VStack(spacing: 12) {
+            Image(systemName: "camera.aperture")
+                .font(.system(size: 36, weight: .regular))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .accessibilityLabel("OneShot aperture icon")
+
             Text("OneShot")
                 .font(.title2)
                 .fontWeight(.semibold)
