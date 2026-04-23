@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 final class ScrollingCaptureOverlayController {
     private var windows: [OverlayWindow] = []
     private var views: [ScrollingSelectionOverlayView] = []
@@ -76,6 +77,7 @@ final class ScrollingCaptureOverlayController {
     }
 }
 
+@MainActor
 final class ScrollingSelectionOverlayView: NSView {
     private let selectionRect: CGRect
 
@@ -103,6 +105,7 @@ final class ScrollingSelectionOverlayView: NSView {
     }
 }
 
+@MainActor
 final class StopCapturePanel: NSPanel {
     init(contentRect: CGRect, onStop: @escaping () -> Void) {
         super.init(
@@ -121,6 +124,7 @@ final class StopCapturePanel: NSPanel {
     }
 }
 
+@MainActor
 final class StopCaptureButtonView: NSView {
     private let onStop: () -> Void
     private let button: NSButton

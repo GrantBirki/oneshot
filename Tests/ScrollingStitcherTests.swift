@@ -3,15 +3,15 @@ import AppKit
 import XCTest
 
 final class ScrollingStitcherTests: XCTestCase {
-    func testStitcherAddsDownwardOffset() {
+    func testStitcherAddsDownwardOffset() async {
         let stitcher = ScrollingStitcher(offsetCalculator: StubOffsetCalculator(offset: 2))
         let base = makeSplitImage(width: 4, height: 4, topColor: .red, bottomColor: .blue)
         let next = makeSplitImage(width: 4, height: 4, topColor: .green, bottomColor: .yellow)
 
-        stitcher.start(with: base)
-        stitcher.add(next)
+        await stitcher.start(with: base)
+        await stitcher.add(next)
 
-        guard let result = stitcher.finish() else {
+        guard let result = await stitcher.finish() else {
             XCTFail("Expected stitched image")
             return
         }
@@ -25,15 +25,15 @@ final class ScrollingStitcherTests: XCTestCase {
         assertColor(rep.colorAt(x: 0, y: result.height - 1), equals: .yellow)
     }
 
-    func testStitcherCropsOnUpwardOffset() {
+    func testStitcherCropsOnUpwardOffset() async {
         let stitcher = ScrollingStitcher(offsetCalculator: StubOffsetCalculator(offset: -2))
         let base = makeSplitImage(width: 4, height: 4, topColor: .red, bottomColor: .blue)
         let next = makeSplitImage(width: 4, height: 4, topColor: .green, bottomColor: .yellow)
 
-        stitcher.start(with: base)
-        stitcher.add(next)
+        await stitcher.start(with: base)
+        await stitcher.add(next)
 
-        guard let result = stitcher.finish() else {
+        guard let result = await stitcher.finish() else {
             XCTFail("Expected cropped image")
             return
         }
@@ -74,7 +74,12 @@ private func makeSplitImage(width: Int, height: Int, topColor: NSColor, bottomCo
     return context.makeImage()!
 }
 
-private func assertColor(_ color: NSColor?, equals expected: NSColor, file: StaticString = #file, line: UInt = #line) {
+private func assertColor(
+    _ color: NSColor?,
+    equals expected: NSColor,
+    file: StaticString = #filePath,
+    line: UInt = #line,
+) {
     guard let color = color?.usingColorSpace(.deviceRGB),
           let expected = expected.usingColorSpace(.deviceRGB)
     else {

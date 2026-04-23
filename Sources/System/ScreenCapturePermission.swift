@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 enum ScreenCapturePermission {
     static func ensureAccess() -> Bool {
         if CGPreflightScreenCaptureAccess() {

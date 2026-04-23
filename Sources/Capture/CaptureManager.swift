@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 final class CaptureManager {
     private let settings: SettingsStore
     private let selectionOverlay = SelectionOverlayController()
@@ -111,7 +112,7 @@ final class CaptureManager {
                 handleCaptureWithoutPreview(captured)
             }
         } catch {
-            NSLog("Failed to encode screenshot: \(error)")
+            AppLog.capture.error("Failed to encode screenshot: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -145,11 +146,11 @@ final class CaptureManager {
             onOpen: { [weak self] in
                 self?.outputCoordinator.finalize(id: saveID) { url in
                     guard let url else {
-                        NSLog("Failed to open saved screenshot: missing file URL")
+                        AppLog.output.error("Failed to open saved screenshot: missing file URL")
                         return
                     }
                     if !NSWorkspace.shared.open(url) {
-                        NSLog("Failed to open saved screenshot at \(url.path)")
+                        AppLog.output.error("Failed to open saved screenshot at \(url.path, privacy: .public)")
                     }
                 }
             },

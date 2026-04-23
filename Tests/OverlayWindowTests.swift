@@ -2,6 +2,7 @@ import AppKit
 @testable import OneShot
 import XCTest
 
+@MainActor
 final class OverlayWindowTests: XCTestCase {
     func testOverlayWindowUsesNonActivatingPanelConfig() {
         let window = OverlayWindow(contentRect: CGRect(x: 0, y: 0, width: 10, height: 10))

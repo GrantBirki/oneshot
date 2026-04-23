@@ -54,6 +54,7 @@ struct PreviewAutoDismissGate {
     }
 }
 
+@MainActor
 final class PreviewController {
     private var panel: PreviewPanel?
     private var hideWorkItem: DispatchWorkItem?
@@ -133,7 +134,7 @@ final class PreviewController {
         }
     }
 
-    // Auto-dismiss waits for the deadline, then only completes once the user isn't hovering or dragging.
+    /// Auto-dismiss waits for the deadline, then only completes once the user isn't hovering or dragging.
     private func handleInteractionChange(isHovered: Bool?, isDragging: Bool?) {
         if autoDismissGate.interactionChanged(isHovered: isHovered, isDragging: isDragging, now: dateProvider()) {
             scheduleGraceDismiss()

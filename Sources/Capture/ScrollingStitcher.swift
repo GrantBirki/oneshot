@@ -1,7 +1,7 @@
 import CoreGraphics
 import Vision
 
-protocol ScrollingOffsetCalculating {
+protocol ScrollingOffsetCalculating: Sendable {
     func verticalOffset(from current: CGImage, to previous: CGImage) -> CGFloat?
 }
 
@@ -24,8 +24,7 @@ struct VisionScrollingOffsetCalculator: ScrollingOffsetCalculating {
     }
 }
 
-// Access is serialized by the capture session's stitch queue.
-final class ScrollingStitcher: @unchecked Sendable {
+actor ScrollingStitcher {
     private var runningImage: CGImage?
     private var previousImage: CGImage?
     private let offsetCalculator: ScrollingOffsetCalculating

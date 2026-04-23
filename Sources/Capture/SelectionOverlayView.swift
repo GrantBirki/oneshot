@@ -1,6 +1,6 @@
 import AppKit
-import os.log
 
+@MainActor
 final class SelectionOverlayView: NSView {
     var onSelection: ((CGRect) -> Void)?
     var onCancel: (() -> Void)?
@@ -11,7 +11,6 @@ final class SelectionOverlayView: NSView {
     private let metricsBackgroundLayer = CAShapeLayer()
     private let metricsTextLayer = CATextLayer()
     private let metricsFont = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
-    private let log = OSLog(subsystem: "com.grantbirki.oneshot", category: "SelectionOverlayView")
 
     init(frame frameRect: NSRect, state: SelectionOverlayState) {
         self.state = state
@@ -26,7 +25,9 @@ final class SelectionOverlayView: NSView {
         nil
     }
 
-    override var acceptsFirstResponder: Bool { true }
+    override var acceptsFirstResponder: Bool {
+        true
+    }
 
     override func acceptsFirstMouse(for _: NSEvent?) -> Bool {
         true
@@ -37,13 +38,14 @@ final class SelectionOverlayView: NSView {
         updateLayerScale()
         updateOverlay()
         #if DEBUG
-            os_log(
-                "viewDidMoveToWindow window=%{public}@ key=%{public}@ main=%{public}@",
-                log: log,
-                type: .debug,
-                window?.description ?? "nil",
-                "\(window?.isKeyWindow ?? false)",
-                "\(window?.isMainWindow ?? false)",
+            let windowDescription = window?.description ?? "nil"
+            let isKeyWindow = window?.isKeyWindow ?? false
+            let isMainWindow = window?.isMainWindow ?? false
+            AppLog.capture.debug(
+                "Selection overlay view moved to window=\(windowDescription, privacy: .public)",
+            )
+            AppLog.capture.debug(
+                "Selection overlay window key=\(isKeyWindow, privacy: .public) main=\(isMainWindow, privacy: .public)",
             )
         #endif
     }
@@ -90,7 +92,7 @@ final class SelectionOverlayView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 {
+        if event.keyCode == KeyboardKeyCode.escape {
             onCancel?()
         }
     }

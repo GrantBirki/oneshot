@@ -27,13 +27,15 @@ final class HotkeyManager {
         )
 
         guard status == noErr, let ref = hotKeyRef else {
-            NSLog("Hotkey registration failed (\(status)) for \(hotkey.displayString)")
+            AppLog.hotkeys.error(
+                "Hotkey register failed (\(status, privacy: .public)) for \(hotkey.displayString, privacy: .public)",
+            )
             return
         }
 
         hotKeyRefs[id] = ref
         handlers[id] = handler
-        NSLog("Hotkey registered: \(hotkey.displayString)")
+        AppLog.hotkeys.info("Hotkey registered: \(hotkey.displayString, privacy: .public)")
     }
 
     func unregisterAll() {

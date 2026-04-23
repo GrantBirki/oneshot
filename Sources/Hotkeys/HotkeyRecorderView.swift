@@ -1,6 +1,6 @@
 import AppKit
-import Carbon.HIToolbox
 
+@MainActor
 final class HotkeyRecorderView: NSControl {
     var hotkey: Hotkey? {
         didSet {
@@ -57,14 +57,6 @@ final class HotkeyRecorderView: NSControl {
         startRecording()
     }
 
-    override func becomeFirstResponder() -> Bool {
-        let didBecome = super.becomeFirstResponder()
-        if didBecome {
-            startRecording()
-        }
-        return didBecome
-    }
-
     override func resignFirstResponder() -> Bool {
         stopRecording(restoreIfNeeded: true)
         return super.resignFirstResponder()
@@ -77,9 +69,9 @@ final class HotkeyRecorderView: NSControl {
         }
 
         switch event.keyCode {
-        case UInt16(kVK_Space), UInt16(kVK_Return), UInt16(kVK_ANSI_KeypadEnter):
+        case KeyboardKeyCode.space, KeyboardKeyCode.returnKey, KeyboardKeyCode.keypadEnter:
             startRecording()
-        case UInt16(kVK_Tab):
+        case KeyboardKeyCode.tab:
             if event.modifierFlags.contains(.shift) {
                 window?.selectPreviousKeyView(self)
             } else {
@@ -108,10 +100,10 @@ final class HotkeyRecorderView: NSControl {
 
     override func layout() {
         super.layout()
-        let paddingX: CGFloat = 8
+        let paddingX: CGFloat = 12
         let paddingY: CGFloat = 4
-        let buttonSize: CGFloat = 14
-        let buttonPadding: CGFloat = 6
+        let buttonSize: CGFloat = 15
+        let buttonPadding: CGFloat = 8
 
         var contentRect = bounds.insetBy(dx: paddingX, dy: paddingY)
         if clearButton.isHidden {
@@ -135,12 +127,12 @@ final class HotkeyRecorderView: NSControl {
     }
 
     override var intrinsicContentSize: NSSize {
-        NSSize(width: 220, height: 26)
+        NSSize(width: 240, height: 28)
     }
 
     private func setupView() {
         wantsLayer = true
-        layer?.cornerRadius = 6
+        layer?.cornerRadius = 7
         layer?.borderWidth = 1
         layer?.masksToBounds = true
 
@@ -194,14 +186,14 @@ final class HotkeyRecorderView: NSControl {
     }
 
     private func handleKeyEvent(_ event: NSEvent) {
-        if event.keyCode == UInt16(kVK_Escape) {
+        if event.keyCode == KeyboardKeyCode.escape {
             stopRecording(restoreIfNeeded: true)
             announce("Recording canceled")
             return
         }
 
         let modifiers = Hotkey.normalizedModifiers(event.modifierFlags)
-        if event.keyCode == UInt16(kVK_Delete) || event.keyCode == UInt16(kVK_ForwardDelete),
+        if event.keyCode == KeyboardKeyCode.delete || event.keyCode == KeyboardKeyCode.forwardDelete,
            modifiers.isEmpty
         {
             commitHotkey(nil)
@@ -278,3 +270,11 @@ final class HotkeyRecorderView: NSControl {
         )
     }
 }
+
+#if DEBUG
+    extension HotkeyRecorderView {
+        var isRecordingForTesting: Bool {
+            isRecording
+        }
+    }
+#endif

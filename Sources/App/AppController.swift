@@ -1,6 +1,7 @@
 import Cocoa
 import Combine
 
+@MainActor
 final class AppController {
     private let settings: SettingsStore
     private let hotkeyManager: HotkeyManager
@@ -43,7 +44,7 @@ final class AppController {
     }
 
     func start() {
-        NSLog("OneShot AppController start")
+        AppLog.app.info("OneShot AppController start")
         menuBarController.start()
         menuBarController.setVisible(!settings.menuBarIconHidden)
         registerHotkeys()
@@ -101,39 +102,39 @@ final class AppController {
         hotkeyManager.unregisterAll()
 
         if let selectionHotkey = settings.hotkeySelection, selectionHotkey.isValid {
-            NSLog("Registering selection hotkey: \(selectionHotkey.displayString)")
+            AppLog.hotkeys.debug("Registering selection hotkey: \(selectionHotkey.displayString, privacy: .public)")
             hotkeyManager.register(hotkey: selectionHotkey) { [weak self] in
                 self?.captureManager.captureSelection()
             }
         } else {
-            NSLog("Selection hotkey not set or invalid")
+            AppLog.hotkeys.debug("Selection hotkey not set or invalid")
         }
 
         if let fullScreenHotkey = settings.hotkeyFullScreen, fullScreenHotkey.isValid {
-            NSLog("Registering full screen hotkey: \(fullScreenHotkey.displayString)")
+            AppLog.hotkeys.debug("Registering full screen hotkey: \(fullScreenHotkey.displayString, privacy: .public)")
             hotkeyManager.register(hotkey: fullScreenHotkey) { [weak self] in
                 self?.captureManager.captureFullScreen()
             }
         } else {
-            NSLog("Full screen hotkey not set or invalid")
+            AppLog.hotkeys.debug("Full screen hotkey not set or invalid")
         }
 
         if let windowHotkey = settings.hotkeyWindow, windowHotkey.isValid {
-            NSLog("Registering window hotkey: \(windowHotkey.displayString)")
+            AppLog.hotkeys.debug("Registering window hotkey: \(windowHotkey.displayString, privacy: .public)")
             hotkeyManager.register(hotkey: windowHotkey) { [weak self] in
                 self?.captureManager.captureWindow()
             }
         } else {
-            NSLog("Window hotkey not set or invalid")
+            AppLog.hotkeys.debug("Window hotkey not set or invalid")
         }
 
         if let scrollingHotkey = settings.hotkeyScrolling, scrollingHotkey.isValid {
-            NSLog("Registering scrolling hotkey: \(scrollingHotkey.displayString)")
+            AppLog.hotkeys.debug("Registering scrolling hotkey: \(scrollingHotkey.displayString, privacy: .public)")
             hotkeyManager.register(hotkey: scrollingHotkey) { [weak self] in
                 self?.captureManager.captureScrolling()
             }
         } else {
-            NSLog("Scrolling hotkey not set or invalid")
+            AppLog.hotkeys.debug("Scrolling hotkey not set or invalid")
         }
 
         menuBarController.refreshHotkeys()
