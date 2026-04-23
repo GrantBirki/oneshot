@@ -59,10 +59,11 @@ When previews are disabled, screenshots follow the `Default output` setting and 
 Notes:
 
 - Click a field and press the shortcut you want to record.
+- Shortcuts must include at least one modifier key, so combinations like `Ctrl+D` are supported but plain letter keys are rejected.
 - Press `Esc` to cancel recording and keep the previous shortcut.
 - Use the clear button (or Delete while recording) to set the shortcut to `None`.
 - A warning appears if the shortcut may conflict with system shortcuts.
-- Some hotkey changes require quitting and reopening OneShot.
+- Hotkey changes take effect immediately.
 
 ## About
 

@@ -45,6 +45,9 @@ enum HotkeyStringParser {
         guard let key, HotkeyFormatter.keyCode(for: key) != nil else {
             return nil
         }
+        guard !modifiers.isEmpty else {
+            return nil
+        }
 
         return ParsedHotkey(normalized: normalized, key: key, modifiers: modifiers)
     }

@@ -25,12 +25,13 @@ final class OutputCoordinator: @unchecked Sendable {
     }
 
     func begin(pngData: Data, scheduleSave: Bool = true) -> UUID {
-        if settings.autoCopyToClipboard {
+        let snapshot = OutputSettingsSnapshot(settings: settings)
+        if snapshot.autoCopyToClipboard {
             clipboardCopy(pngData)
         }
 
         let id = UUID()
-        let delay = settings.saveDelaySeconds
+        let delay = snapshot.saveDelaySeconds
         let schedule = { [weak self] in
             guard let self else { return }
             let workItem = DispatchWorkItem { [weak self] in
@@ -38,6 +39,7 @@ final class OutputCoordinator: @unchecked Sendable {
             }
             pendingSaves[id] = PendingSave(
                 pngData: pngData,
+                snapshot: snapshot,
                 workItem: workItem,
                 savedURL: nil,
             )
@@ -78,7 +80,7 @@ final class OutputCoordinator: @unchecked Sendable {
                     dispatchCompletion(completion, nil)
                     return
                 }
-                let savedURL = saveNow(pngData: pngData, id: id)
+                let savedURL = saveNow(pngData: pngData, snapshot: pending.snapshot, id: id)
                 pending.savedURL = savedURL
                 if savedURL != nil {
                     pending.pngData = nil
@@ -116,7 +118,7 @@ final class OutputCoordinator: @unchecked Sendable {
                 pendingSaves.removeValue(forKey: id)
                 return
             }
-            let savedURL = saveNow(pngData: pngData, id: id)
+            let savedURL = saveNow(pngData: pngData, snapshot: pending.snapshot, id: id)
             pending.savedURL = savedURL
             if savedURL != nil {
                 pending.pngData = nil
@@ -126,12 +128,9 @@ final class OutputCoordinator: @unchecked Sendable {
         pendingSaves[id] = pending
     }
 
-    private func saveNow(pngData: Data, id: UUID) -> URL? {
-        let directory = SaveLocationResolver.resolve(
-            option: settings.saveLocationOption,
-            customPath: settings.customSavePath,
-        )
-        let filename = FilenameFormatter.makeFilename(prefix: settings.filenamePrefix, date: dateProvider())
+    private func saveNow(pngData: Data, snapshot: OutputSettingsSnapshot, id: UUID) -> URL? {
+        let directory = snapshot.directory
+        let filename = FilenameFormatter.makeFilename(prefix: snapshot.filenamePrefix, date: dateProvider())
 
         do {
             let url = try FileSaveService.save(pngData: pngData, to: directory, filename: filename)
@@ -164,6 +163,24 @@ final class OutputCoordinator: @unchecked Sendable {
 
 private struct PendingSave {
     var pngData: Data?
+    let snapshot: OutputSettingsSnapshot
     var workItem: DispatchWorkItem
     var savedURL: URL?
+}
+
+private struct OutputSettingsSnapshot {
+    let autoCopyToClipboard: Bool
+    let saveDelaySeconds: Double
+    let directory: URL
+    let filenamePrefix: String
+
+    init(settings: SettingsStore) {
+        autoCopyToClipboard = settings.autoCopyToClipboard
+        saveDelaySeconds = settings.saveDelaySeconds
+        directory = SaveLocationResolver.resolve(
+            option: settings.saveLocationOption,
+            customPath: settings.customSavePath,
+        )
+        filenamePrefix = settings.filenamePrefix
+    }
 }

@@ -24,6 +24,15 @@ final class HotkeyRecorderViewTests: XCTestCase {
         XCTAssertEqual(view.accessibilityValue() as? String, "Type shortcut...")
     }
 
+    func testAccessibilityPressStartsRecording() {
+        let view = HotkeyRecorderView()
+
+        XCTAssertEqual(view.accessibilityRole(), .button)
+        XCTAssertTrue(view.accessibilityPerformPress())
+        XCTAssertTrue(view.isRecordingForTesting)
+        XCTAssertEqual(view.accessibilityValue() as? String, "Type shortcut...")
+    }
+
     func testEscapeCancelsRecordingAndRestoresInitialHotkey() {
         let view = HotkeyRecorderView()
         view.hotkey = Hotkey(keyCode: UInt16(kVK_ANSI_D), modifiers: [.control])
@@ -75,6 +84,20 @@ final class HotkeyRecorderViewTests: XCTestCase {
         XCTAssertEqual(view.accessibilityValue() as? String, "⌃G")
         XCTAssertEqual(changes.count, 1)
         XCTAssertEqual(changes[0], expected)
+    }
+
+    func testRecordingRejectsUnmodifiedShortcut() {
+        let view = HotkeyRecorderView()
+        var changes: [Hotkey?] = []
+        view.onChange = { changes.append($0) }
+
+        view.keyDown(with: makeKeyEvent(keyCode: UInt16(kVK_Space), characters: " "))
+        view.keyDown(with: makeKeyEvent(keyCode: UInt16(kVK_ANSI_G), characters: "g"))
+
+        XCTAssertTrue(view.isRecordingForTesting)
+        XCTAssertNil(view.hotkey)
+        XCTAssertTrue(changes.isEmpty)
+        XCTAssertEqual(view.accessibilityValue() as? String, "Type shortcut...")
     }
 
     func testPerformKeyEquivalentCommitsCommandShortcutWhileRecording() {

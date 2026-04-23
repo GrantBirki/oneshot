@@ -154,6 +154,8 @@ final class HotkeyRecorderView: NSControl {
         }
         addSubview(clearButton)
 
+        setAccessibilityElement(true)
+        setAccessibilityRole(.button)
         setAccessibilityLabel("Hotkey")
         updateDisplay()
         updateAppearance()
@@ -213,6 +215,11 @@ final class HotkeyRecorderView: NSControl {
         }
 
         let newHotkey = Hotkey(keyCode: event.keyCode, modifiers: modifiers)
+        guard newHotkey.isValid else {
+            NSSound.beep()
+            announce("Shortcut must include a modifier key")
+            return
+        }
         commitHotkey(newHotkey)
         didCapture = true
         stopRecording(restoreIfNeeded: false)
@@ -268,6 +275,19 @@ final class HotkeyRecorderView: NSControl {
                 .priority: NSAccessibilityPriorityLevel.medium.rawValue,
             ],
         )
+    }
+
+    override func accessibilityValue() -> Any? {
+        label.stringValue
+    }
+
+    override func accessibilityHelp() -> String? {
+        "Press to record a shortcut. Shortcuts must include at least one modifier key."
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        startRecording()
+        return true
     }
 }
 

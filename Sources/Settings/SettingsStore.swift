@@ -324,7 +324,8 @@ private extension SettingsStore {
 
         let keyCode = UInt16(keyCodeInt)
         let rawValue = modifierRawValue(forKey: modifiersKey)
-        return Hotkey(keyCode: keyCode, modifiers: NSEvent.ModifierFlags(rawValue: rawValue))
+        let hotkey = Hotkey(keyCode: keyCode, modifiers: NSEvent.ModifierFlags(rawValue: rawValue))
+        return hotkey.isValid ? hotkey : nil
     }
 
     func modifierRawValue(forKey key: String) -> UInt {
