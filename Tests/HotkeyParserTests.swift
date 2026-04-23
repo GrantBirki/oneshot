@@ -20,6 +20,7 @@ final class HotkeyParserTests: XCTestCase {
 
     func testInvalidHotkeyReturnsNil() {
         XCTAssertNil(HotkeyParser.parse("ctrl+"))
+        XCTAssertNil(HotkeyParser.parse("d"))
         XCTAssertNil(HotkeyParser.parse(""))
     }
 }

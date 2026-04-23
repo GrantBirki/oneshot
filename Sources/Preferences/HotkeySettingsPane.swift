@@ -41,7 +41,7 @@ struct HotkeySettingsPane: View {
                 )
                 Text("Click a field and press the shortcut. Press Esc to cancel.")
                     .foregroundStyle(.secondary)
-                Text("Many hotkey changes require quitting and reopening OneShot for changes to take effect.")
+                Text("Shortcuts must include at least one modifier key and take effect immediately.")
                     .foregroundStyle(.secondary)
             }
         }

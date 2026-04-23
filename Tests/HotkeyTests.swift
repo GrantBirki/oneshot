@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 @testable import OneShot
 import XCTest
 
@@ -21,5 +22,13 @@ final class HotkeyTests: XCTestCase {
         XCTAssertEqual(hotkey.keyCode, 6)
         XCTAssertTrue(hotkey.modifiers.contains(.shift))
         XCTAssertFalse(hotkey.modifiers.contains(.capsLock))
+    }
+
+    func testValidHotkeysRequireAtLeastOneModifier() {
+        let controlD = Hotkey(keyCode: UInt16(kVK_ANSI_D), modifiers: [.control])
+        let plainD = Hotkey(keyCode: UInt16(kVK_ANSI_D), modifiers: [])
+
+        XCTAssertTrue(controlD.isValid)
+        XCTAssertFalse(plainD.isValid)
     }
 }

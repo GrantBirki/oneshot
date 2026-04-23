@@ -80,7 +80,6 @@ struct SettingsTabStrip: View {
             .padding(Layout.railPadding)
         }
         .fixedSize(horizontal: true, vertical: false)
-        .accessibilityLabel("Settings section")
     }
 }
 
@@ -100,6 +99,7 @@ private struct SettingsTabButton: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .accessibilityLabel(tab.title)
+        .accessibilityHint("Shows the \(tab.title) settings.")
         .accessibilityValue(isSelected ? "Selected" : "")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }

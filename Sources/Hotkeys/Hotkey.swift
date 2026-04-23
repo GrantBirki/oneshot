@@ -16,7 +16,7 @@ struct Hotkey: Codable, Equatable, Hashable {
     }
 
     var isValid: Bool {
-        HotkeyFormatter.keyString(for: keyCode) != nil
+        HotkeyFormatter.keyString(for: keyCode) != nil && !modifiers.isEmpty
     }
 
     var carbonKeyCode: UInt32 {

@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 @testable import OneShot
 import XCTest
 
@@ -173,6 +174,15 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(settings.hotkeySelection?.keyCode, 6)
         XCTAssertTrue(settings.hotkeySelection?.modifiers.contains(.control) ?? false)
+    }
+
+    func testStoredHotkeyRejectsUnmodifiedKey() {
+        defaults.set(Int(kVK_ANSI_D), forKey: "settings.hotkeySelection.keyCode")
+        defaults.set(0, forKey: "settings.hotkeySelection.modifiers")
+
+        let settings = SettingsStore(defaults: defaults)
+
+        XCTAssertNil(settings.hotkeySelection)
     }
 
     func testInvalidSelectionDimmingColorFallsBackToDefault() {
