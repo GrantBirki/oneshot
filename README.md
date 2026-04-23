@@ -49,7 +49,7 @@ brew install --cask grantbirki/tap/oneshot
 
 ## Settings
 
-<https://github.com/user-attachments/assets/0a693a06-e0c8-4cb9-bc99-64d9f086ef1c>
+<https://github.com/user-attachments/assets/4e60b74c-bfa0-4008-b46a-47f4dc1aba42>
 
 ## 📖 Usage
 
