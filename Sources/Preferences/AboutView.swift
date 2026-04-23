@@ -36,9 +36,17 @@ struct AboutInfoView: View {
 
 struct AboutView: View {
     private let linkColor = Color.primary.opacity(0.75)
+    @StateObject private var updateChecker = UpdateCheckViewModel()
 
     var body: some View {
         VStack(spacing: 12) {
+            Image(systemName: "camera.aperture")
+                .font(.system(size: 36, weight: .regular))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .accessibilityLabel("OneShot aperture icon")
+
             Text("OneShot")
                 .font(.title2)
                 .fontWeight(.semibold)
@@ -50,8 +58,64 @@ struct AboutView: View {
                 .foregroundStyle(linkColor)
                 .tint(linkColor)
                 .underline()
+
+            UpdateCheckView(viewModel: updateChecker)
         }
         .padding(20)
-        .frame(width: 320)
+        .frame(width: 340)
+    }
+}
+
+private struct UpdateCheckView: View {
+    @ObservedObject var viewModel: UpdateCheckViewModel
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Button {
+                Task {
+                    await viewModel.checkForUpdates()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    if viewModel.isChecking {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    Text(viewModel.isChecking ? "Checking..." : "Check for Updates")
+                }
+            }
+            .buttonStyle(.bordered)
+            .disabled(viewModel.isChecking)
+
+            statusView
+        }
+        .padding(.top, 2)
+    }
+
+    @ViewBuilder
+    private var statusView: some View {
+        switch viewModel.state {
+        case .idle,
+             .checking:
+            EmptyView()
+        case let .upToDate(version):
+            Text("OneShot is up to date (\(version.displayValue)).")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        case let .updateAvailable(version, releaseURL):
+            HStack(spacing: 6) {
+                Text("\(version.displayValue) is available.")
+                Link("Open Release", destination: releaseURL)
+                    .underline()
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        case let .failed(message):
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
     }
 }
