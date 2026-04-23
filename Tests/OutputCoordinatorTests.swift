@@ -29,6 +29,7 @@ final class OutputCoordinatorTests: XCTestCase {
         super.tearDown()
     }
 
+    @MainActor
     func testFinalizeSavesImmediately() {
         let settings = SettingsStore(defaults: defaults)
         settings.saveLocationOption = .custom
@@ -64,6 +65,7 @@ final class OutputCoordinatorTests: XCTestCase {
         XCTAssertEqual(savedData, pngData)
     }
 
+    @MainActor
     func testCancelDeletesSavedFileAfterSave() {
         let settings = SettingsStore(defaults: defaults)
         settings.saveLocationOption = .custom
@@ -98,6 +100,7 @@ final class OutputCoordinatorTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
     }
 
+    @MainActor
     func testBeginCopiesPNGDataToClipboard() {
         let settings = SettingsStore(defaults: defaults)
         settings.saveLocationOption = .custom
@@ -122,6 +125,7 @@ final class OutputCoordinatorTests: XCTestCase {
         XCTAssertEqual(clipboardData, pngData)
     }
 
+    @MainActor
     func testBeginSkipsClipboardWhenDisabled() {
         let settings = SettingsStore(defaults: defaults)
         settings.autoCopyToClipboard = false
@@ -147,6 +151,7 @@ final class OutputCoordinatorTests: XCTestCase {
         XCTAssertNil(clipboardData)
     }
 
+    @MainActor
     func testBeginWithoutSchedulingDefersSaveUntilFinalize() {
         let settings = SettingsStore(defaults: defaults)
         settings.saveLocationOption = .custom
@@ -178,6 +183,7 @@ final class OutputCoordinatorTests: XCTestCase {
         wait(for: [saveExpectation], timeout: 2)
     }
 
+    @MainActor
     func testFinalizeReturnsSavedURL() {
         let settings = SettingsStore(defaults: defaults)
         settings.saveLocationOption = .custom
@@ -212,6 +218,7 @@ final class OutputCoordinatorTests: XCTestCase {
         XCTAssertEqual(savedData, pngData)
     }
 
+    @MainActor
     func testFinalizeReturnsSavedURLAfterScheduledSave() {
         let settings = SettingsStore(defaults: defaults)
         settings.saveLocationOption = .custom
@@ -252,6 +259,7 @@ final class OutputCoordinatorTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: savedURL.path))
     }
 
+    @MainActor
     func testFinalizeReturnsNilWhenSaveFails() throws {
         let settings = SettingsStore(defaults: defaults)
         let invalidDirectory = tempDirectory.appendingPathComponent("not-a-directory")
@@ -279,6 +287,7 @@ final class OutputCoordinatorTests: XCTestCase {
 
         wait(for: [finalizeExpectation], timeout: 2)
         XCTAssertNil(finalizedURL)
+        XCTAssertEqual(coordinator.pendingSaveCountForTesting(), 0)
     }
 }
 

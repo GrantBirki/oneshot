@@ -7,6 +7,8 @@
 
 Open source screenshot utility for macOS with QoL improvements over the native Apple screenshot utility.
 
+Requires macOS Tahoe 26 or later.
+
 ![oneshot](docs/assets/oneshot.png)
 
 ## 🎯 Goals

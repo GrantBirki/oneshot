@@ -11,6 +11,7 @@ struct PreviewContentConfiguration {
     let onDragChanged: (Bool) -> Void
 }
 
+@MainActor
 final class PreviewContentView: NSView {
     private enum Layout {
         static let cornerRadius: CGFloat = 12
@@ -28,35 +29,27 @@ final class PreviewContentView: NSView {
             static let logHitTesting = true
             static let logActions = true
             static let logViewHierarchy = true
+            @MainActor
             static var didLogViewHierarchy = false
         }
     #endif
 
-    private static var closeBackgroundColor: NSColor {
-        NSColor.controlBackgroundColor.withAlphaComponent(0.8)
+    private static var transparentBackgroundColor: NSColor {
+        .clear
     }
 
-    private static var closeHoverBackgroundColor: NSColor {
-        NSColor.controlBackgroundColor.withAlphaComponent(0.95)
-    }
-
-    private static var deleteBackgroundColor: NSColor {
-        NSColor.systemRed.withAlphaComponent(0.8)
-    }
-
-    private static var deleteHoverBackgroundColor: NSColor {
-        NSColor.systemRed.withAlphaComponent(1.0)
-    }
-
-    private let backgroundView = NSVisualEffectView()
+    private let backgroundView = NSGlassEffectView()
     private let imageView = PreviewImageView()
+    private let actionContainerView = NSGlassEffectContainerView()
     private let actionOverlayView = PreviewActionOverlayView()
+    private let closeGlassView = NSGlassEffectView()
+    private let trashGlassView = NSGlassEffectView()
     private let closeButton = PreviewActionButton(
         symbolName: "checkmark",
         symbolPointSize: Layout.buttonSymbolPointSize,
         tintColor: .labelColor,
-        backgroundColor: PreviewContentView.closeBackgroundColor,
-        hoverBackgroundColor: PreviewContentView.closeHoverBackgroundColor,
+        backgroundColor: PreviewContentView.transparentBackgroundColor,
+        hoverBackgroundColor: PreviewContentView.transparentBackgroundColor,
         accessibilityLabel: "Save screenshot",
         identifier: "preview-close",
     )
@@ -64,8 +57,8 @@ final class PreviewContentView: NSView {
         symbolName: "trash",
         symbolPointSize: Layout.buttonSymbolPointSize,
         tintColor: .white,
-        backgroundColor: PreviewContentView.deleteBackgroundColor,
-        hoverBackgroundColor: PreviewContentView.deleteHoverBackgroundColor,
+        backgroundColor: PreviewContentView.transparentBackgroundColor,
+        hoverBackgroundColor: PreviewContentView.transparentBackgroundColor,
         accessibilityLabel: "Delete screenshot",
         identifier: "preview-trash",
     )
@@ -83,29 +76,41 @@ final class PreviewContentView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        backgroundView.material = .hudWindow
-        backgroundView.blendingMode = .withinWindow
-        backgroundView.state = .active
-        backgroundView.wantsLayer = true
-        backgroundView.layer?.cornerRadius = Layout.cornerRadius
-        backgroundView.layer?.masksToBounds = true
+        backgroundView.style = .regular
+        backgroundView.cornerRadius = Layout.cornerRadius
+        backgroundView.clipsToBounds = true
         addSubview(backgroundView)
 
         imageView.imageScaling = .scaleProportionallyUpOrDown
-        backgroundView.addSubview(imageView)
+        imageView.autoresizingMask = [.width, .height]
+        backgroundView.contentView = imageView
 
         closeButton.target = self
         closeButton.action = #selector(handleClose)
+        closeButton.autoresizingMask = [.width, .height]
 
         trashButton.target = self
         trashButton.action = #selector(handleTrash)
+        trashButton.autoresizingMask = [.width, .height]
+
+        closeGlassView.style = .regular
+        closeGlassView.cornerRadius = Layout.buttonSize / 2
+        closeGlassView.contentView = closeButton
+
+        trashGlassView.style = .regular
+        trashGlassView.cornerRadius = Layout.buttonSize / 2
+        trashGlassView.tintColor = .systemRed
+        trashGlassView.contentView = trashButton
+
+        actionContainerView.spacing = 8
+        actionContainerView.contentView = actionOverlayView
 
         actionOverlayView.wantsLayer = true
         actionOverlayView.alphaValue = 0
         actionOverlayView.isHidden = true
-        actionOverlayView.addSubview(closeButton)
-        actionOverlayView.addSubview(trashButton)
-        addSubview(actionOverlayView, positioned: .above, relativeTo: backgroundView)
+        actionOverlayView.addSubview(closeGlassView)
+        actionOverlayView.addSubview(trashGlassView)
+        addSubview(actionContainerView, positioned: .above, relativeTo: backgroundView)
     }
 
     required init?(coder _: NSCoder) {
@@ -125,11 +130,11 @@ final class PreviewContentView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         if isActionOverlayActive {
             let overlayPoint = actionOverlayView.convert(point, from: self)
-            if closeButton.frame.contains(overlayPoint) {
+            if closeGlassView.frame.contains(overlayPoint) {
                 logHitTest(closeButton)
                 return closeButton
             }
-            if trashButton.frame.contains(overlayPoint) {
+            if trashGlassView.frame.contains(overlayPoint) {
                 logHitTest(trashButton)
                 return trashButton
             }
@@ -171,23 +176,26 @@ final class PreviewContentView: NSView {
         let overlap = Layout.buttonOverlap
         backgroundView.frame = bounds.insetBy(dx: overlap, dy: overlap)
         imageView.frame = backgroundView.bounds
-        actionOverlayView.frame = bounds
+        actionContainerView.frame = bounds
+        actionOverlayView.frame = actionContainerView.bounds
         let buttonSize = Layout.buttonSize
         let insetX = Layout.cornerButtonInsetX
         let insetY = Layout.cornerButtonInsetY
         let buttonOriginY = bounds.height - buttonSize - insetY
-        closeButton.frame = NSRect(
+        closeGlassView.frame = NSRect(
             x: insetX,
             y: buttonOriginY,
             width: buttonSize,
             height: buttonSize,
         )
-        trashButton.frame = NSRect(
+        trashGlassView.frame = NSRect(
             x: bounds.width - buttonSize - insetX,
             y: buttonOriginY,
             width: buttonSize,
             height: buttonSize,
         )
+        closeButton.frame = closeGlassView.bounds
+        trashButton.frame = trashGlassView.bounds
     }
 }
 
@@ -263,7 +271,7 @@ extension PreviewContentView {
     private func isPointInActionButtons(_ point: NSPoint) -> Bool {
         guard isActionOverlayActive else { return false }
         let overlayPoint = actionOverlayView.convert(point, from: self)
-        return closeButton.frame.contains(overlayPoint) || trashButton.frame.contains(overlayPoint)
+        return closeGlassView.frame.contains(overlayPoint) || trashGlassView.frame.contains(overlayPoint)
     }
 }
 
@@ -293,9 +301,11 @@ private extension PreviewContentView {
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             actionOverlayView.animator().alphaValue = hovered ? 1 : 0
         } completionHandler: { [weak self] in
-            guard let self else { return }
-            if !isHovered {
-                actionOverlayView.isHidden = true
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if !isHovered {
+                    actionOverlayView.isHidden = true
+                }
             }
         }
 
@@ -325,7 +335,7 @@ private extension PreviewContentView {
 
     func logDebug(_ message: String) {
         #if DEBUG
-            NSLog("PreviewTile: \(message)")
+            AppLog.preview.debug("PreviewTile: \(message, privacy: .public)")
         #endif
     }
 

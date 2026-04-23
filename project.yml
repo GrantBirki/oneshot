@@ -3,7 +3,11 @@ name: OneShot
 options:
   bundleIdPrefix: com.grantbirki
   deploymentTarget:
-    macOS: "14.0"
+    macOS: "26.0"
+
+settings:
+  base:
+    SWIFT_VERSION: 6.0
 
 targets:
   OneShot:
@@ -32,6 +36,7 @@ targets:
       base:
         APP_DISPLAY_NAME: OneShot
         PRODUCT_BUNDLE_IDENTIFIER: com.grantbirki.oneshot
+        SWIFT_VERSION: 6.0
         MARKETING_VERSION: 0.0.0
         CURRENT_PROJECT_VERSION: 0.0.0
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -44,5 +49,8 @@ targets:
     platform: macOS
     sources:
       - Tests
+    settings:
+      base:
+        SWIFT_VERSION: 6.0
     dependencies:
       - target: OneShot

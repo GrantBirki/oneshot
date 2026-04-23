@@ -1,6 +1,9 @@
 import AppKit
 import Foundation
 
+private typealias Keys = SettingsStoreKeys
+private typealias LegacyKeys = SettingsStoreLegacyKeys
+
 final class SettingsStore: ObservableObject {
     @Published var autoLaunchEnabled: Bool {
         didSet { defaults.set(autoLaunchEnabled, forKey: Keys.autoLaunchEnabled) }
@@ -15,7 +18,7 @@ final class SettingsStore: ObservableObject {
     }
 
     @Published var saveDelaySeconds: Double {
-        didSet { defaults.set(saveDelaySeconds, forKey: Keys.saveDelaySeconds) }
+        didSet { persistSaveDelaySeconds() }
     }
 
     @Published var previewTimeoutEnabled: Bool {
@@ -188,11 +191,11 @@ private extension SettingsStore {
 
     static func loadSaveDelaySeconds(from defaults: UserDefaults) -> Double {
         if let saveDelay = defaults.object(forKey: Keys.saveDelaySeconds) as? Double {
-            return saveDelay
+            return clampSaveDelaySeconds(saveDelay)
         }
         if let legacyDelay = defaults.object(forKey: LegacyKeys.previewTimeoutSeconds) as? Double {
             defaults.removeObject(forKey: LegacyKeys.previewTimeoutSeconds)
-            return legacyDelay
+            return clampSaveDelaySeconds(legacyDelay)
         }
         return 7
     }
@@ -353,46 +356,22 @@ private extension SettingsStore {
         defaults.set(clamped, forKey: Keys.shutterSoundVolume)
     }
 
+    func persistSaveDelaySeconds() {
+        let clamped = Self.clampSaveDelaySeconds(saveDelaySeconds)
+        if clamped != saveDelaySeconds {
+            saveDelaySeconds = clamped
+            return
+        }
+        defaults.set(clamped, forKey: Keys.saveDelaySeconds)
+    }
+
     static func clampVolume(_ value: Double) -> Double {
         min(max(value, 0), 1)
     }
 
+    static func clampSaveDelaySeconds(_ value: Double) -> Double {
+        max(value, 0)
+    }
+
     static let unsetKeyCodeSentinel = -1
-}
-
-private enum Keys {
-    static let autoLaunchEnabled = "settings.autoLaunchEnabled"
-    static let menuBarIconHidden = "settings.menuBarIconHidden"
-    static let showSelectionCoordinates = "settings.showSelectionCoordinates"
-    static let saveDelaySeconds = "settings.saveDelaySeconds"
-    static let previewTimeoutEnabled = "settings.previewTimeoutEnabled"
-    static let previewEnabled = "settings.previewEnabled"
-    static let previewAutoDismissBehavior = "settings.previewAutoDismissBehavior"
-    static let previewReplacementBehavior = "settings.previewReplacementBehavior"
-    static let previewDisabledOutputBehavior = "settings.previewDisabledOutputBehavior"
-    static let selectionDimmingMode = "settings.selectionDimmingMode"
-    static let selectionDimmingColorHex = "settings.selectionDimmingColorHex"
-    static let selectionVisualCue = "settings.selectionVisualCue"
-    static let autoCopyToClipboard = "settings.autoCopyToClipboard"
-    static let saveLocationOption = "settings.saveLocationOption"
-    static let customSavePath = "settings.customSavePath"
-    static let filenamePrefix = "settings.filenamePrefix"
-    static let shutterSoundEnabled = "settings.shutterSoundEnabled"
-    static let shutterSound = "settings.shutterSound"
-    static let shutterSoundVolume = "settings.shutterSoundVolume"
-    static let hotkeySelectionKeyCode = "settings.hotkeySelection.keyCode"
-    static let hotkeySelectionModifiers = "settings.hotkeySelection.modifiers"
-    static let hotkeyFullScreenKeyCode = "settings.hotkeyFullScreen.keyCode"
-    static let hotkeyFullScreenModifiers = "settings.hotkeyFullScreen.modifiers"
-    static let hotkeyWindowKeyCode = "settings.hotkeyWindow.keyCode"
-    static let hotkeyWindowModifiers = "settings.hotkeyWindow.modifiers"
-    static let hotkeyScrollingKeyCode = "settings.hotkeyScrolling.keyCode"
-    static let hotkeyScrollingModifiers = "settings.hotkeyScrolling.modifiers"
-}
-
-private enum LegacyKeys {
-    static let previewTimeoutSeconds = "settings.previewTimeoutSeconds"
-    static let hotkeySelection = "settings.hotkeySelection"
-    static let hotkeyFullScreen = "settings.hotkeyFullScreen"
-    static let hotkeyWindow = "settings.hotkeyWindow"
 }

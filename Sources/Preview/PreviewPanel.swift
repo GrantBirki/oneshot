@@ -1,18 +1,14 @@
 import AppKit
 
+@MainActor
 final class PreviewPanel: NSPanel {
     private let content: PreviewContentView
-    private var keyMonitor: Any?
-    private var globalKeyMonitor: Any?
+    private var keyMonitor: EventMonitor?
+    private var globalKeyMonitor: EventMonitor?
 
     private enum Layout {
         static let padding: CGFloat = 16
         static let desiredPixelSize = CGSize(width: 600, height: 500)
-    }
-
-    private enum KeyCodes {
-        static let escape: UInt16 = 53
-        static let delete: UInt16 = 51
     }
 
     init(
@@ -114,49 +110,50 @@ final class PreviewPanel: NSPanel {
 
     private func startKeyMonitor() {
         if keyMonitor == nil {
-            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-                guard let self else { return event }
-                if handleKeyEvent(event) {
-                    return nil
+            keyMonitor = EventMonitor(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+                let keyCode = event.keyCode
+                let modifiers = event.modifierFlags
+                let handled = MainActor.assumeIsolated {
+                    guard let self else { return false }
+                    return self.handleKeyCode(keyCode, modifiers: modifiers)
                 }
-                return event
-            }
+                return handled ? nil : event
+            })
         }
 
         if globalKeyMonitor == nil {
-            globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+            let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+                let keyCode = event.keyCode
+                let modifiers = event.modifierFlags
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
                     guard !NSApp.isActive else { return }
-                    _ = handleKeyEvent(event)
+                    _ = handleKeyCode(keyCode, modifiers: modifiers)
                 }
             }
+            globalKeyMonitor = EventMonitor(monitor)
         }
     }
 
     private func stopKeyMonitor() {
-        if let monitor = keyMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
+        keyMonitor?.cancel()
         keyMonitor = nil
 
-        if let monitor = globalKeyMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
+        globalKeyMonitor?.cancel()
         globalKeyMonitor = nil
     }
 
-    deinit {
-        stopKeyMonitor()
+    private func handleKeyEvent(_ event: NSEvent) -> Bool {
+        handleKeyCode(event.keyCode, modifiers: event.modifierFlags)
     }
 
-    private func handleKeyEvent(_ event: NSEvent) -> Bool {
+    private func handleKeyCode(_ keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
         guard isVisible else { return false }
-        if event.keyCode == KeyCodes.escape {
+        if keyCode == KeyboardKeyCode.escape {
             content.performClose()
             return true
         }
-        if event.keyCode == KeyCodes.delete, event.modifierFlags.contains(.command) {
+        if keyCode == KeyboardKeyCode.delete, modifiers.contains(.command) {
             content.performTrash()
             return true
         }

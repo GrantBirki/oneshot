@@ -2,7 +2,7 @@ import AppKit
 import ScreenCaptureKit
 
 enum ScreenCaptureService {
-    private struct ScreenCaptureTarget: Sendable {
+    private struct ScreenCaptureTarget {
         let frame: CGRect
         let displayID: CGDirectDisplayID
         let captureRect: CGRect
@@ -24,10 +24,11 @@ enum ScreenCaptureService {
         let targets = await screenTargets(intersecting: rect)
         guard !targets.isEmpty else { return nil }
 
-        let displaysByID = await scDisplaysByID()
+        guard let content = await shareableContent() else { return nil }
+        let displaysByID = scDisplaysByID(in: content)
         guard !displaysByID.isEmpty else { return nil }
 
-        let excludedWindow = await scWindow(for: excludingWindowID)
+        let excludedWindow = scWindow(for: excludingWindowID, in: content)
 
         var pieces: [CapturedPiece] = []
 
@@ -52,7 +53,9 @@ enum ScreenCaptureService {
     }
 
     static func capture(windowID: CGWindowID) async -> CGImage? {
-        guard let window = await scWindow(for: windowID) else { return nil }
+        guard let content = await shareableContent(),
+              let window = scWindow(for: windowID, in: content)
+        else { return nil }
         let filter = SCContentFilter(desktopIndependentWindow: window)
         let scale = max(CGFloat(filter.pointPixelScale), 1)
         let size = filter.contentRect.size
@@ -68,15 +71,19 @@ enum ScreenCaptureService {
         do {
             return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
         } catch {
-            NSLog("ScreenCaptureKit window capture failed: \(error)")
+            AppLog.capture.error(
+                "ScreenCaptureKit window capture failed: \(String(describing: error), privacy: .public)",
+            )
             return nil
         }
     }
 
     static func captureScrolling(rect: CGRect) async -> CGImage? {
         guard let screenTarget = await screenTarget(containing: rect) else { return nil }
-        guard let display = await scDisplay(for: screenTarget.displayID) else { return nil }
-        let currentApp = await currentApplication()
+        guard let content = await shareableContent(),
+              let display = scDisplay(for: screenTarget.displayID, in: content)
+        else { return nil }
+        let currentApp = currentApplication(in: content)
 
         let clampedRect = rect.intersection(screenTarget.frame)
         guard !clampedRect.isNull, !clampedRect.isEmpty else { return nil }
@@ -102,7 +109,9 @@ enum ScreenCaptureService {
         do {
             return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
         } catch {
-            NSLog("ScreenCaptureKit capture failed: \(error)")
+            AppLog.capture.error(
+                "ScreenCaptureKit scrolling capture failed: \(String(describing: error), privacy: .public)",
+            )
             return nil
         }
     }
@@ -169,7 +178,9 @@ enum ScreenCaptureService {
             )
             return CapturedPiece(image: image, pixelRect: pixelRect)
         } catch {
-            NSLog("ScreenCaptureKit display capture failed: \(error)")
+            AppLog.capture.error(
+                "ScreenCaptureKit display capture failed: \(String(describing: error), privacy: .public)",
+            )
             return nil
         }
     }
@@ -246,45 +257,32 @@ enum ScreenCaptureService {
         return intersection.width * intersection.height
     }
 
-    private static func scDisplaysByID() async -> [CGDirectDisplayID: SCDisplay] {
+    private static func shareableContent() async -> SCShareableContent? {
         do {
-            let displays = try await SCShareableContent.current.displays
-            return Dictionary(uniqueKeysWithValues: displays.map { ($0.displayID, $0) })
+            return try await SCShareableContent.current
         } catch {
-            NSLog("Failed to fetch SCDisplays: \(error)")
-            return [:]
-        }
-    }
-
-    private static func scDisplay(for displayID: CGDirectDisplayID) async -> SCDisplay? {
-        do {
-            let displays = try await SCShareableContent.current.displays
-            return displays.first { $0.displayID == displayID }
-        } catch {
-            NSLog("Failed to fetch SCDisplay: \(error)")
+            AppLog.capture.error(
+                "Failed to fetch ScreenCaptureKit shareable content: \(String(describing: error), privacy: .public)",
+            )
             return nil
         }
     }
 
-    private static func scWindow(for windowID: CGWindowID?) async -> SCWindow? {
+    private static func scDisplaysByID(in content: SCShareableContent) -> [CGDirectDisplayID: SCDisplay] {
+        Dictionary(uniqueKeysWithValues: content.displays.map { ($0.displayID, $0) })
+    }
+
+    private static func scDisplay(for displayID: CGDirectDisplayID, in content: SCShareableContent) -> SCDisplay? {
+        content.displays.first { $0.displayID == displayID }
+    }
+
+    private static func scWindow(for windowID: CGWindowID?, in content: SCShareableContent) -> SCWindow? {
         guard let windowID else { return nil }
-        do {
-            let windows = try await SCShareableContent.current.windows
-            return windows.first { $0.windowID == windowID }
-        } catch {
-            NSLog("Failed to fetch SCWindow: \(error)")
-            return nil
-        }
+        return content.windows.first { $0.windowID == windowID }
     }
 
-    private static func currentApplication() async -> SCRunningApplication? {
-        do {
-            let apps = try await SCShareableContent.current.applications
-            let pid = NSRunningApplication.current.processIdentifier
-            return apps.first { $0.processID == pid }
-        } catch {
-            NSLog("Failed to fetch current app for capture: \(error)")
-            return nil
-        }
+    private static func currentApplication(in content: SCShareableContent) -> SCRunningApplication? {
+        let pid = NSRunningApplication.current.processIdentifier
+        return content.applications.first { $0.processID == pid }
     }
 }

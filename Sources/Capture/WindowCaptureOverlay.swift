@@ -1,13 +1,10 @@
 import AppKit
 
+@MainActor
 final class WindowCaptureOverlayController {
     private var windows: [OverlayWindow] = []
-    private var keyMonitor: Any?
-    private var globalKeyMonitor: Any?
-
-    private enum KeyCodes {
-        static let escape: UInt16 = 53
-    }
+    private var keyMonitor: EventMonitor?
+    private var globalKeyMonitor: EventMonitor?
 
     func beginSelection(completion: @escaping (WindowInfo?) -> Void) {
         guard windows.isEmpty else { return }
@@ -53,40 +50,42 @@ final class WindowCaptureOverlayController {
 
     private func startKeyMonitor(onCancel: @escaping () -> Void) {
         if keyMonitor == nil {
-            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
-                if event.keyCode == KeyCodes.escape {
-                    onCancel()
-                    return nil
+            keyMonitor = EventMonitor(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+                let shouldCancel = event.keyCode == KeyboardKeyCode.escape
+                let handled = MainActor.assumeIsolated {
+                    if shouldCancel {
+                        onCancel()
+                        return true
+                    }
+                    return false
                 }
-                return event
-            }
+                return handled ? nil : event
+            })
         }
 
         if globalKeyMonitor == nil {
-            globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { event in
+            globalKeyMonitor = EventMonitor(NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { event in
+                let keyCode = event.keyCode
                 DispatchQueue.main.async {
                     guard !NSApp.isActive else { return }
-                    if event.keyCode == KeyCodes.escape {
+                    if keyCode == KeyboardKeyCode.escape {
                         onCancel()
                     }
                 }
-            }
+            })
         }
     }
 
     private func stopKeyMonitor() {
-        if let monitor = keyMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
+        keyMonitor?.cancel()
         keyMonitor = nil
 
-        if let monitor = globalKeyMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
+        globalKeyMonitor?.cancel()
         globalKeyMonitor = nil
     }
 }
 
+@MainActor
 final class WindowCaptureOverlayView: NSView {
     var onSelection: ((WindowInfo) -> Void)?
     var onCancel: (() -> Void)?
@@ -108,7 +107,9 @@ final class WindowCaptureOverlayView: NSView {
         nil
     }
 
-    override var acceptsFirstResponder: Bool { true }
+    override var acceptsFirstResponder: Bool {
+        true
+    }
 
     override func acceptsFirstMouse(for _: NSEvent?) -> Bool {
         true
@@ -159,7 +160,7 @@ final class WindowCaptureOverlayView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 {
+        if event.keyCode == KeyboardKeyCode.escape {
             onCancel?()
         }
     }

@@ -2,6 +2,7 @@ import Foundation
 @testable import OneShot
 import XCTest
 
+@MainActor
 final class ScreenshotSoundPlayerTests: XCTestCase {
     func testResolveSoundURLReturnsFirstMatch() {
         let expected = URL(fileURLWithPath: "/tmp/shutter.wav")

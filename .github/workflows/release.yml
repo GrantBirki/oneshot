@@ -16,7 +16,7 @@ jobs:
       contents: read
       id-token: write
       attestations: write
-    runs-on: macos-latest
+    runs-on: macos-26
     outputs:
       artifact-id: ${{ steps.upload-artifact.outputs.artifact-id }}
       version: ${{ steps.version.outputs.version }}
@@ -211,7 +211,7 @@ jobs:
             desc "Open source screenshot utility for macOS"
             homepage "https://github.com/grantbirki/oneshot"
 
-            depends_on macos: ">= :sonoma"
+            depends_on macos: ">= :tahoe"
 
             livecheck do
               url :url

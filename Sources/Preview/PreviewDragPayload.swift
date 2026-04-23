@@ -73,7 +73,7 @@ final class PreviewDragPayload {
             scheduleCleanup()
             return url
         } catch {
-            NSLog("Failed to write drag preview file: \(error)")
+            AppLog.preview.error("Failed to write drag preview file: \(String(describing: error), privacy: .public)")
             return nil
         }
     }

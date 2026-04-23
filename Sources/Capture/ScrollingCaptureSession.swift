@@ -1,120 +1,101 @@
 import AppKit
 
+@MainActor
 final class ScrollingCaptureSession {
     private let captureInterval: TimeInterval
-    private let stateQueue: DispatchQueue
-    private let stitchQueue: DispatchQueue
     private let stitcher: ScrollingStitcher
-    private let captureImage: (CGRect) async -> CGImage?
+    private let captureImage: @Sendable (CGRect) async -> CGImage?
     private var captureTask: Task<Void, Never>?
     private var captureRect: CGRect = .zero
     private var onFinish: ((CGImage?) -> Void)?
-    private var keyMonitor: Any?
-    private var globalKeyMonitor: Any?
-
-    private enum KeyCodes {
-        static let escape: UInt16 = 53
-    }
+    private var keyMonitor: EventMonitor?
+    private var globalKeyMonitor: EventMonitor?
 
     init(
         captureInterval: TimeInterval = 0.025,
-        stateQueue: DispatchQueue = DispatchQueue(label: "oneshot.scrolling.capture", qos: .userInitiated),
-        stitchQueue: DispatchQueue = DispatchQueue(label: "oneshot.scrolling.stitch", qos: .userInitiated),
         stitcher: ScrollingStitcher = ScrollingStitcher(),
-        captureImage: @escaping (CGRect) async -> CGImage? = { await ScreenCaptureService.captureScrolling(rect: $0) },
+        captureImage: @escaping @Sendable (CGRect) async -> CGImage? = {
+            await ScreenCaptureService.captureScrolling(rect: $0)
+        },
     ) {
         self.captureInterval = captureInterval
-        self.stateQueue = stateQueue
-        self.stitchQueue = stitchQueue
         self.stitcher = stitcher
         self.captureImage = captureImage
     }
 
     var isActive: Bool {
-        stateQueue.sync { captureTask != nil }
+        captureTask != nil
     }
 
     func start(rect: CGRect, onFinish: @escaping (CGImage?) -> Void) {
+        guard captureTask == nil else { return }
         startKeyMonitor()
-        stateQueue.sync {
-            guard captureTask == nil else { return }
-            captureRect = rect
-            self.onFinish = onFinish
-            stitchQueue.sync {
-                stitcher.reset()
-            }
-            captureTask = Task.detached(priority: .userInitiated) { [weak self] in
-                await self?.captureLoop()
-            }
+        captureRect = rect
+        self.onFinish = onFinish
+        captureTask = Task(priority: .userInitiated) { [weak self] in
+            await self?.captureLoop()
         }
     }
 
     func stop() {
         stopKeyMonitor()
-        stateQueue.sync {
-            captureTask?.cancel()
-        }
+        captureTask?.cancel()
     }
 
     private func captureLoop() async {
-        defer { finish() }
+        await stitcher.reset()
         let interval = max(captureInterval, 0.025)
         while !Task.isCancelled {
-            if let image = await captureImage(captureRect) {
-                stitchQueue.async { [stitcher] in
-                    stitcher.add(image)
-                }
+            if let image = await captureImage(captureRect), !Task.isCancelled {
+                await stitcher.add(image)
             }
             try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
         }
+        let finalImage = await stitcher.finish()
+        finish(with: finalImage)
     }
 
-    private func finish() {
-        let finalImage = stitchQueue.sync {
-            stitcher.finish()
-        }
-        let finish = stateQueue.sync {
-            let callback = onFinish
-            onFinish = nil
-            captureTask = nil
-            return callback
-        }
-        DispatchQueue.main.async {
-            finish?(finalImage)
-        }
+    private func finish(with image: CGImage?) {
+        stopKeyMonitor()
+        let callback = onFinish
+        onFinish = nil
+        captureTask = nil
+        callback?(image)
     }
 
     private func startKeyMonitor() {
         if keyMonitor == nil {
-            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-                if event.keyCode == KeyCodes.escape {
-                    self?.stop()
-                    return nil
+            keyMonitor = EventMonitor(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+                let shouldCancel = event.keyCode == KeyboardKeyCode.escape
+                let handled = MainActor.assumeIsolated {
+                    if shouldCancel {
+                        self?.stop()
+                        return true
+                    }
+                    return false
                 }
-                return event
-            }
+                return handled ? nil : event
+            })
         }
 
         if globalKeyMonitor == nil {
-            globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-                if event.keyCode == KeyCodes.escape {
+            let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+                let keyCode = event.keyCode
+                if keyCode == KeyboardKeyCode.escape {
                     DispatchQueue.main.async {
                         self?.stop()
                     }
                 }
             }
+            globalKeyMonitor = EventMonitor(monitor)
         }
     }
 
     private func stopKeyMonitor() {
-        if let monitor = keyMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
+        keyMonitor?.cancel()
         keyMonitor = nil
 
-        if let monitor = globalKeyMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
+        globalKeyMonitor?.cancel()
         globalKeyMonitor = nil
     }
 }

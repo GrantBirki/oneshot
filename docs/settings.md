@@ -2,10 +2,12 @@
 
 This document describes the settings available in OneShot.
 
+The settings window is organized into General, Capture, Output, Preview, Hotkeys, and About tabs. The Capture tab contains the selection and sound controls.
+
 ## General
 
 - `Launch at login` (default: off): Start OneShot automatically when you sign in.
-- `Hide menu bar icon` (default: off): Remove the OneShot icon from the menu bar. To bring it back, open OneShot from Spotlight and disable this setting.
+- `Show menu bar icon` (default: on): Show the OneShot icon in the menu bar. If you turn this off, open OneShot from Spotlight to bring the settings window back.
 
 ## Selection
 
@@ -31,13 +33,13 @@ Notes:
 
 - `Play shutter sound` (default: on): Play a sound when a screenshot is captured.
 - `Shutter sound` (default: `Default shutter`): Choose the capture sound (`Default shutter`, `Grant's camera`, `Leah's camera`, or `Norm's camera`).
-- `Volume` (default: `100%`): Set the shutter sound volume between 0% and 100%.
+- `Volume` (default: `100%`): Set the shutter sound volume between 0% and 100%. Use the play button next to the slider to preview the selected sound at the current volume.
 
 ## Preview
 
 - `Show floating preview` (default: on): Show the thumbnail preview after capture.
 - `Auto-dismiss preview` (default: on): Automatically dismiss the preview after the save delay. Hovering or dragging pauses the dismissal.
-- `Save delay (seconds)` (default: `7`): Time to wait before the preview timeout or background save when previews are enabled.
+- `Save delay (seconds)` (default: `7`): Time to wait before the preview timeout or background save when previews are enabled. Values below `0` are clamped to `0`.
 - `On preview timeout` (default: `Save to disk`): Choose whether the capture saves to disk or is discarded when the preview timer ends. Only applies when `Auto-dismiss preview` is on.
 - `On new screenshot` (default: `Save previous capture`): Choose whether a visible preview is saved immediately or discarded when a new capture happens.
 

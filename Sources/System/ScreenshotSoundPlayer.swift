@@ -6,6 +6,7 @@ protocol SoundResourceBundle {
 
 extension Bundle: SoundResourceBundle {}
 
+@MainActor
 enum ScreenshotSoundPlayer {
     private static let soundExtension = "wav"
     private static var soundCache: [String: NSSound] = [:]
@@ -14,7 +15,9 @@ enum ScreenshotSoundPlayer {
         guard isEnabled else { return }
         let name = option.resourceName
         guard let sound = sound(named: name) else {
-            NSLog("Screenshot sound missing: \(name).\(soundExtension)")
+            AppLog.system.error(
+                "Screenshot sound missing: \(name, privacy: .public).\(soundExtension, privacy: .public)",
+            )
             return
         }
         sound.stop()

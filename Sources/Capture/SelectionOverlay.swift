@@ -1,16 +1,11 @@
 import AppKit
-import os.log
 
+@MainActor
 final class SelectionOverlayController {
     private var windows: [OverlayWindow] = []
     private var views: [SelectionOverlayView] = []
-    private var keyMonitor: Any?
-    private var globalKeyMonitor: Any?
-    private let log = OSLog(subsystem: "com.grantbirki.oneshot", category: "SelectionOverlay")
-
-    private enum KeyCodes {
-        static let escape: UInt16 = 53
-    }
+    private var keyMonitor: EventMonitor?
+    private var globalKeyMonitor: EventMonitor?
 
     init() {}
 
@@ -78,36 +73,37 @@ final class SelectionOverlayController {
 
     private func startKeyMonitor(onCancel: @escaping () -> Void) {
         if keyMonitor == nil {
-            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
-                if event.keyCode == KeyCodes.escape {
-                    onCancel()
-                    return nil
+            keyMonitor = EventMonitor(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+                let shouldCancel = event.keyCode == KeyboardKeyCode.escape
+                let handled = MainActor.assumeIsolated {
+                    if shouldCancel {
+                        onCancel()
+                        return true
+                    }
+                    return false
                 }
-                return event
-            }
+                return handled ? nil : event
+            })
         }
 
         if globalKeyMonitor == nil {
-            globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { event in
+            globalKeyMonitor = EventMonitor(NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { event in
+                let keyCode = event.keyCode
                 DispatchQueue.main.async {
                     guard !NSApp.isActive else { return }
-                    if event.keyCode == KeyCodes.escape {
+                    if keyCode == KeyboardKeyCode.escape {
                         onCancel()
                     }
                 }
-            }
+            })
         }
     }
 
     private func stopKeyMonitor() {
-        if let monitor = keyMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
+        keyMonitor?.cancel()
         keyMonitor = nil
 
-        if let monitor = globalKeyMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
+        globalKeyMonitor?.cancel()
         globalKeyMonitor = nil
     }
 
@@ -158,12 +154,13 @@ final class SelectionOverlayController {
         if let keyWindow = windows.first(where: { $0.isKeyWindow }) ?? windows.first {
             keyWindow.makeKeyAndOrderFront(nil)
             #if DEBUG
-                os_log(
-                    "reassert key window %{public}d appActive=%{public}@",
-                    log: log,
-                    type: .debug,
-                    keyWindow.windowNumber,
-                    "\(NSApp.isActive)",
+                let windowNumber = keyWindow.windowNumber
+                let appActive = NSApp.isActive
+                AppLog.capture.debug(
+                    "Reasserted selection key window \(windowNumber, privacy: .public)",
+                )
+                AppLog.capture.debug(
+                    "Selection overlay appActive=\(appActive, privacy: .public)",
                 )
             #endif
         }
@@ -171,14 +168,17 @@ final class SelectionOverlayController {
 
     private func logKeyWindow(_ window: NSWindow, screen: NSScreen, message: String) {
         #if DEBUG
-            os_log(
-                "%{public}@ %{public}d for screen %{public}@, appActive=%{public}@",
-                log: log,
-                type: .debug,
-                message,
-                window.windowNumber,
-                "\(screen.frame)",
-                "\(NSApp.isActive)",
+            let frameDescription = String(describing: screen.frame)
+            let windowNumber = window.windowNumber
+            let appActive = NSApp.isActive
+            AppLog.capture.debug(
+                "\(message, privacy: .public) window=\(windowNumber, privacy: .public)",
+            )
+            AppLog.capture.debug(
+                "Selection overlay screen=\(frameDescription, privacy: .public)",
+            )
+            AppLog.capture.debug(
+                "Selection overlay appActive=\(appActive, privacy: .public)",
             )
         #endif
     }

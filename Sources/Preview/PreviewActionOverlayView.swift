@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 final class PreviewActionOverlayView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         for subview in subviews.reversed() {

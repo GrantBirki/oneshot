@@ -1,91 +1,78 @@
 import AppKit
-import Carbon.HIToolbox
 import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings: SettingsStore
+    @State private var selectedTab: SettingsTab = .general
     @State private var showMenuBarHiddenAlert = false
-    @State private var selectionDimmingHexInput: String
-    @FocusState private var selectionDimmingHexFocused: Bool
-
-    init(settings: SettingsStore) {
-        self.settings = settings
-        _selectionDimmingHexInput = State(initialValue: settings.selectionDimmingColorHex)
-    }
-
-    private let numberFormatter: NumberFormatter = {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.minimum = 0
-        formatter.maximumFractionDigits = 0
-        return formatter
-    }()
 
     var body: some View {
-        Form {
+        VStack(spacing: 14) {
+            SettingsTabStrip(selectedTab: $selectedTab)
+
+            Group {
+                switch selectedTab {
+                case .general:
+                    GeneralSettingsPane(
+                        settings: settings,
+                        showMenuBarHiddenAlert: $showMenuBarHiddenAlert,
+                    )
+                case .capture:
+                    CaptureSettingsPane(settings: settings)
+                case .output:
+                    OutputSettingsPane(settings: settings)
+                case .preview:
+                    PreviewSettingsPane(settings: settings)
+                case .hotkeys:
+                    HotkeySettingsPane(settings: settings)
+                case .about:
+                    AboutSettingsPane()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .padding(20)
+        .frame(minWidth: 620, minHeight: 460)
+        .alert("Menu Bar Icon Hidden", isPresented: $showMenuBarHiddenAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("To bring it back, open OneShot from Spotlight and turn this setting off.")
+        }
+    }
+}
+
+private struct GeneralSettingsPane: View {
+    @ObservedObject var settings: SettingsStore
+    @Binding var showMenuBarHiddenAlert: Bool
+
+    var body: some View {
+        SettingsForm {
             Section("General") {
                 Toggle("Launch at login", isOn: $settings.autoLaunchEnabled)
-                Toggle("Hide menu bar icon", isOn: $settings.menuBarIconHidden)
-                    .onChange(of: settings.menuBarIconHidden) { _, newValue in
-                        if newValue {
+                Toggle("Show menu bar icon", isOn: menuBarIconVisible)
+                    .onChange(of: settings.menuBarIconHidden) { _, isHidden in
+                        if isHidden {
                             showMenuBarHiddenAlert = true
                         }
                     }
-                    .help("Hide the OneShot icon from the menu bar.")
+                    .help("Show the OneShot icon in the menu bar.")
             }
+        }
+    }
 
-            Section("Selection") {
-                Toggle("Show selection coordinates", isOn: $settings.showSelectionCoordinates)
-                    .help("Show the selection size next to the cursor.")
-                Picker("Selection dimming", selection: $settings.selectionDimmingMode) {
-                    ForEach(SelectionDimmingMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
-                    }
-                }
-                .help("Choose whether the overlay dims the full screen or only the selection.")
-                LabeledContent("Selection color") {
-                    HStack(spacing: 12) {
-                        ColorPicker(
-                            "",
-                            selection: selectionDimmingColorBinding,
-                            supportsOpacity: true,
-                        )
-                        .labelsHidden()
-                        TextField("", text: $selectionDimmingHexInput)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 120)
-                            .focused($selectionDimmingHexFocused)
-                            .onChange(of: selectionDimmingHexInput) { _, newValue in
-                                let sanitized = sanitizeHexInput(newValue)
-                                if sanitized != newValue {
-                                    selectionDimmingHexInput = sanitized
-                                    return
-                                }
-                                let digitsCount = sanitized.filter(\.isHexDigit).count
-                                guard digitsCount == 6 || digitsCount == 8 else { return }
-                                guard let normalized = ColorHexCodec.normalized(sanitized) else { return }
-                                if normalized != settings.selectionDimmingColorHex {
-                                    settings.selectionDimmingColorHex = normalized
-                                }
-                                if digitsCount == 8, normalized != selectionDimmingHexInput {
-                                    selectionDimmingHexInput = normalized
-                                }
-                            }
-                        Button("Reset") {
-                            resetSelectionDimmingColor()
-                        }
-                        .help("Reset to the default selection color.")
-                    }
-                }
-                .help("Choose the selection-only fill color (RGBA hex).")
-                Picker("Selection visual cue", selection: $settings.selectionVisualCue) {
-                    ForEach(SelectionVisualCue.allCases) { cue in
-                        Text(cue.title).tag(cue)
-                    }
-                }
-                .help("Choose a visual cue shown when selection mode starts.")
-            }
+    private var menuBarIconVisible: Binding<Bool> {
+        Binding(
+            get: { !settings.menuBarIconHidden },
+            set: { settings.menuBarIconHidden = !$0 },
+        )
+    }
+}
 
+private struct OutputSettingsPane: View {
+    @ObservedObject var settings: SettingsStore
+
+    var body: some View {
+        SettingsForm {
             Section("Output") {
                 LabeledContent("Filename prefix") {
                     TextField("", text: $settings.filenamePrefix)
@@ -127,28 +114,35 @@ struct SettingsView: View {
                     .help("Choose what happens when previews are disabled.")
                 }
             }
+        }
+    }
 
-            Section("Sound") {
-                Toggle("Play shutter sound", isOn: $settings.shutterSoundEnabled)
-                    .help("Play a sound when a screenshot is captured.")
-                Picker("Shutter sound", selection: $settings.shutterSound) {
-                    ForEach(ShutterSoundOption.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .disabled(!settings.shutterSoundEnabled)
-                LabeledContent("Volume") {
-                    HStack(spacing: 8) {
-                        Slider(value: shutterSoundVolumeBinding, in: 0 ... 1)
-                        Text("\(Int((settings.shutterSoundVolume * 100).rounded()))%")
-                            .frame(width: 48, alignment: .trailing)
-                    }
-                }
-                .disabled(!settings.shutterSoundEnabled)
-                .listRowSeparator(.hidden)
-                .help("Set the shutter sound volume.")
-            }
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose Folder"
 
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.customSavePath = url.path
+        }
+    }
+}
+
+private struct PreviewSettingsPane: View {
+    @ObservedObject var settings: SettingsStore
+
+    private let numberFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimum = 0
+        formatter.maximumFractionDigits = 0
+        return formatter
+    }()
+
+    var body: some View {
+        SettingsForm {
             Section("Preview") {
                 Toggle("Show floating preview", isOn: $settings.previewEnabled)
                 Toggle("Auto-dismiss preview", isOn: $settings.previewTimeoutEnabled)
@@ -181,155 +175,26 @@ struct SettingsView: View {
                         "and the old preview is still visible.",
                 )
             }
-
-            Section("Hotkeys") {
-                HotkeyRecorderRow(
-                    title: "Selection",
-                    hotkey: $settings.hotkeySelection,
-                    conflictMessage: conflictMessage(
-                        for: settings.hotkeySelection,
-                        against: [settings.hotkeyScrolling, settings.hotkeyFullScreen, settings.hotkeyWindow],
-                    ),
-                )
-                HotkeyRecorderRow(
-                    title: "Scrolling",
-                    hotkey: $settings.hotkeyScrolling,
-                    conflictMessage: conflictMessage(
-                        for: settings.hotkeyScrolling,
-                        against: [settings.hotkeySelection, settings.hotkeyFullScreen, settings.hotkeyWindow],
-                    ),
-                )
-                HotkeyRecorderRow(
-                    title: "Window",
-                    hotkey: $settings.hotkeyWindow,
-                    conflictMessage: conflictMessage(
-                        for: settings.hotkeyWindow,
-                        against: [settings.hotkeySelection, settings.hotkeyFullScreen, settings.hotkeyScrolling],
-                    ),
-                )
-                HotkeyRecorderRow(
-                    title: "Full screen",
-                    hotkey: $settings.hotkeyFullScreen,
-                    conflictMessage: conflictMessage(
-                        for: settings.hotkeyFullScreen,
-                        against: [settings.hotkeySelection, settings.hotkeyWindow, settings.hotkeyScrolling],
-                    ),
-                )
-                Text("Click a field and press the shortcut. Press Esc to cancel.")
-                    .foregroundStyle(.secondary)
-                Text("Many hotkey changes require quitting and reopening OneShot for changes to take effect.")
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                AboutInfoView()
-            }
-        }
-        .formStyle(.grouped)
-        .background(FocusClearView())
-        .padding(20)
-        .frame(minWidth: 560, minHeight: 480)
-        .alert("Menu Bar Icon Hidden", isPresented: $showMenuBarHiddenAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("To bring it back, open OneShot from Spotlight and turn this setting off.")
-        }
-        .onChange(of: selectionDimmingHexFocused) { _, focused in
-            if !focused {
-                normalizeSelectionDimmingHexInput()
-            }
-        }
-        .onChange(of: settings.selectionDimmingColorHex) { _, newValue in
-            if !selectionDimmingHexFocused, selectionDimmingHexInput != newValue {
-                selectionDimmingHexInput = newValue
-            }
         }
     }
 }
 
-private extension SettingsView {
-    func chooseFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Choose Folder"
-
-        if panel.runModal() == .OK, let url = panel.url {
-            settings.customSavePath = url.path
+private struct AboutSettingsPane: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            AboutView()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+}
 
-    func conflictMessage(for hotkey: Hotkey?, against others: [Hotkey?]) -> String? {
-        guard let hotkey, hotkey.isValid else {
-            return nil
+struct SettingsForm<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Form {
+            content
         }
-
-        if others.compactMap(\.self).contains(hotkey) {
-            return "This shortcut is already used by OneShot."
-        }
-
-        if SettingsView.reservedSystemHotkeys.contains(hotkey) {
-            return "This shortcut may conflict with system shortcuts."
-        }
-
-        return nil
-    }
-
-    static let reservedSystemHotkeys: Set<Hotkey> = [
-        Hotkey(keyCode: UInt16(kVK_ANSI_3), modifiers: [.command, .shift]),
-        Hotkey(keyCode: UInt16(kVK_ANSI_4), modifiers: [.command, .shift]),
-        Hotkey(keyCode: UInt16(kVK_ANSI_5), modifiers: [.command, .shift]),
-        Hotkey(keyCode: UInt16(kVK_ANSI_6), modifiers: [.command, .shift]),
-        Hotkey(keyCode: UInt16(kVK_ANSI_3), modifiers: [.command, .shift, .control]),
-        Hotkey(keyCode: UInt16(kVK_ANSI_4), modifiers: [.command, .shift, .control]),
-    ]
-
-    func sanitizeHexInput(_ value: String) -> String {
-        let digits = value.filter(\.isHexDigit)
-        guard !digits.isEmpty else { return "" }
-        let limited = String(digits.prefix(8))
-        return "#\(limited.uppercased())"
-    }
-
-    func normalizeSelectionDimmingHexInput() {
-        let sanitized = sanitizeHexInput(selectionDimmingHexInput)
-        guard let normalized = ColorHexCodec.normalized(sanitized) else {
-            if selectionDimmingHexInput != settings.selectionDimmingColorHex {
-                selectionDimmingHexInput = settings.selectionDimmingColorHex
-            }
-            return
-        }
-        if normalized != settings.selectionDimmingColorHex {
-            settings.selectionDimmingColorHex = normalized
-        }
-        if normalized != selectionDimmingHexInput {
-            selectionDimmingHexInput = normalized
-        }
-    }
-
-    func resetSelectionDimmingColor() {
-        let defaultHex = ColorHexCodec.defaultSelectionDimmingColorHex
-        settings.selectionDimmingColorHex = defaultHex
-        selectionDimmingHexInput = defaultHex
-    }
-
-    var shutterSoundVolumeBinding: Binding<Double> {
-        Binding(
-            get: { settings.shutterSoundVolume },
-            set: { settings.shutterSoundVolume = roundedVolume($0) },
-        )
-    }
-
-    var selectionDimmingColorBinding: Binding<Color> {
-        Binding(
-            get: { Color(nsColor: settings.selectionDimmingColor) },
-            set: { settings.selectionDimmingColor = NSColor($0) },
-        )
-    }
-
-    func roundedVolume(_ value: Double) -> Double {
-        let clamped = min(max(value, 0), 1)
-        return (clamped * 100).rounded() / 100
+        .formStyle(.grouped)
     }
 }

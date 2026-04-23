@@ -107,12 +107,33 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.previewTimeout, 5)
     }
 
+    func testSaveDelayClampsToZero() {
+        var settings = SettingsStore(defaults: defaults)
+        settings.saveDelaySeconds = -5
+        XCTAssertEqual(settings.saveDelaySeconds, 0)
+
+        settings = SettingsStore(defaults: defaults)
+        XCTAssertEqual(settings.saveDelaySeconds, 0)
+    }
+
     func testClearingHotkeyPersists() {
         var settings = SettingsStore(defaults: defaults)
         settings.hotkeySelection = nil
 
         settings = SettingsStore(defaults: defaults)
         XCTAssertNil(settings.hotkeySelection)
+    }
+
+    func testClearingHotkeyWritesSentinelValues() {
+        let settings = SettingsStore(defaults: defaults)
+        settings.hotkeyScrolling = HotkeyParser.parse("ctrl+shift+s")
+        settings.hotkeyScrolling = nil
+
+        XCTAssertEqual(defaults.integer(forKey: SettingsStoreKeys.hotkeyScrollingKeyCode), -1)
+        XCTAssertEqual(defaults.integer(forKey: SettingsStoreKeys.hotkeyScrollingModifiers), 0)
+
+        let reloaded = SettingsStore(defaults: defaults)
+        XCTAssertNil(reloaded.hotkeyScrolling)
     }
 
     func testLegacyPreviewTimeoutMigratesToSaveDelay() {
@@ -163,6 +184,26 @@ final class SettingsStoreTests: XCTestCase {
             settings.selectionDimmingColorHex,
             ColorHexCodec.defaultSelectionDimmingColorHex,
         )
+    }
+
+    func testInvalidEnumRawValuesFallBackToDefaults() {
+        defaults.set("invalid", forKey: SettingsStoreKeys.previewAutoDismissBehavior)
+        defaults.set("invalid", forKey: SettingsStoreKeys.previewReplacementBehavior)
+        defaults.set("invalid", forKey: SettingsStoreKeys.previewDisabledOutputBehavior)
+        defaults.set("invalid", forKey: SettingsStoreKeys.selectionDimmingMode)
+        defaults.set("invalid", forKey: SettingsStoreKeys.selectionVisualCue)
+        defaults.set("invalid", forKey: SettingsStoreKeys.saveLocationOption)
+        defaults.set("invalid", forKey: SettingsStoreKeys.shutterSound)
+
+        let settings = SettingsStore(defaults: defaults)
+
+        XCTAssertEqual(settings.previewAutoDismissBehavior, .saveToDisk)
+        XCTAssertEqual(settings.previewReplacementBehavior, .saveImmediately)
+        XCTAssertEqual(settings.previewDisabledOutputBehavior, .saveToDisk)
+        XCTAssertEqual(settings.selectionDimmingMode, .fullScreen)
+        XCTAssertEqual(settings.selectionVisualCue, .none)
+        XCTAssertEqual(settings.saveLocationOption, .downloads)
+        XCTAssertEqual(settings.shutterSound, .shutter)
     }
 
     func testShutterSoundVolumeClampsToRange() {

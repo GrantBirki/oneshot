@@ -10,7 +10,7 @@ final class LaunchAtLoginManager {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            NSLog("LaunchAtLogin error: \(error)")
+            AppLog.system.error("Launch at login update failed: \(String(describing: error), privacy: .public)")
         }
     }
 }

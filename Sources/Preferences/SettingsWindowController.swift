@@ -1,6 +1,7 @@
 import Cocoa
 import SwiftUI
 
+@MainActor
 final class SettingsWindowController: NSWindowController {
     init(settings: SettingsStore) {
         let view = SettingsView(settings: settings)

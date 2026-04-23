@@ -1,5 +1,6 @@
 import Cocoa
 
+@MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
     struct HotkeyBindings {
         let selection: Hotkey?
@@ -87,7 +88,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 button.title = "OneShot"
             }
         } else {
-            NSLog("Status item button unavailable")
+            AppLog.app.error("Status item button unavailable")
         }
         let menu = buildMenu()
         menu.delegate = self
@@ -95,7 +96,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         self.menu = menu
         updateScrollingTitle()
         refreshHotkeys()
-        NSLog("Menu bar item started")
+        AppLog.app.info("Menu bar item started")
     }
 
     func setVisible(_ isVisible: Bool) {

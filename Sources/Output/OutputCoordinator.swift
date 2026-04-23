@@ -1,6 +1,6 @@
 import AppKit
 
-final class OutputCoordinator {
+final class OutputCoordinator: @unchecked Sendable {
     private let settings: SettingsStore
     private let queue: DispatchQueue
     private let queueKey = DispatchSpecificKey<Void>()
@@ -40,7 +40,6 @@ final class OutputCoordinator {
                 pngData: pngData,
                 workItem: workItem,
                 savedURL: nil,
-                releaseAfterSave: false,
             )
             if scheduleSave {
                 queue.asyncAfter(deadline: .now() + delay, execute: workItem)
@@ -65,26 +64,18 @@ final class OutputCoordinator {
         }
     }
 
-    func finalize(id: UUID, completion: ((URL?) -> Void)? = nil) {
-        let action = { [weak self] in
+    func finalize(id: UUID, completion: (@MainActor @Sendable (URL?) -> Void)? = nil) {
+        let action: @Sendable () -> Void = { [weak self] in
             guard let self else { return }
             guard var pending = pendingSaves[id] else {
-                if let completion {
-                    DispatchQueue.main.async {
-                        completion(nil)
-                    }
-                }
+                dispatchCompletion(completion, nil)
                 return
             }
             pending.workItem.cancel()
             if pending.savedURL == nil {
                 guard let pngData = pending.pngData else {
                     pendingSaves.removeValue(forKey: id)
-                    if let completion {
-                        DispatchQueue.main.async {
-                            completion(nil)
-                        }
-                    }
+                    dispatchCompletion(completion, nil)
                     return
                 }
                 let savedURL = saveNow(pngData: pngData, id: id)
@@ -95,11 +86,7 @@ final class OutputCoordinator {
             }
             let savedURL = pending.savedURL
             pendingSaves.removeValue(forKey: id)
-            if let completion {
-                DispatchQueue.main.async {
-                    completion(savedURL)
-                }
-            }
+            dispatchCompletion(completion, savedURL)
         }
         if DispatchQueue.getSpecific(key: queueKey) != nil {
             action()
@@ -108,15 +95,13 @@ final class OutputCoordinator {
         }
     }
 
-    func markAutoDismissed(id: UUID) {
-        queue.async { [weak self] in
-            guard let self, var pending = pendingSaves[id] else { return }
-            if pending.savedURL != nil {
-                pendingSaves.removeValue(forKey: id)
-            } else {
-                pending.releaseAfterSave = true
-                pendingSaves[id] = pending
-            }
+    private func dispatchCompletion(
+        _ completion: (@MainActor @Sendable (URL?) -> Void)?,
+        _ url: URL?,
+    ) {
+        guard let completion else { return }
+        Task { @MainActor in
+            completion(url)
         }
     }
 
@@ -138,11 +123,7 @@ final class OutputCoordinator {
             }
         }
 
-        if pending.releaseAfterSave {
-            pendingSaves.removeValue(forKey: id)
-        } else {
-            pendingSaves[id] = pending
-        }
+        pendingSaves[id] = pending
     }
 
     private func saveNow(pngData: Data, id: UUID) -> URL? {
@@ -157,7 +138,7 @@ final class OutputCoordinator {
             onSave?(id, url)
             return url
         } catch {
-            NSLog("Failed to save screenshot: \(error)")
+            AppLog.output.error("Failed to save screenshot: \(String(describing: error), privacy: .public)")
             return nil
         }
     }
@@ -166,14 +147,23 @@ final class OutputCoordinator {
         do {
             try FileManager.default.removeItem(at: url)
         } catch {
-            NSLog("Failed to delete screenshot: \(error)")
+            AppLog.output.error("Failed to delete screenshot: \(String(describing: error), privacy: .public)")
         }
     }
 }
+
+#if DEBUG
+    extension OutputCoordinator {
+        func pendingSaveCountForTesting() -> Int {
+            queue.sync {
+                pendingSaves.count
+            }
+        }
+    }
+#endif
 
 private struct PendingSave {
     var pngData: Data?
     var workItem: DispatchWorkItem
     var savedURL: URL?
-    var releaseAfterSave: Bool
 }

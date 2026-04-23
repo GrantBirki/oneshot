@@ -6,7 +6,9 @@ enum SaveLocationOption: String, CaseIterable, Identifiable {
     case documents
     case custom
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -22,7 +24,9 @@ enum PreviewDisabledOutputBehavior: String, CaseIterable, Identifiable {
     case saveToDisk
     case clipboardOnly
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -45,7 +49,9 @@ enum PreviewReplacementBehavior: String, CaseIterable, Identifiable {
     case saveImmediately
     case discard
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -70,7 +76,9 @@ enum PreviewAutoDismissBehavior: String, CaseIterable, Identifiable {
     case saveToDisk
     case discard
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -95,7 +103,9 @@ enum SelectionDimmingMode: String, CaseIterable, Identifiable {
     case fullScreen = "macosLike"
     case selectionOnly = "inverse"
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -109,7 +119,9 @@ enum SelectionVisualCue: String, CaseIterable, Identifiable {
     case pulse
     case none
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -125,7 +137,9 @@ enum ShutterSoundOption: String, CaseIterable, Identifiable {
     case sonyA7II = "sony_a7ii"
     case popPopCanonAE1 = "pop-pop_canon_ae-1"
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -136,5 +150,7 @@ enum ShutterSoundOption: String, CaseIterable, Identifiable {
         }
     }
 
-    var resourceName: String { rawValue }
+    var resourceName: String {
+        rawValue
+    }
 }
