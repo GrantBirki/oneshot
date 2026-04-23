@@ -32,6 +32,12 @@ if [[ ! -d "$APP_PATH" ]]; then
   exit 1
 fi
 
+touch "$APP_PATH"
+
+echo "Debug app bundle:"
+echo "$APP_PATH"
+echo "Bundle identifier:"
+echo "$BUNDLE_ID"
 echo "Tip: you can stream logs with:"
 echo "log stream --predicate 'process == \"OneShot\"' --style compact"
 echo "Or you can use:"
