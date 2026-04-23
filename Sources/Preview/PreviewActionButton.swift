@@ -2,7 +2,7 @@ import AppKit
 
 final class PreviewActionButton: NSButton {
     private enum Scale {
-        static let hover: CGFloat = 1.06
+        static let hover: CGFloat = 1
         static let press: CGFloat = 0.95
     }
 

@@ -50,6 +50,22 @@ final class PreviewContentViewTests: XCTestCase {
         XCTAssertTrue(hitImage is PreviewImageView)
     }
 
+    func testActionButtonsKeepStableScaleWhenPreviewActionsHide() throws {
+        let sut = try makeSUT()
+
+        sut.view.setActionsVisibleForTesting(true)
+        sut.view.setActionsVisibleForTesting(false)
+
+        XCTAssertEqual(sut.closeButton.layer?.transform.m11 ?? 0, 1, accuracy: 0.001)
+        XCTAssertEqual(sut.trashButton.layer?.transform.m11 ?? 0, 1, accuracy: 0.001)
+    }
+
+    func testTrashActionUsesRedSymbolTint() throws {
+        let sut = try makeSUT()
+
+        XCTAssertEqual(sut.trashButton.contentTintColor, .systemRed)
+    }
+
     func testPreviewImageIsAccessibleAndPerformPressOpensScreenshot() throws {
         let sut = try makeSUT()
         var didOpen = false
