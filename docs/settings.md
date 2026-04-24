@@ -28,6 +28,7 @@ Notes:
 
 - When `Copy to clipboard automatically` is off, only the `Default output` option `Copy to clipboard` will place images on the clipboard.
 - When `Default output` is `Copy to clipboard`, nothing is saved to disk and the save location/filename prefix are ignored.
+- If a generated filename already exists, OneShot keeps the timestamped name and appends a numbered suffix such as `-2` or `-3` instead of overwriting the existing file.
 
 ## Sound
 

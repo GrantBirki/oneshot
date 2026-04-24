@@ -3,6 +3,16 @@ import ImageIO
 import UniformTypeIdentifiers
 
 enum PNGDataEncoder {
+    static func encodeAsync(cgImage: CGImage) async throws -> Data {
+        try await Task.detached(priority: .userInitiated) {
+            let signpostID = AppSignpost.begin("PNG encode")
+            defer {
+                AppSignpost.end("PNG encode", id: signpostID)
+            }
+            return try encode(cgImage: cgImage)
+        }.value
+    }
+
     static func encode(cgImage: CGImage) throws -> Data {
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(

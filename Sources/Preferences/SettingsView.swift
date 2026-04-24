@@ -77,6 +77,7 @@ private struct OutputSettingsPane: View {
                 LabeledContent("Filename prefix") {
                     TextField("", text: $settings.filenamePrefix)
                         .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("Filename prefix")
                 }
 
                 Toggle("Copy to clipboard automatically", isOn: $settings.autoCopyToClipboard)
@@ -96,6 +97,7 @@ private struct OutputSettingsPane: View {
                         HStack(spacing: 8) {
                             TextField("", text: $settings.customSavePath)
                                 .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("Custom folder")
                             Button("Choose...") {
                                 chooseFolder()
                             }
@@ -152,6 +154,7 @@ private struct PreviewSettingsPane: View {
                         TextField("", value: $settings.saveDelaySeconds, formatter: numberFormatter)
                             .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: 80)
+                            .accessibilityLabel("Save delay in seconds")
                     }
                     Picker("On preview timeout", selection: $settings.previewAutoDismissBehavior) {
                         ForEach(PreviewAutoDismissBehavior.allCases) { behavior in

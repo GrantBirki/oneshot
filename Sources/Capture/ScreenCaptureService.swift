@@ -1,6 +1,11 @@
 import AppKit
 import ScreenCaptureKit
 
+struct ScrollingCaptureContext: @unchecked Sendable {
+    let filter: SCContentFilter
+    let configuration: SCStreamConfiguration
+}
+
 enum ScreenCaptureService {
     private struct ScreenCaptureTarget {
         let frame: CGRect
@@ -15,10 +20,14 @@ enum ScreenCaptureService {
 
     static func captureFullScreen() async -> CGImage? {
         guard let frame = await MainActor.run(body: { ScreenFrameHelper.allScreensFrame() }) else { return nil }
-        return await capture(rect: frame, excludingWindowID: nil)
+        return await capture(rect: frame, excludingWindowIDs: [])
     }
 
     static func capture(rect: CGRect, excludingWindowID: CGWindowID? = nil) async -> CGImage? {
+        await capture(rect: rect, excludingWindowIDs: excludingWindowID.map { [$0] } ?? [])
+    }
+
+    static func capture(rect: CGRect, excludingWindowIDs: Set<CGWindowID>) async -> CGImage? {
         guard !rect.isNull, !rect.isEmpty else { return nil }
 
         let targets = await screenTargets(intersecting: rect)
@@ -28,7 +37,7 @@ enum ScreenCaptureService {
         let displaysByID = scDisplaysByID(in: content)
         guard !displaysByID.isEmpty else { return nil }
 
-        let excludedWindow = scWindow(for: excludingWindowID, in: content)
+        let excludedWindows = scWindows(for: excludingWindowIDs, in: content)
 
         var pieces: [CapturedPiece] = []
 
@@ -38,7 +47,7 @@ enum ScreenCaptureService {
                 display: display,
                 screenFrame: target.frame,
                 captureRect: target.captureRect,
-                excludedWindow: excludedWindow,
+                excludedWindows: excludedWindows,
             ) {
                 pieces.append(piece)
             }
@@ -79,6 +88,11 @@ enum ScreenCaptureService {
     }
 
     static func captureScrolling(rect: CGRect) async -> CGImage? {
+        guard let context = await makeScrollingCaptureContext(rect: rect) else { return nil }
+        return await captureScrolling(context: context)
+    }
+
+    static func makeScrollingCaptureContext(rect: CGRect) async -> ScrollingCaptureContext? {
         guard let screenTarget = await screenTarget(containing: rect) else { return nil }
         guard let content = await shareableContent(),
               let display = scDisplay(for: screenTarget.displayID, in: content)
@@ -106,16 +120,29 @@ enum ScreenCaptureService {
         config.colorSpaceName = CGColorSpace.sRGB
         config.showsCursor = false
 
+        return ScrollingCaptureContext(filter: filter, configuration: config)
+    }
+
+    static func captureScrolling(context: ScrollingCaptureContext) async -> CGImage? {
+        let signpostID = AppSignpost.begin("ScreenCaptureKit frame capture")
         do {
-            return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+            let image = try await SCScreenshotManager.captureImage(
+                contentFilter: context.filter,
+                configuration: context.configuration,
+            )
+            AppSignpost.end("ScreenCaptureKit frame capture", id: signpostID)
+            return image
         } catch {
+            AppSignpost.end("ScreenCaptureKit frame capture", id: signpostID)
             AppLog.capture.error(
                 "ScreenCaptureKit scrolling capture failed: \(String(describing: error), privacy: .public)",
             )
             return nil
         }
     }
+}
 
+private extension ScreenCaptureService {
     private static func screenTargets(intersecting rect: CGRect) async -> [ScreenCaptureTarget] {
         await MainActor.run {
             let screens = NSScreen.screens
@@ -140,15 +167,15 @@ enum ScreenCaptureService {
         display: SCDisplay,
         screenFrame: CGRect,
         captureRect: CGRect,
-        excludedWindow: SCWindow?,
+        excludedWindows: [SCWindow],
     ) async -> CapturedPiece? {
         let adjustedRect = ScreenCaptureCoordinateConverter.adjustedRect(for: captureRect, screenFrame: screenFrame)
         guard adjustedRect.width > 0, adjustedRect.height > 0 else { return nil }
 
-        let filter = if let excludedWindow {
-            SCContentFilter(display: display, excludingWindows: [excludedWindow])
-        } else {
+        let filter = if excludedWindows.isEmpty {
             SCContentFilter(display: display, excludingApplications: [], exceptingWindows: [])
+        } else {
+            SCContentFilter(display: display, excludingWindows: excludedWindows)
         }
 
         let scale = max(CGFloat(filter.pointPixelScale), 1)
@@ -279,6 +306,11 @@ enum ScreenCaptureService {
     private static func scWindow(for windowID: CGWindowID?, in content: SCShareableContent) -> SCWindow? {
         guard let windowID else { return nil }
         return content.windows.first { $0.windowID == windowID }
+    }
+
+    private static func scWindows(for windowIDs: Set<CGWindowID>, in content: SCShareableContent) -> [SCWindow] {
+        guard !windowIDs.isEmpty else { return [] }
+        return content.windows.filter { windowIDs.contains($0.windowID) }
     }
 
     private static func currentApplication(in content: SCShareableContent) -> SCRunningApplication? {

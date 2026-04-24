@@ -42,8 +42,21 @@ generate_xcodeproj() {
   fi
 
   require_tool xcodegen "xcodegen not found. Run script/bootstrap."
+  mkdir -p "$DIR/.tmp"
+  local lock_dir="$DIR/.tmp/xcodegen.lock"
+  local waited=0
+  until mkdir "$lock_dir" 2>/dev/null; do
+    if (( waited == 0 )); then
+      echo -e "${YELLOW}Waiting for existing XcodeGen run...${OFF}"
+    fi
+    sleep 0.2
+    waited=$((waited + 1))
+  done
+  trap 'rm -rf "$lock_dir"' RETURN
   echo -e "${BLUE}Generating Xcode project...${OFF}"
   (cd "$DIR" && xcodegen generate)
+  rm -rf "$lock_dir"
+  trap - RETURN
   echo -e "${GREEN}✅ Update complete!${OFF}"
 }
 

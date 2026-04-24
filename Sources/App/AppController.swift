@@ -57,6 +57,11 @@ final class AppController {
         settingsWindowController.show()
     }
 
+    func stop() {
+        captureManager.cleanup()
+        hotkeyManager.unregisterAll()
+    }
+
     private func observeSettings() {
         settings.$autoLaunchEnabled
             .sink { [weak self] enabled in

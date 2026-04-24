@@ -49,6 +49,7 @@ struct CaptureSettingsPane: View {
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 120)
                             .focused($selectionDimmingHexFocused)
+                            .accessibilityLabel("Selection color hex value")
                             .onChange(of: selectionDimmingHexInput) { _, newValue in
                                 updateSelectionDimmingHexInput(newValue)
                             }

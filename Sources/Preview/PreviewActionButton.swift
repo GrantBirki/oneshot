@@ -93,10 +93,11 @@ final class PreviewActionButton: NSButton {
 
     func setBaseScale(_ scale: CGFloat, duration: TimeInterval) {
         baseScale = scale
-        applyScale(duration: duration)
+        applyScale(duration: adjustedDuration(duration))
     }
 
     private func updateAppearance(duration: TimeInterval) {
+        let duration = adjustedDuration(duration)
         let background = (isHovering || isHighlighted) ? hoverBackgroundColor : normalBackgroundColor
         layer?.backgroundColor = background.cgColor
         let targetAlpha: CGFloat = isHighlighted ? 0.85 : 1
@@ -112,6 +113,10 @@ final class PreviewActionButton: NSButton {
         }
 
         applyScale(duration: duration)
+    }
+
+    private func adjustedDuration(_ duration: TimeInterval) -> TimeInterval {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : duration
     }
 
     private func applyScale(duration: TimeInterval) {

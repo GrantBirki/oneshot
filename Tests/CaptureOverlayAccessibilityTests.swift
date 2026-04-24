@@ -54,10 +54,14 @@ final class CaptureOverlayAccessibilityTests: XCTestCase {
         let stopView = StopCaptureButtonView {
             didStop = true
         }
-        stopView.frame = NSRect(x: 0, y: 0, width: 96, height: 34)
+        stopView.frame = NSRect(x: 0, y: 0, width: 112, height: 44)
         stopView.layout()
 
         let button = try XCTUnwrap(stopView.recursiveSubviews.compactMap { $0 as? NSButton }.first)
+        XCTAssertEqual(button.frame, stopView.bounds)
+        XCTAssertTrue(button.isBordered)
+        XCTAssertEqual(button.bezelStyle, .glass)
+        XCTAssertNotNil(stopView.layer?.shadowPath)
         XCTAssertEqual(button.accessibilityLabel(), "Stop scrolling capture")
         XCTAssertEqual(button.accessibilityHelp(), "Finish scrolling capture and create the stitched screenshot.")
 

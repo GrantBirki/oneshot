@@ -153,6 +153,10 @@ final class PreviewPanel: NSPanel {
             content.performClose()
             return true
         }
+        if keyCode == KeyboardKeyCode.returnKey || keyCode == KeyboardKeyCode.keypadEnter {
+            content.performOpen()
+            return true
+        }
         if keyCode == KeyboardKeyCode.delete, modifiers.contains(.command) {
             content.performTrash()
             return true

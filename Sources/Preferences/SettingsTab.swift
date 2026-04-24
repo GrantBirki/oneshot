@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum SettingsTab: String, CaseIterable, Identifiable {
@@ -49,12 +50,11 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
 struct SettingsTabStrip: View {
     @Binding var selectedTab: SettingsTab
-    @Namespace private var glassNamespace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     fileprivate enum Layout {
-        static let selectedGlassID = "selected-settings-tab"
         static let animation = Animation.snappy(duration: 0.30, extraBounce: 0.05)
-        static let glassSpacing: CGFloat = 24
         static let itemSpacing: CGFloat = 8
         static let itemHeight: CGFloat = 36
         static let itemWidth: CGFloat = 88
@@ -63,34 +63,34 @@ struct SettingsTabStrip: View {
     }
 
     var body: some View {
-        GlassEffectContainer(spacing: Layout.glassSpacing) {
-            HStack(spacing: Layout.itemSpacing) {
-                ForEach(SettingsTab.allCases) { tab in
-                    SettingsTabButton(
-                        tab: tab,
-                        isSelected: selectedTab == tab,
-                        namespace: glassNamespace,
-                        selectedGlassID: Layout.selectedGlassID,
-                    ) {
-                        withAnimation(Layout.animation) {
-                            selectedTab = tab
-                        }
+        HStack(spacing: Layout.itemSpacing) {
+            ForEach(SettingsTab.allCases) { tab in
+                SettingsTabButton(
+                    tab: tab,
+                    isSelected: selectedTab == tab,
+                    reduceTransparency: reduceTransparency,
+                ) {
+                    withAnimation(currentAnimation) {
+                        selectedTab = tab
                     }
                 }
             }
-            .padding(Layout.railPadding)
         }
+        .padding(Layout.railPadding)
         .fixedSize(horizontal: true, vertical: false)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Settings section")
+    }
+
+    private var currentAnimation: Animation? {
+        reduceMotion ? .linear(duration: 0.08) : Layout.animation
     }
 }
 
 private struct SettingsTabButton: View {
     let tab: SettingsTab
     let isSelected: Bool
-    let namespace: Namespace.ID
-    let selectedGlassID: String
+    let reduceTransparency: Bool
     let action: () -> Void
 
     @State private var isHovered = false
@@ -107,24 +107,14 @@ private struct SettingsTabButton: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    @ViewBuilder
     private var content: some View {
-        if isSelected {
-            label
-                .foregroundStyle(.primary)
-                .glassEffect(.regular.tint(.accentColor), in: Capsule())
-                .glassEffectID(selectedGlassID, in: namespace)
-                .glassEffectTransition(.matchedGeometry)
-        } else {
-            label
-                .foregroundStyle(Color.primary.opacity(isHovered ? 0.92 : 0.74))
-                .background {
-                    if isHovered {
-                        Capsule()
-                            .fill(Color.primary.opacity(0.06))
-                    }
+        label
+            .foregroundStyle(Color.primary.opacity(isSelected ? 1 : (isHovered ? 0.92 : 0.74)))
+            .background {
+                if isSelected {
+                    selectedBackground
                 }
-        }
+            }
     }
 
     private var label: some View {
@@ -134,5 +124,37 @@ private struct SettingsTabButton: View {
             .padding(.horizontal, SettingsTabStrip.Layout.horizontalPadding)
             .frame(width: SettingsTabStrip.Layout.itemWidth, height: SettingsTabStrip.Layout.itemHeight)
             .contentShape(Capsule())
+    }
+
+    @ViewBuilder
+    private var selectedBackground: some View {
+        if reduceTransparency {
+            Capsule()
+                .fill(Color.accentColor.opacity(0.18))
+                .overlay {
+                    Capsule()
+                        .stroke(Color.accentColor.opacity(0.55), lineWidth: 1)
+                }
+                .accessibilityHidden(true)
+        } else {
+            SettingsTabGlassBackground()
+                .clipShape(Capsule())
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+private struct SettingsTabGlassBackground: NSViewRepresentable {
+    func makeNSView(context _: Context) -> NSGlassEffectView {
+        let view = NSGlassEffectView()
+        view.style = .regular
+        view.tintColor = .controlAccentColor
+        view.cornerRadius = SettingsTabStrip.Layout.itemHeight / 2
+        return view
+    }
+
+    func updateNSView(_ view: NSGlassEffectView, context _: Context) {
+        view.tintColor = .controlAccentColor
+        view.cornerRadius = SettingsTabStrip.Layout.itemHeight / 2
     }
 }
