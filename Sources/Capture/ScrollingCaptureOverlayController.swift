@@ -133,33 +133,27 @@ final class StopCapturePanel: NSPanel {
 @MainActor
 final class StopCaptureButtonView: NSView {
     private let onStop: () -> Void
-    private let glassView = NSGlassEffectView()
     private let button: NSButton
-    private let contentHost = NSView()
-    private let contentStack = NSStackView()
-    private let iconView = NSImageView()
-    private let titleLabel = NSTextField(labelWithString: "Stop")
 
     init(onStop: @escaping () -> Void) {
         self.onStop = onStop
-        button = NSButton(frame: .zero)
+        button = NSButton(title: "Stop", target: nil, action: nil)
         super.init(frame: .zero)
 
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
-        layer?.shadowColor = NSColor.black.withAlphaComponent(0.35).cgColor
+        layer?.shadowColor = NSColor.black.withAlphaComponent(0.25).cgColor
         layer?.shadowOpacity = 1
-        layer?.shadowRadius = 6
+        layer?.shadowRadius = 4
         layer?.shadowOffset = CGSize(width: 0, height: -2)
 
-        glassView.style = .regular
-        glassView.tintColor = .systemRed
-        glassView.clipsToBounds = true
-
-        button.isBordered = false
-        button.title = ""
+        button.isBordered = true
+        button.bezelStyle = .glass
+        button.bezelColor = .systemRed
+        button.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+        button.imagePosition = .imageLeading
         if let image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: nil) {
-            iconView.image = image.withSymbolConfiguration(
+            button.image = image.withSymbolConfiguration(
                 NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold),
             )
         }
@@ -168,24 +162,6 @@ final class StopCaptureButtonView: NSView {
         button.setAccessibilityLabel("Stop scrolling capture")
         button.setAccessibilityHelp("Finish scrolling capture and create the stitched screenshot.")
 
-        iconView.contentTintColor = .white
-        iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
-        iconView.setFrameSize(NSSize(width: 12, height: 12))
-
-        titleLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
-        titleLabel.textColor = .white
-        titleLabel.alignment = .center
-
-        contentStack.orientation = .horizontal
-        contentStack.alignment = .centerY
-        contentStack.distribution = .gravityAreas
-        contentStack.spacing = 8
-        contentStack.addArrangedSubview(iconView)
-        contentStack.addArrangedSubview(titleLabel)
-
-        contentHost.addSubview(contentStack)
-        glassView.contentView = contentHost
-        addSubview(glassView)
         addSubview(button)
         setAccessibilityElement(false)
     }
@@ -196,22 +172,12 @@ final class StopCaptureButtonView: NSView {
 
     override func layout() {
         super.layout()
-        let radius = bounds.height / 2
+        let radius: CGFloat = 12
         layer?.shadowPath = CGPath(
             roundedRect: bounds,
             cornerWidth: radius,
             cornerHeight: radius,
             transform: nil,
-        )
-        glassView.frame = bounds
-        glassView.cornerRadius = radius
-        contentHost.frame = glassView.bounds
-        let contentSize = contentStack.fittingSize
-        contentStack.frame = NSRect(
-            x: (contentHost.bounds.width - contentSize.width) / 2,
-            y: (contentHost.bounds.height - contentSize.height) / 2,
-            width: contentSize.width,
-            height: contentSize.height,
         )
         button.frame = bounds
     }
