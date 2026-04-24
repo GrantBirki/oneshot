@@ -77,7 +77,7 @@ final class PreviewContentView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        backgroundView.style = .regular
+        backgroundView.style = .clear
         backgroundView.cornerRadius = Layout.cornerRadius
         backgroundView.clipsToBounds = true
         addSubview(backgroundView)

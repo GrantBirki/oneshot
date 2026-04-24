@@ -66,6 +66,14 @@ final class PreviewContentViewTests: XCTestCase {
         XCTAssertEqual(sut.trashButton.contentTintColor, .systemRed)
     }
 
+    func testPreviewSurfaceUsesClearGlassWithRegularActionGlass() throws {
+        let sut = try makeSUT()
+
+        XCTAssertEqual(sut.backgroundView.style, .clear)
+        XCTAssertEqual(sut.closeGlassView.style, .regular)
+        XCTAssertEqual(sut.trashGlassView.style, .regular)
+    }
+
     func testPreviewImageIsAccessibleAndPerformPressOpensScreenshot() throws {
         let sut = try makeSUT()
         var didOpen = false
