@@ -85,19 +85,23 @@ actor ScrollingStitcher {
     private var previousImage: CGImage?
     private var width: Int?
     private var height = 0
+    private var retainedPixelCount = 0
     private var didReachPixelLimit = false
     private let offsetCalculator: ScrollingOffsetCalculating
     private let minimumOffset: Int
     private let maxPixelCount: Int
+    private let maxRetainedPixelCount: Int
 
     init(
         offsetCalculator: ScrollingOffsetCalculating = VisionScrollingOffsetCalculator(),
         minimumOffset: Int = 1,
         maxPixelCount: Int = 120_000_000,
+        maxRetainedPixelCount: Int? = nil,
     ) {
         self.offsetCalculator = offsetCalculator
         self.minimumOffset = minimumOffset
         self.maxPixelCount = maxPixelCount
+        self.maxRetainedPixelCount = maxRetainedPixelCount ?? maxPixelCount
     }
 
     func reset() {
@@ -105,6 +109,7 @@ actor ScrollingStitcher {
         previousImage = nil
         width = nil
         height = 0
+        retainedPixelCount = 0
         didReachPixelLimit = false
     }
 
@@ -113,6 +118,7 @@ actor ScrollingStitcher {
         previousImage = image
         width = image.width
         height = image.height
+        retainedPixelCount = image.pixelCount
         didReachPixelLimit = false
     }
 
@@ -149,23 +155,43 @@ actor ScrollingStitcher {
         }
 
         if offsetPixels > 0 {
-            let nextHeight = height + offsetPixels
-            if nextHeight * width > maxPixelCount {
-                didReachPixelLimit = true
-                let dimensions = "\(width)x\(nextHeight)"
-                AppLog.capture.warning(
-                    "Scrolling capture pixel limit reached at \(dimensions, privacy: .public)",
-                )
-                return .limitReached
+            let status = acceptDownwardFrame(image, offsetPixels: offsetPixels, width: width)
+            guard status == .accepted else {
+                return status
             }
-            shiftSegments(upBy: offsetPixels)
-            segments.append(Segment(image: image, originY: 0))
-            height = nextHeight
         } else {
             cropBottom(by: abs(offsetPixels))
         }
 
         previousImage = image
+        return .accepted
+    }
+
+    private func acceptDownwardFrame(_ image: CGImage, offsetPixels: Int, width: Int) -> ScrollingStitcherStatus {
+        let nextHeight = height + offsetPixels
+        if nextHeight * width > maxPixelCount {
+            didReachPixelLimit = true
+            let dimensions = "\(width)x\(nextHeight)"
+            AppLog.capture.warning(
+                "Scrolling capture pixel limit reached at \(dimensions, privacy: .public)",
+            )
+            return .limitReached
+        }
+
+        let nextRetainedPixelCount = retainedPixelCount + image.pixelCount
+        if nextRetainedPixelCount > maxRetainedPixelCount {
+            didReachPixelLimit = true
+            let retainedPixels = "\(nextRetainedPixelCount) pixels"
+            AppLog.capture.warning(
+                "Scrolling capture retained frame limit reached at \(retainedPixels, privacy: .public)",
+            )
+            return .limitReached
+        }
+
+        shiftSegments(upBy: offsetPixels)
+        segments.append(Segment(image: image, originY: 0))
+        retainedPixelCount = nextRetainedPixelCount
+        height = nextHeight
         return .accepted
     }
 
@@ -205,6 +231,9 @@ actor ScrollingStitcher {
         segments.removeAll { segment in
             segment.originY + segment.image.height <= 0
         }
+        retainedPixelCount = segments.reduce(0) { total, segment in
+            total + segment.image.pixelCount
+        }
     }
 
     private func makeContext(reference image: CGImage, width: Int, height: Int) -> CGContext? {
@@ -217,5 +246,11 @@ actor ScrollingStitcher {
             space: image.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: image.bitmapInfo.rawValue,
         )
+    }
+}
+
+private extension CGImage {
+    var pixelCount: Int {
+        width * height
     }
 }

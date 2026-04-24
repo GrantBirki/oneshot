@@ -95,6 +95,33 @@ final class ScrollingStitcherTests: XCTestCase {
         assertColor(rep.colorAt(x: 0, y: result.height - 1), equals: .blue)
     }
 
+    func testStitcherStopsAtRetainedFrameLimitBeforeStitchedPixelLimit() async {
+        let stitcher = ScrollingStitcher(
+            offsetCalculator: StubOffsetCalculator(offset: 1),
+            maxPixelCount: 1000,
+            maxRetainedPixelCount: 40,
+        )
+        let base = makeSplitImage(width: 4, height: 4, topColor: .red, bottomColor: .blue)
+        let next = makeSplitImage(width: 4, height: 4, topColor: .green, bottomColor: .yellow)
+        let extra = makeSplitImage(width: 4, height: 4, topColor: .white, bottomColor: .black)
+
+        await stitcher.start(with: base)
+        let acceptedStatus = await stitcher.add(next)
+        let limitedStatus = await stitcher.add(extra)
+
+        guard let result = await stitcher.finish() else {
+            XCTFail("Expected best current image")
+            return
+        }
+
+        XCTAssertEqual(acceptedStatus, .accepted)
+        XCTAssertEqual(limitedStatus, .limitReached)
+        let reachedPixelLimit = await stitcher.reachedPixelLimitForTesting()
+        XCTAssertTrue(reachedPixelLimit)
+        XCTAssertEqual(result.width, 4)
+        XCTAssertEqual(result.height, 5)
+    }
+
     func testStitcherResetsOnSizeMismatch() async {
         let stitcher = ScrollingStitcher(offsetCalculator: StubOffsetCalculator(offset: 2))
         let base = makeSplitImage(width: 4, height: 4, topColor: .red, bottomColor: .blue)
