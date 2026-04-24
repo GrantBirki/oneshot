@@ -135,6 +135,7 @@ final class StopCaptureButtonView: NSView {
     private let onStop: () -> Void
     private let glassView = NSGlassEffectView()
     private let button: NSButton
+    private let contentHost = NSView()
     private let contentStack = NSStackView()
     private let iconView = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "Stop")
@@ -153,7 +154,7 @@ final class StopCaptureButtonView: NSView {
 
         glassView.style = .regular
         glassView.tintColor = .systemRed
-        glassView.cornerRadius = 18
+        glassView.clipsToBounds = true
 
         button.isBordered = false
         button.title = ""
@@ -182,8 +183,9 @@ final class StopCaptureButtonView: NSView {
         contentStack.addArrangedSubview(iconView)
         contentStack.addArrangedSubview(titleLabel)
 
+        contentHost.addSubview(contentStack)
+        glassView.contentView = contentHost
         addSubview(glassView)
-        addSubview(contentStack)
         addSubview(button)
         setAccessibilityElement(false)
     }
@@ -194,11 +196,20 @@ final class StopCaptureButtonView: NSView {
 
     override func layout() {
         super.layout()
+        let radius = bounds.height / 2
+        layer?.shadowPath = CGPath(
+            roundedRect: bounds,
+            cornerWidth: radius,
+            cornerHeight: radius,
+            transform: nil,
+        )
         glassView.frame = bounds
+        glassView.cornerRadius = radius
+        contentHost.frame = glassView.bounds
         let contentSize = contentStack.fittingSize
         contentStack.frame = NSRect(
-            x: (bounds.width - contentSize.width) / 2,
-            y: (bounds.height - contentSize.height) / 2,
+            x: (contentHost.bounds.width - contentSize.width) / 2,
+            y: (contentHost.bounds.height - contentSize.height) / 2,
             width: contentSize.width,
             height: contentSize.height,
         )
