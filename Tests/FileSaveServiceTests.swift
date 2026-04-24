@@ -32,6 +32,36 @@ final class FileSaveServiceTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: url), pngData)
     }
 
+    func testSavePNGDataDoesNotOverwriteExistingFile() throws {
+        let existingURL = tempDirectory.appendingPathComponent("screenshot.png")
+        let existingData = Data("existing".utf8)
+        try existingData.write(to: existingURL)
+        let pngData = makePNGData(width: 2, height: 2)
+
+        let url = try FileSaveService.save(pngData: pngData, to: tempDirectory, filename: "screenshot.png")
+
+        XCTAssertEqual(url.lastPathComponent, "screenshot-2.png")
+        XCTAssertEqual(try Data(contentsOf: existingURL), existingData)
+        XCTAssertEqual(try Data(contentsOf: url), pngData)
+    }
+
+    func testUniqueURLSkipsExistingNumberedSuffixes() throws {
+        try Data().write(to: tempDirectory.appendingPathComponent("screenshot.png"))
+        try Data().write(to: tempDirectory.appendingPathComponent("screenshot-2.png"))
+
+        let url = FileSaveService.uniqueURL(for: "screenshot.png", in: tempDirectory)
+
+        XCTAssertEqual(url.lastPathComponent, "screenshot-3.png")
+    }
+
+    func testUniqueURLHandlesFilenamesWithoutExtension() throws {
+        try Data().write(to: tempDirectory.appendingPathComponent("screenshot"))
+
+        let url = FileSaveService.uniqueURL(for: "screenshot", in: tempDirectory)
+
+        XCTAssertEqual(url.lastPathComponent, "screenshot-2")
+    }
+
     func testSaveImageWritesPNGFile() throws {
         let directory = tempDirectory.appendingPathComponent("images", isDirectory: true)
         let image = makeImage(width: 3, height: 3)

@@ -11,7 +11,7 @@ final class SelectionOverlayController {
 
     struct SelectionResult {
         let rect: CGRect
-        let excludeWindowID: CGWindowID?
+        let excludeWindowIDs: Set<CGWindowID>
     }
 
     func beginSelection(
@@ -74,6 +74,10 @@ final class SelectionOverlayController {
         stopKeyMonitor()
     }
 
+    func cancel() {
+        end()
+    }
+
     private func startKeyMonitor(onCancel: @escaping () -> Void) {
         if keyMonitor == nil {
             keyMonitor = EventMonitor(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
@@ -122,10 +126,10 @@ final class SelectionOverlayController {
         for screen in screens {
             let window = OverlayWindow(contentRect: screen.frame)
             let view = SelectionOverlayView(frame: window.contentView?.bounds ?? .zero, state: state)
-            var windowID: CGWindowID = 0
             view.onSelectionChanged = refreshViews
-            view.onSelection = { rect in
-                finish(SelectionResult(rect: rect, excludeWindowID: windowID))
+            view.onSelection = { [weak self] rect in
+                let excludedWindowIDs = Set(self?.windows.map { CGWindowID($0.windowNumber) } ?? [])
+                finish(SelectionResult(rect: rect, excludeWindowIDs: excludedWindowIDs))
             }
             view.onCancel = {
                 finish(nil)
@@ -138,7 +142,6 @@ final class SelectionOverlayController {
                 logKeyWindow(window, screen: screen, message: "made key window")
             }
             window.makeFirstResponder(view)
-            windowID = CGWindowID(window.windowNumber)
             windows.append(window)
             views.append(view)
         }

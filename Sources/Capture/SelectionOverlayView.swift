@@ -95,6 +95,12 @@ final class SelectionOverlayView: NSView {
     override func keyDown(with event: NSEvent) {
         if event.keyCode == KeyboardKeyCode.escape {
             onCancel?()
+        } else if event.keyCode == KeyboardKeyCode.returnKey || event.keyCode == KeyboardKeyCode.keypadEnter {
+            guard let rect = state.rect, rect.width >= 2, rect.height >= 2 else {
+                NSSound.beep()
+                return
+            }
+            onSelection?(rect)
         }
     }
 

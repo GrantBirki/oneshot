@@ -1,10 +1,12 @@
 import AppKit
 
+typealias ScrollingFrameCapture = @Sendable () async -> CGImage?
+
 @MainActor
 final class ScrollingCaptureSession {
-    private let captureInterval: TimeInterval
+    private let targetFrameInterval: TimeInterval
     private let stitcher: ScrollingStitcher
-    private let captureImage: @Sendable (CGRect) async -> CGImage?
+    private let makeFrameCapture: @Sendable (CGRect) async -> ScrollingFrameCapture?
     private var captureTask: Task<Void, Never>?
     private var captureRect: CGRect = .zero
     private var onFinish: ((CGImage?) -> Void)?
@@ -12,15 +14,32 @@ final class ScrollingCaptureSession {
     private var globalKeyMonitor: EventMonitor?
 
     init(
-        captureInterval: TimeInterval = 0.025,
+        captureInterval: TimeInterval = 0.1,
         stitcher: ScrollingStitcher = ScrollingStitcher(),
-        captureImage: @escaping @Sendable (CGRect) async -> CGImage? = {
-            await ScreenCaptureService.captureScrolling(rect: $0)
+        makeFrameCapture: @escaping @Sendable (CGRect) async -> ScrollingFrameCapture? = { rect in
+            guard let context = await ScreenCaptureService.makeScrollingCaptureContext(rect: rect) else {
+                return nil
+            }
+            return {
+                await ScreenCaptureService.captureScrolling(context: context)
+            }
         },
     ) {
-        self.captureInterval = captureInterval
+        targetFrameInterval = max(captureInterval, 0.1)
         self.stitcher = stitcher
-        self.captureImage = captureImage
+        self.makeFrameCapture = makeFrameCapture
+    }
+
+    convenience init(
+        captureInterval: TimeInterval = 0.1,
+        stitcher: ScrollingStitcher = ScrollingStitcher(),
+        captureImage: @escaping @Sendable (CGRect) async -> CGImage?,
+    ) {
+        self.init(captureInterval: captureInterval, stitcher: stitcher) { rect in
+            {
+                await captureImage(rect)
+            }
+        }
     }
 
     var isActive: Bool {
@@ -32,6 +51,7 @@ final class ScrollingCaptureSession {
         startKeyMonitor()
         captureRect = rect
         self.onFinish = onFinish
+        AccessibilityAnnouncer.announce("Scrolling capture started")
         captureTask = Task(priority: .userInitiated) { [weak self] in
             await self?.captureLoop()
         }
@@ -44,15 +64,33 @@ final class ScrollingCaptureSession {
 
     private func captureLoop() async {
         await stitcher.reset()
-        let interval = max(captureInterval, 0.025)
-        while !Task.isCancelled {
-            if let image = await captureImage(captureRect), !Task.isCancelled {
-                await stitcher.add(image)
-            }
-            try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+        guard let captureFrame = await makeFrameCapture(captureRect), !Task.isCancelled else {
+            finish(with: nil)
+            return
         }
+
+        while !Task.isCancelled {
+            let start = Date()
+            if let image = await captureFrame(), !Task.isCancelled {
+                let status = await stitcher.add(image)
+                if status == .limitReached {
+                    break
+                }
+            }
+            await sleepAfterFrame(startedAt: start)
+        }
+
+        let signpostID = AppSignpost.begin("Scrolling final composition")
         let finalImage = await stitcher.finish()
+        AppSignpost.end("Scrolling final composition", id: signpostID)
         finish(with: finalImage)
+    }
+
+    private func sleepAfterFrame(startedAt start: Date) async {
+        let elapsed = Date().timeIntervalSince(start)
+        let remaining = targetFrameInterval - elapsed
+        guard remaining > 0 else { return }
+        try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
     }
 
     private func finish(with image: CGImage?) {
@@ -60,6 +98,7 @@ final class ScrollingCaptureSession {
         let callback = onFinish
         onFinish = nil
         captureTask = nil
+        AccessibilityAnnouncer.announce("Scrolling capture stopped")
         callback?(image)
     }
 

@@ -5,7 +5,7 @@ final class ScrollingCaptureOverlayController {
     private var windows: [OverlayWindow] = []
     private var views: [ScrollingSelectionOverlayView] = []
     private var stopPanel: StopCapturePanel?
-    private let stopButtonSize = NSSize(width: 96, height: 34)
+    private let stopButtonSize = NSSize(width: 112, height: 44)
 
     func show(selectionRect: CGRect, onStop: @escaping () -> Void) {
         hide()
@@ -133,33 +133,57 @@ final class StopCapturePanel: NSPanel {
 @MainActor
 final class StopCaptureButtonView: NSView {
     private let onStop: () -> Void
+    private let glassView = NSGlassEffectView()
     private let button: NSButton
+    private let contentStack = NSStackView()
+    private let iconView = NSImageView()
+    private let titleLabel = NSTextField(labelWithString: "Stop")
 
     init(onStop: @escaping () -> Void) {
         self.onStop = onStop
-        button = NSButton(title: "Stop", target: nil, action: nil)
+        button = NSButton(frame: .zero)
         super.init(frame: .zero)
 
         wantsLayer = true
-        layer?.backgroundColor = NSColor.systemRed.cgColor
-        layer?.cornerRadius = 8
+        layer?.backgroundColor = NSColor.clear.cgColor
         layer?.shadowColor = NSColor.black.withAlphaComponent(0.35).cgColor
         layer?.shadowOpacity = 1
         layer?.shadowRadius = 6
         layer?.shadowOffset = CGSize(width: 0, height: -2)
 
+        glassView.style = .regular
+        glassView.tintColor = .systemRed
+        glassView.cornerRadius = 18
+
         button.isBordered = false
-        button.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-        button.contentTintColor = .white
+        button.title = ""
         if let image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: nil) {
-            button.image = image
-            button.imagePosition = .imageLeading
+            iconView.image = image.withSymbolConfiguration(
+                NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold),
+            )
         }
         button.target = self
         button.action = #selector(stopPressed)
         button.setAccessibilityLabel("Stop scrolling capture")
         button.setAccessibilityHelp("Finish scrolling capture and create the stitched screenshot.")
 
+        iconView.contentTintColor = .white
+        iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+        iconView.setFrameSize(NSSize(width: 12, height: 12))
+
+        titleLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+        titleLabel.textColor = .white
+        titleLabel.alignment = .center
+
+        contentStack.orientation = .horizontal
+        contentStack.alignment = .centerY
+        contentStack.distribution = .gravityAreas
+        contentStack.spacing = 8
+        contentStack.addArrangedSubview(iconView)
+        contentStack.addArrangedSubview(titleLabel)
+
+        addSubview(glassView)
+        addSubview(contentStack)
         addSubview(button)
         setAccessibilityElement(false)
     }
@@ -170,7 +194,15 @@ final class StopCaptureButtonView: NSView {
 
     override func layout() {
         super.layout()
-        button.frame = bounds.insetBy(dx: 8, dy: 4)
+        glassView.frame = bounds
+        let contentSize = contentStack.fittingSize
+        contentStack.frame = NSRect(
+            x: (bounds.width - contentSize.width) / 2,
+            y: (bounds.height - contentSize.height) / 2,
+            width: contentSize.width,
+            height: contentSize.height,
+        )
+        button.frame = bounds
     }
 
     @objc private func stopPressed() {

@@ -51,6 +51,10 @@ final class WindowCaptureOverlayController {
         stopKeyMonitor()
     }
 
+    func cancel() {
+        end()
+    }
+
     private func startKeyMonitor(onCancel: @escaping () -> Void) {
         if keyMonitor == nil {
             keyMonitor = EventMonitor(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
@@ -166,6 +170,10 @@ final class WindowCaptureOverlayView: NSView {
     override func keyDown(with event: NSEvent) {
         if event.keyCode == KeyboardKeyCode.escape {
             onCancel?()
+        } else if event.keyCode == KeyboardKeyCode.returnKey || event.keyCode == KeyboardKeyCode.keypadEnter {
+            if let highlightedWindow {
+                onSelection?(highlightedWindow)
+            }
         }
     }
 

@@ -1,5 +1,39 @@
 import AppKit
 
+enum CaptureSessionState: Equatable {
+    case idle
+    case selecting
+    case windowSelecting
+    case scrolling
+    case processing
+}
+
+struct CaptureSessionTracker {
+    private(set) var state: CaptureSessionState = .idle
+
+    mutating func begin(_ nextState: CaptureSessionState) -> Bool {
+        guard state == .idle else {
+            return false
+        }
+        state = nextState
+        return true
+    }
+
+    mutating func transition(to nextState: CaptureSessionState) {
+        state = nextState
+    }
+
+    mutating func finish(_ completedState: CaptureSessionState) {
+        if state == completedState || state == .processing {
+            state = .idle
+        }
+    }
+
+    mutating func reset() {
+        state = .idle
+    }
+}
+
 @MainActor
 final class CaptureManager {
     private let settings: SettingsStore
@@ -9,6 +43,7 @@ final class CaptureManager {
     private let previewController = PreviewController()
     private let scrollingCaptureSession = ScrollingCaptureSession()
     private let scrollingOverlay = ScrollingCaptureOverlayController()
+    private var sessionTracker = CaptureSessionTracker()
 
     var onScrollingCaptureStateChange: ((Bool) -> Void)?
 
@@ -19,22 +54,30 @@ final class CaptureManager {
 
     func captureSelection() {
         guard ScreenCapturePermission.ensureAccess() else { return }
+        guard beginSession(.selecting) else { return }
+        AccessibilityAnnouncer.announce("Selection capture started")
         selectionOverlay.beginSelection(
             showSelectionCoordinates: settings.showSelectionCoordinates,
             visualCue: settings.selectionVisualCue,
             dimmingMode: settings.selectionDimmingMode,
             selectionDimmingColor: settings.selectionDimmingColor,
         ) { [weak self] selection in
-            guard let self, let selection else { return }
+            guard let self else { return }
+            guard let selection else {
+                finishSession(.selecting)
+                return
+            }
+            sessionTracker.transition(to: .processing)
             Task { [weak self] in
                 guard let self else { return }
                 if let image = await ScreenCaptureService.capture(
                     rect: selection.rect,
-                    excludingWindowID: selection.excludeWindowID,
+                    excludingWindowIDs: selection.excludeWindowIDs,
                 ) {
-                    await MainActor.run {
-                        self.handleCapture(image, displaySize: selection.rect.size, anchorRect: selection.rect)
-                    }
+                    await handleCapture(image, displaySize: selection.rect.size, anchorRect: selection.rect)
+                }
+                await MainActor.run {
+                    self.finishSession(.processing)
                 }
             }
         }
@@ -42,27 +85,40 @@ final class CaptureManager {
 
     func captureFullScreen() {
         guard ScreenCapturePermission.ensureAccess() else { return }
+        guard beginSession(.processing) else { return }
         Task { [weak self] in
             guard let self else { return }
-            guard let image = await ScreenCaptureService.captureFullScreen() else { return }
-            await MainActor.run {
-                let frame = ScreenFrameHelper.allScreensFrame()
+            if let image = await ScreenCaptureService.captureFullScreen() {
+                let frame = await MainActor.run {
+                    ScreenFrameHelper.allScreensFrame()
+                }
                 let size = frame?.size ?? NSSize(width: image.width, height: image.height)
-                self.handleCapture(image, displaySize: size, anchorRect: frame)
+                await handleCapture(image, displaySize: size, anchorRect: frame)
+            }
+            await MainActor.run {
+                self.finishSession(.processing)
             }
         }
     }
 
     func captureWindow() {
         guard ScreenCapturePermission.ensureAccess() else { return }
+        guard beginSession(.windowSelecting) else { return }
+        AccessibilityAnnouncer.announce("Window capture started")
         windowOverlay.beginSelection { [weak self] windowInfo in
-            guard let self, let windowInfo else { return }
+            guard let self else { return }
+            guard let windowInfo else {
+                finishSession(.windowSelecting)
+                return
+            }
+            sessionTracker.transition(to: .processing)
             Task { [weak self] in
                 guard let self else { return }
                 if let image = await ScreenCaptureService.capture(windowID: windowInfo.id) {
-                    await MainActor.run {
-                        self.handleCapture(image, displaySize: windowInfo.bounds.size, anchorRect: windowInfo.bounds)
-                    }
+                    await handleCapture(image, displaySize: windowInfo.bounds.size, anchorRect: windowInfo.bounds)
+                }
+                await MainActor.run {
+                    self.finishSession(.processing)
                 }
             }
         }
@@ -70,10 +126,11 @@ final class CaptureManager {
 
     func captureScrolling() {
         guard ScreenCapturePermission.ensureAccess() else { return }
-        if scrollingCaptureSession.isActive {
+        if sessionTracker.state == .scrolling || scrollingCaptureSession.isActive {
             scrollingCaptureSession.stop()
             return
         }
+        guard beginSession(.selecting) else { return }
 
         selectionOverlay.beginSelection(
             showSelectionCoordinates: settings.showSelectionCoordinates,
@@ -81,8 +138,13 @@ final class CaptureManager {
             dimmingMode: settings.selectionDimmingMode,
             selectionDimmingColor: settings.selectionDimmingColor,
         ) { [weak self] selection in
-            guard let self, let selection else { return }
+            guard let self else { return }
+            guard let selection else {
+                finishSession(.selecting)
+                return
+            }
             let anchorRect = selection.rect.integral
+            sessionTracker.transition(to: .scrolling)
             updateScrollingCaptureState(isActive: true)
             scrollingOverlay.show(selectionRect: anchorRect) { [weak self] in
                 self?.scrollingCaptureSession.stop()
@@ -91,29 +153,55 @@ final class CaptureManager {
                 guard let self else { return }
                 scrollingOverlay.hide()
                 updateScrollingCaptureState(isActive: false)
+                finishSession(.scrolling)
                 guard let image else { return }
+                sessionTracker.transition(to: .processing)
                 let displaySize = displaySize(for: image, baseRect: anchorRect)
-                handleCapture(image, displaySize: displaySize, anchorRect: anchorRect)
+                Task { [weak self] in
+                    guard let self else { return }
+                    await handleCapture(image, displaySize: displaySize, anchorRect: anchorRect)
+                    await MainActor.run {
+                        self.finishSession(.processing)
+                    }
+                }
             }
         }
     }
 
-    private func handleCapture(_ image: CGImage, displaySize: NSSize, anchorRect: CGRect?) {
+    func cleanup() {
+        selectionOverlay.cancel()
+        windowOverlay.cancel()
+        scrollingCaptureSession.stop()
+        scrollingOverlay.hide()
+        previewController.hide()
+        sessionTracker.reset()
+        updateScrollingCaptureState(isActive: false)
+    }
+
+    private func handleCapture(_ image: CGImage, displaySize: NSSize, anchorRect: CGRect?) async {
+        let signpostID = AppSignpost.begin("Capture process")
         do {
-            let captured = try CapturedImage(cgImage: image, displaySize: displaySize)
-            ScreenshotSoundPlayer.play(
-                sound: settings.shutterSound,
-                volume: settings.shutterSoundVolume,
-                isEnabled: settings.shutterSoundEnabled,
-            )
-            if settings.previewEnabled {
-                handleCaptureWithPreview(captured, anchorRect: anchorRect)
-            } else {
-                handleCaptureWithoutPreview(captured)
+            let pngData = try await PNGDataEncoder.encodeAsync(cgImage: image)
+            await MainActor.run {
+                let captured = CapturedImage(cgImage: image, displaySize: displaySize, pngData: pngData)
+                ScreenshotSoundPlayer.play(
+                    sound: settings.shutterSound,
+                    volume: settings.shutterSoundVolume,
+                    isEnabled: settings.shutterSoundEnabled,
+                )
+                if settings.previewEnabled {
+                    handleCaptureWithPreview(captured, anchorRect: anchorRect)
+                } else {
+                    handleCaptureWithoutPreview(captured)
+                }
             }
         } catch {
-            AppLog.capture.error("Failed to encode screenshot: \(String(describing: error), privacy: .public)")
+            await MainActor.run {
+                AppLog.capture.error("Failed to encode screenshot: \(String(describing: error), privacy: .public)")
+                AccessibilityAnnouncer.announce("Screenshot could not be encoded")
+            }
         }
+        AppSignpost.end("Capture process", id: signpostID)
     }
 
     private func handleCaptureWithPreview(_ captured: CapturedImage, anchorRect: CGRect?) {
@@ -192,6 +280,19 @@ final class CaptureManager {
         DispatchQueue.main.async { [weak self] in
             self?.onScrollingCaptureStateChange?(isActive)
         }
+    }
+
+    private func beginSession(_ state: CaptureSessionState) -> Bool {
+        guard sessionTracker.begin(state) else {
+            NSSound.beep()
+            AccessibilityAnnouncer.announce("OneShot is already capturing")
+            return false
+        }
+        return true
+    }
+
+    private func finishSession(_ state: CaptureSessionState) {
+        sessionTracker.finish(state)
     }
 }
 

@@ -13,4 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appController?.showSettings()
         return false
     }
+
+    func applicationWillTerminate(_: Notification) {
+        appController?.stop()
+    }
 }

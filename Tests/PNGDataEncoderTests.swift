@@ -11,6 +11,15 @@ final class PNGDataEncoderTests: XCTestCase {
         XCTAssertEqual(Array(data.prefix(8)), [137, 80, 78, 71, 13, 10, 26, 10])
     }
 
+    func testEncodeAsyncProducesPNGData() async throws {
+        let cgImage = makeCGImage(width: 2, height: 2)
+
+        let data = try await PNGDataEncoder.encodeAsync(cgImage: cgImage)
+
+        XCTAssertTrue(data.count > 8)
+        XCTAssertEqual(Array(data.prefix(8)), [137, 80, 78, 71, 13, 10, 26, 10])
+    }
+
     func testEncodeNSImageUsesLargestRepresentation() throws {
         let image = NSImage(size: NSSize(width: 2, height: 2))
         let smallRep = makeBitmapRep(width: 1, height: 1)

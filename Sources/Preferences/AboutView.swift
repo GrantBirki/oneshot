@@ -92,6 +92,9 @@ private struct UpdateCheckView: View {
             statusView
         }
         .padding(.top, 2)
+        .onChange(of: viewModel.state) { _, state in
+            announce(state)
+        }
     }
 
     @ViewBuilder
@@ -116,6 +119,20 @@ private struct UpdateCheckView: View {
             Text(message)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private func announce(_ state: UpdateCheckViewModel.State) {
+        switch state {
+        case .idle,
+             .checking:
+            return
+        case let .upToDate(version):
+            AccessibilityAnnouncer.announce("OneShot is up to date, \(version.displayValue)")
+        case let .updateAvailable(version, _):
+            AccessibilityAnnouncer.announce("OneShot \(version.displayValue) is available")
+        case let .failed(message):
+            AccessibilityAnnouncer.announce(message)
         }
     }
 }

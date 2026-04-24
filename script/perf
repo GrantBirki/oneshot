@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source script/env "$@"
+source "$DIR/script/lib/common.sh"
+
+require_macos error "Performance checks require macOS."
+require_tool xctrace "xctrace not found. Install Xcode."
+
+CONFIGURATION="${CONFIGURATION:-Release}"
+export CONFIGURATION
+
+script/build
+
+APP_NAME="${APP_NAME:-OneShot}"
+DERIVED_DATA="${DERIVED_DATA:-$DIR/build/DerivedData}"
+APP_PATH="$DERIVED_DATA/Build/Products/$CONFIGURATION/$APP_NAME.app"
+TRACE_DIR="${TRACE_DIR:-$DIR/build/perf}"
+RUN_SECONDS="${RUN_SECONDS:-30}"
+
+if [[ ! -d "$APP_PATH" ]]; then
+  echo -e "${RED}App not found at ${APP_PATH}.${OFF}"
+  exit 1
+fi
+
+mkdir -p "$TRACE_DIR"
+
+echo "Release app:"
+echo "$APP_PATH"
+echo
+echo "Manual scenario checklist:"
+echo "- Open settings and switch General, Capture, Output, Preview, Hotkeys, About."
+echo "- Capture selection, full screen, window, and scrolling screenshots."
+echo "- Hover preview controls, drag preview, save, trash, and open."
+echo
+echo "Recording Points of Interest for ${RUN_SECONDS}s..."
+open "$APP_PATH"
+xcrun xctrace record \
+  --template "Points of Interest" \
+  --time-limit "${RUN_SECONDS}s" \
+  --output "$TRACE_DIR/OneShot-$(date +%Y%m%d-%H%M%S).trace" \
+  --target "$APP_NAME"

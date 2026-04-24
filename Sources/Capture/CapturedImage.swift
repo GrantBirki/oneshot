@@ -12,4 +12,9 @@ struct CapturedImage {
         previewImage = NSImage(cgImage: cgImage, size: displaySize)
         pngData = try encoder(cgImage)
     }
+
+    init(cgImage: CGImage, displaySize: NSSize, pngData: Data) {
+        previewImage = NSImage(cgImage: cgImage, size: displaySize)
+        self.pngData = pngData
+    }
 }

@@ -26,9 +26,9 @@ final class PreviewContentView: NSView {
 
     #if DEBUG
         private enum Debug {
-            static let logHitTesting = true
-            static let logActions = true
-            static let logViewHierarchy = true
+            static let logHitTesting = ProcessInfo.processInfo.environment["ONESHOT_DEBUG_PREVIEW_HIT_TESTING"] == "1"
+            static let logActions = ProcessInfo.processInfo.environment["ONESHOT_DEBUG_PREVIEW_ACTIONS"] == "1"
+            static let logViewHierarchy = ProcessInfo.processInfo.environment["ONESHOT_DEBUG_PREVIEW_HIERARCHY"] == "1"
             @MainActor
             static var didLogViewHierarchy = false
         }
@@ -67,6 +67,7 @@ final class PreviewContentView: NSView {
     private var isHovered = false
     private var onClose: (() -> Void)?
     private var onTrash: (() -> Void)?
+    private var onOpen: (() -> Void)?
     private var onHoverChanged: ((Bool) -> Void)?
     private var onDragChanged: ((Bool) -> Void)?
     private var isActionOverlayActive: Bool {
@@ -203,6 +204,7 @@ extension PreviewContentView {
     func configure(with configuration: PreviewContentConfiguration) {
         onClose = configuration.onClose
         onTrash = configuration.onTrash
+        onOpen = configuration.onOpen
         onHoverChanged = configuration.onHoverChanged
         onDragChanged = configuration.onDragChanged
 
@@ -220,7 +222,7 @@ extension PreviewContentView {
                     logDebug("Tile clicked -> open")
                 }
             #endif
-            configuration.onOpen()
+            self?.onOpen?()
         }
         imageView.onDragStateChanged = { [weak self] dragging in
             guard let self else { return }
@@ -248,6 +250,10 @@ extension PreviewContentView {
 
     func performTrash() {
         handleTrash()
+    }
+
+    func performOpen() {
+        onOpen?()
     }
 
     @objc private func handleClose() {
@@ -287,7 +293,9 @@ private extension PreviewContentView {
         guard isHovered != hovered else { return }
         isHovered = hovered
         onHoverChanged?(hovered)
-        let duration = animated ? Layout.hoverFadeDuration : 0
+        let duration = animated && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            ? Layout.hoverFadeDuration
+            : 0
 
         if hovered {
             actionOverlayView.isHidden = false
