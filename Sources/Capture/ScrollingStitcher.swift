@@ -293,6 +293,10 @@ actor ScrollingStitcher {
         retainedByteCount
     }
 
+    func retainedSegmentHeightsForTesting() -> [Int] {
+        segments.map(\.image.height)
+    }
+
     private func releaseCapturedFrames() {
         segments.removeAll(keepingCapacity: false)
         previousAcceptedImage = nil

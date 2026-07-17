@@ -57,6 +57,7 @@ final class PreviewContentViewTests: XCTestCase {
             retryCount += 1
         }
         sut.view.layout()
+        sut.view.layoutSubtreeIfNeeded()
 
         let retryButton = try XCTUnwrap(
             sut.view.recursiveSubviews.compactMap { $0 as? NSButton }.first { $0.title == "Retry" },

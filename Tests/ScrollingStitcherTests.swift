@@ -158,7 +158,9 @@ final class ScrollingStitcherTests: XCTestCase {
 
         await stitcher.add(image)
         let stitchedByteCount = await stitcher.retainedByteCountForTesting()
-        XCTAssertEqual(stitchedByteCount, 96)
+        let retainedSegmentHeights = await stitcher.retainedSegmentHeightsForTesting()
+        XCTAssertGreaterThan(stitchedByteCount, initialByteCount)
+        XCTAssertEqual(retainedSegmentHeights, [4, 2])
 
         _ = await stitcher.finish()
         let finishedByteCount = await stitcher.retainedByteCountForTesting()
