@@ -59,8 +59,8 @@ final class PreviewDragPayloadTests: XCTestCase {
 
         let item = payload.makeDraggingItem(dragFrame: NSRect(x: 0, y: 0, width: 10, height: 10))
 
-        XCTAssertNotNil(item.item as? NSFilePromiseProvider)
-        XCTAssertEqual(payload.operationQueue(for: item.item as! NSFilePromiseProvider).maxConcurrentOperationCount, 1)
+        let provider = try XCTUnwrap(item.item as? NSFilePromiseProvider)
+        XCTAssertEqual(payload.operationQueue(for: provider).maxConcurrentOperationCount, 1)
         XCTAssertTrue(try (FileManager.default.contentsOfDirectory(atPath: tempDirectory.path)).isEmpty)
     }
 

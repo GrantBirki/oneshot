@@ -188,8 +188,10 @@ final class CaptureManager {
         sessionTracker.reset()
         updateScrollingCaptureState(isActive: false)
     }
+}
 
-    private func prepareForCapture(_ operation: @escaping @MainActor () -> Void) {
+private extension CaptureManager {
+    func prepareForCapture(_ operation: @escaping @MainActor () -> Void) {
         guard preparationTask == nil, sessionTracker.state == .idle else {
             rejectConcurrentCapture()
             return
@@ -204,7 +206,7 @@ final class CaptureManager {
         }
     }
 
-    private func startSelectionCapture() {
+    func startSelectionCapture() {
         guard beginSession(.selecting) else { return }
         AccessibilityAnnouncer.announce("Selection capture started")
         selectionOverlay.beginSelection(
@@ -237,7 +239,7 @@ final class CaptureManager {
         }
     }
 
-    private func startFullScreenCapture() {
+    func startFullScreenCapture() {
         guard beginSession(.processing) else { return }
         captureTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -255,7 +257,7 @@ final class CaptureManager {
         }
     }
 
-    private func startWindowCapture() {
+    func startWindowCapture() {
         guard beginSession(.windowSelecting) else { return }
         AccessibilityAnnouncer.announce("Window capture started")
         windowOverlay.beginSelection { [weak self] windowInfo in
@@ -280,7 +282,7 @@ final class CaptureManager {
         }
     }
 
-    private func startScrollingSelection() {
+    func startScrollingSelection() {
         guard beginSession(.selecting) else { return }
         AccessibilityAnnouncer.announce("Scrolling capture started. Scroll downward and use Stop when finished.")
         selectionOverlay.beginSelection(
@@ -340,7 +342,7 @@ final class CaptureManager {
         }
     }
 
-    private func finishScrollingCapture(_ result: ScrollingCaptureResult, anchorRect: CGRect) {
+    func finishScrollingCapture(_ result: ScrollingCaptureResult, anchorRect: CGRect) {
         scrollingOverlay.hide()
         updateScrollingCaptureState(isActive: false)
         finishSession(.scrolling)
@@ -377,7 +379,7 @@ final class CaptureManager {
         }
     }
 
-    private func handleCapture(_ image: CGImage, displaySize: NSSize, anchorRect: CGRect?) async {
+    func handleCapture(_ image: CGImage, displaySize: NSSize, anchorRect: CGRect?) async {
         let signpostID = AppSignpost.begin("Capture process")
         defer { AppSignpost.end("Capture process", id: signpostID) }
         do {
@@ -402,7 +404,7 @@ final class CaptureManager {
         }
     }
 
-    private func handleCaptureWithPreview(_ captured: CapturedImage, anchorRect: CGRect?) async {
+    func handleCaptureWithPreview(_ captured: CapturedImage, anchorRect: CGRect?) async {
         let previewTimeout = settings.previewTimeout
         let saveID = await outputCoordinator.begin(
             pngData: captured.pngData,
@@ -422,7 +424,7 @@ final class CaptureManager {
         }
     }
 
-    private func handleCaptureWithoutPreview(_ captured: CapturedImage, anchorRect: CGRect?) async {
+    func handleCaptureWithoutPreview(_ captured: CapturedImage, anchorRect: CGRect?) async {
         switch settings.previewDisabledOutputBehavior {
         case .saveToDisk:
             let saveID = await outputCoordinator.begin(pngData: captured.pngData, scheduleSave: false)
@@ -451,7 +453,7 @@ final class CaptureManager {
         }
     }
 
-    private func makePreviewRequest(
+    func makePreviewRequest(
         captured: CapturedImage,
         saveID: UUID,
         timeout: TimeInterval?,
@@ -528,23 +530,23 @@ final class CaptureManager {
         )
     }
 
-    private func saveAndComplete(id: UUID) async throws {
+    func saveAndComplete(id: UUID) async throws {
         _ = try await outputCoordinator.saveAndFinish(id: id)
         clearActiveOutput(id: id)
     }
 
-    private func discardAndComplete(id: UUID) async throws {
+    func discardAndComplete(id: UUID) async throws {
         try await outputCoordinator.discard(id: id)
         clearActiveOutput(id: id)
     }
 
-    private func clearActiveOutput(id: UUID) {
+    func clearActiveOutput(id: UUID) {
         if activeOutputID == id {
             activeOutputID = nil
         }
     }
 
-    private func chooseSaveURL() -> URL? {
+    func chooseSaveURL() -> URL? {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
         panel.canCreateDirectories = true
@@ -556,7 +558,7 @@ final class CaptureManager {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    private func displaySize(for image: CGImage, baseRect: CGRect) -> NSSize {
+    func displaySize(for image: CGImage, baseRect: CGRect) -> NSSize {
         guard baseRect.width > 0 else {
             return NSSize(width: image.width, height: image.height)
         }
@@ -565,17 +567,17 @@ final class CaptureManager {
         return NSSize(width: baseRect.width, height: height)
     }
 
-    private func updateScrollingCaptureState(isActive: Bool) {
+    func updateScrollingCaptureState(isActive: Bool) {
         onScrollingCaptureStateChange?(isActive)
     }
 
-    private func cancelScrollingPreparation() {
+    func cancelScrollingPreparation() {
         scrollingPreparationTask?.cancel()
         scrollingPreparationTask = nil
         scrollingPreparationID = nil
     }
 
-    private func beginSession(_ state: CaptureSessionState) -> Bool {
+    func beginSession(_ state: CaptureSessionState) -> Bool {
         guard sessionTracker.begin(state) else {
             rejectConcurrentCapture()
             return false
@@ -583,20 +585,20 @@ final class CaptureManager {
         return true
     }
 
-    private func finishSession(_ state: CaptureSessionState) {
+    func finishSession(_ state: CaptureSessionState) {
         sessionTracker.finish(state)
     }
 
-    private func rejectConcurrentCapture() {
+    func rejectConcurrentCapture() {
         NSSound.beep()
         AccessibilityAnnouncer.announce("OneShot is already capturing or resolving a screenshot")
     }
 
-    private func presentCaptureFailure(_ message: String) {
+    func presentCaptureFailure(_ message: String) {
         UserErrorPresenter.showCaptureFailure(message)
     }
 
-    private func waitForTask(_ task: Task<Void, Never>, timeout: Duration) async -> Bool {
+    func waitForTask(_ task: Task<Void, Never>, timeout: Duration) async -> Bool {
         await TaskCompletionRace.wait(for: task, timeout: timeout)
     }
 }
