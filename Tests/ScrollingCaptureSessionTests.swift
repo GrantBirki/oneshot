@@ -4,26 +4,25 @@ import XCTest
 
 @MainActor
 final class ScrollingCaptureSessionTests: XCTestCase {
-    func testScrollingCaptureWaitsForStitchingBeforeCapturingNextFrame() async {
+    func testScrollingCaptureWaitsForFrameBeforeCapturingNextFrame() async {
         let probe = ScrollingCaptureProbe()
         let finished = expectation(description: "Scrolling capture finished")
-        var finalImage: CGImage?
-        let session = ScrollingCaptureSession(captureInterval: 0.001) { rect in
+        let session = ScrollingCaptureSession(clock: .immediateForTesting) { rect in
             await probe.capture(rect: rect)
         }
 
-        session.start(rect: CGRect(x: 0, y: 0, width: 4, height: 4)) { image in
-            finalImage = image
+        session.start(rect: CGRect(x: 0, y: 0, width: 4, height: 4)) { result in
+            XCTAssertEqual(result.reason, .userStopped)
+            XCTAssertNotNil(result.image)
             finished.fulfill()
         }
 
-        try? await Task.sleep(nanoseconds: 160_000_000)
+        await probe.waitForCaptures(3)
         session.stop()
 
         await fulfillment(of: [finished], timeout: 2)
         let snapshot = await probe.snapshot()
-        XCTAssertNotNil(finalImage)
-        XCTAssertGreaterThanOrEqual(snapshot.captures, 1)
+        XCTAssertGreaterThanOrEqual(snapshot.captures, 3)
         XCTAssertEqual(snapshot.maxInFlight, 1)
     }
 
@@ -31,8 +30,11 @@ final class ScrollingCaptureSessionTests: XCTestCase {
         let factory = ScrollingFrameCaptureFactory()
         let finished = expectation(description: "Scrolling capture finished")
         let rect = CGRect(x: 10, y: 20, width: 40, height: 50)
-        let stitcher = ScrollingStitcher(offsetCalculator: SessionOffsetCalculator(offset: 0))
-        let session = ScrollingCaptureSession(captureInterval: 0.001, stitcher: stitcher) { rect in
+        let stitcher = ScrollingStitcher(offsetCalculator: SessionOffsetCalculator(vertical: 0))
+        let session = ScrollingCaptureSession(
+            stitcher: stitcher,
+            clock: .immediateForTesting,
+        ) { rect in
             await factory.make(rect: rect)
         }
 
@@ -40,22 +42,104 @@ final class ScrollingCaptureSessionTests: XCTestCase {
             finished.fulfill()
         }
 
-        try? await Task.sleep(nanoseconds: 260_000_000)
+        await factory.waitForFrames(3)
         session.stop()
 
         await fulfillment(of: [finished], timeout: 2)
         let snapshot = await factory.snapshot()
         XCTAssertEqual(snapshot.factoryCalls, 1)
-        XCTAssertGreaterThanOrEqual(snapshot.frameCalls, 2)
+        XCTAssertGreaterThanOrEqual(snapshot.frameCalls, 3)
         XCTAssertEqual(snapshot.lastRect, rect)
+    }
+
+    func testScrollingCaptureStopsAfterFiveFrameFailures() async {
+        let finished = expectation(description: "Scrolling capture failed")
+        let session = ScrollingCaptureSession(
+            clock: .immediateForTesting,
+            captureImage: { _ in nil },
+        )
+
+        session.start(rect: CGRect(x: 0, y: 0, width: 4, height: 4)) { result in
+            XCTAssertEqual(result.reason, .captureFailed)
+            XCTAssertNil(result.image)
+            finished.fulfill()
+        }
+
+        await fulfillment(of: [finished], timeout: 2)
+    }
+
+    func testScrollingCaptureStopsAfterFiveRegistrationFailuresWithBestImage() async {
+        let finished = expectation(description: "Scrolling registration failed")
+        let stitcher = ScrollingStitcher(offsetCalculator: SessionOffsetCalculator(vertical: nil))
+        let session = ScrollingCaptureSession(
+            stitcher: stitcher,
+            clock: .immediateForTesting,
+        ) { _ in
+            makeSolidProbeImage()
+        }
+
+        session.start(rect: CGRect(x: 0, y: 0, width: 4, height: 4)) { result in
+            XCTAssertEqual(result.reason, .captureFailed)
+            XCTAssertNotNil(result.image)
+            finished.fulfill()
+        }
+
+        await fulfillment(of: [finished], timeout: 2)
+    }
+
+    func testScrollingCaptureReportsLimitAndReturnsBestImage() async {
+        let finished = expectation(description: "Scrolling capture reached limit")
+        let stitcher = ScrollingStitcher(
+            offsetCalculator: SessionOffsetCalculator(vertical: 2),
+            maxPixelCount: 20,
+        )
+        let session = ScrollingCaptureSession(
+            stitcher: stitcher,
+            clock: .immediateForTesting,
+        ) { _ in
+            makeSolidProbeImage()
+        }
+
+        session.start(rect: CGRect(x: 0, y: 0, width: 4, height: 4)) { result in
+            XCTAssertEqual(result.reason, .limitReached)
+            XCTAssertEqual(result.image?.height, 4)
+            finished.fulfill()
+        }
+
+        await fulfillment(of: [finished], timeout: 2)
+    }
+
+    func testScrollingCaptureCancelUsesCancelledReason() async {
+        let probe = ScrollingCaptureProbe()
+        let finished = expectation(description: "Scrolling capture cancelled")
+        let session = ScrollingCaptureSession(clock: .immediateForTesting) { rect in
+            await probe.capture(rect: rect)
+        }
+
+        session.start(rect: CGRect(x: 0, y: 0, width: 4, height: 4)) { result in
+            XCTAssertEqual(result.reason, .cancelled)
+            finished.fulfill()
+        }
+
+        await probe.waitForCaptures(1)
+        session.cancel()
+
+        await fulfillment(of: [finished], timeout: 2)
     }
 }
 
-private struct SessionOffsetCalculator: ScrollingOffsetCalculating {
-    let offset: CGFloat?
+private extension ScrollingSessionClock {
+    static let immediateForTesting = ScrollingSessionClock(
+        now: { ContinuousClock().now },
+        sleep: { _ in await Task.yield() },
+    )
+}
 
-    func verticalOffset(from _: CGImage, to _: CGImage) -> CGFloat? {
-        offset
+private struct SessionOffsetCalculator: ScrollingOffsetCalculating {
+    let vertical: CGFloat?
+
+    mutating func offset(from _: CGImage, to _: CGImage) -> ScrollingOffset? {
+        vertical.map { ScrollingOffset(horizontal: 0, vertical: $0) }
     }
 }
 
@@ -63,22 +147,33 @@ private actor ScrollingCaptureProbe {
     private var captures = 0
     private var inFlight = 0
     private var maxInFlight = 0
+    private var waiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
     func capture(rect _: CGRect) async -> CGImage? {
         captures += 1
         inFlight += 1
         maxInFlight = max(maxInFlight, inFlight)
-        try? await Task.sleep(nanoseconds: 40_000_000)
+        resumeSatisfiedWaiters()
+        await Task.yield()
         inFlight -= 1
-        return makeProbeImage()
+        return makeSolidProbeImage()
+    }
+
+    func waitForCaptures(_ count: Int) async {
+        guard captures < count else { return }
+        await withCheckedContinuation { continuation in
+            waiters.append((count, continuation))
+        }
     }
 
     func snapshot() -> (captures: Int, maxInFlight: Int) {
         (captures, maxInFlight)
     }
 
-    private func makeProbeImage() -> CGImage {
-        makeSolidProbeImage()
+    private func resumeSatisfiedWaiters() {
+        let satisfied = waiters.filter { captures >= $0.count }
+        waiters.removeAll { captures >= $0.count }
+        satisfied.forEach { $0.continuation.resume() }
     }
 }
 
@@ -92,6 +187,7 @@ private actor ScrollingFrameCaptureFactory {
     private var factoryCalls = 0
     private var frameCalls = 0
     private var lastRect: CGRect?
+    private var waiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
     func make(rect: CGRect) -> ScrollingFrameCapture? {
         factoryCalls += 1
@@ -101,12 +197,22 @@ private actor ScrollingFrameCaptureFactory {
         }
     }
 
+    func waitForFrames(_ count: Int) async {
+        guard frameCalls < count else { return }
+        await withCheckedContinuation { continuation in
+            waiters.append((count, continuation))
+        }
+    }
+
     func snapshot() -> Snapshot {
         Snapshot(factoryCalls: factoryCalls, frameCalls: frameCalls, lastRect: lastRect)
     }
 
     private func capture() -> CGImage {
         frameCalls += 1
+        let satisfied = waiters.filter { frameCalls >= $0.count }
+        waiters.removeAll { frameCalls >= $0.count }
+        satisfied.forEach { $0.continuation.resume() }
         return makeSolidProbeImage()
     }
 }

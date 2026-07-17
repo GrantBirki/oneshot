@@ -2,20 +2,47 @@ import AppKit
 
 typealias ScrollingFrameCapture = @Sendable () async -> CGImage?
 
+enum ScrollingCompletionReason: Equatable, Sendable {
+    case userStopped
+    case limitReached
+    case captureFailed
+    case cancelled
+}
+
+struct ScrollingCaptureResult: @unchecked Sendable {
+    let image: CGImage?
+    let reason: ScrollingCompletionReason
+}
+
+struct ScrollingSessionClock: Sendable {
+    let now: @Sendable () -> ContinuousClock.Instant
+    let sleep: @Sendable (Duration) async -> Void
+
+    static let continuous = ScrollingSessionClock(
+        now: { ContinuousClock.now },
+        sleep: { duration in
+            try? await Task.sleep(for: duration)
+        },
+    )
+}
+
 @MainActor
 final class ScrollingCaptureSession {
-    private let targetFrameInterval: TimeInterval
+    private let targetFrameInterval: Duration
+    private let maximumConsecutiveFailures: Int
     private let stitcher: ScrollingStitcher
     private let makeFrameCapture: @Sendable (CGRect) async -> ScrollingFrameCapture?
+    private let clock: ScrollingSessionClock
     private var captureTask: Task<Void, Never>?
     private var captureRect: CGRect = .zero
-    private var onFinish: ((CGImage?) -> Void)?
-    private var keyMonitor: EventMonitor?
-    private var globalKeyMonitor: EventMonitor?
+    private var onFinish: ((ScrollingCaptureResult) -> Void)?
+    private var requestedCompletionReason: ScrollingCompletionReason?
 
     init(
         captureInterval: TimeInterval = 0.1,
+        maximumConsecutiveFailures: Int = 5,
         stitcher: ScrollingStitcher = ScrollingStitcher(),
+        clock: ScrollingSessionClock = .continuous,
         makeFrameCapture: @escaping @Sendable (CGRect) async -> ScrollingFrameCapture? = { rect in
             guard let context = await ScreenCaptureService.makeScrollingCaptureContext(rect: rect) else {
                 return nil
@@ -25,17 +52,29 @@ final class ScrollingCaptureSession {
             }
         },
     ) {
-        targetFrameInterval = max(captureInterval, 0.1)
+        let sanitizedInterval = captureInterval.isFinite
+            ? min(max(captureInterval, 0.1), 3600)
+            : 0.1
+        targetFrameInterval = .nanoseconds(Int64((sanitizedInterval * 1_000_000_000).rounded()))
+        self.maximumConsecutiveFailures = max(1, maximumConsecutiveFailures)
         self.stitcher = stitcher
+        self.clock = clock
         self.makeFrameCapture = makeFrameCapture
     }
 
     convenience init(
         captureInterval: TimeInterval = 0.1,
+        maximumConsecutiveFailures: Int = 5,
         stitcher: ScrollingStitcher = ScrollingStitcher(),
+        clock: ScrollingSessionClock = .continuous,
         captureImage: @escaping @Sendable (CGRect) async -> CGImage?,
     ) {
-        self.init(captureInterval: captureInterval, stitcher: stitcher) { rect in
+        self.init(
+            captureInterval: captureInterval,
+            maximumConsecutiveFailures: maximumConsecutiveFailures,
+            stitcher: stitcher,
+            clock: clock,
+        ) { rect in
             {
                 await captureImage(rect)
             }
@@ -46,95 +85,111 @@ final class ScrollingCaptureSession {
         captureTask != nil
     }
 
-    func start(rect: CGRect, onFinish: @escaping (CGImage?) -> Void) {
-        guard captureTask == nil else { return }
-        startKeyMonitor()
+    @discardableResult
+    func start(rect: CGRect, onFinish: @escaping (ScrollingCaptureResult) -> Void) -> Bool {
+        guard captureTask == nil else { return false }
         captureRect = rect
         self.onFinish = onFinish
+        requestedCompletionReason = nil
         AccessibilityAnnouncer.announce("Scrolling capture started")
         captureTask = Task(priority: .userInitiated) { [weak self] in
             await self?.captureLoop()
         }
+        return true
+    }
+
+    @discardableResult
+    func start(rect: CGRect, onFinish: @escaping (CGImage?) -> Void) -> Bool {
+        start(rect: rect) { result in
+            onFinish(result.reason == .cancelled ? nil : result.image)
+        }
     }
 
     func stop() {
-        stopKeyMonitor()
+        requestStop(reason: .userStopped)
+    }
+
+    func cancel() {
+        requestStop(reason: .cancelled)
+    }
+
+    private func requestStop(reason: ScrollingCompletionReason) {
+        guard captureTask != nil else { return }
+        requestedCompletionReason = reason
         captureTask?.cancel()
     }
 
     private func captureLoop() async {
         await stitcher.reset()
         guard let captureFrame = await makeFrameCapture(captureRect), !Task.isCancelled else {
-            finish(with: nil)
+            finish(with: nil, reason: requestedCompletionReason ?? .captureFailed)
             return
         }
 
+        var consecutiveFailures = 0
+        var completionReason: ScrollingCompletionReason?
+
         while !Task.isCancelled {
-            let start = Date()
+            let startedAt = clock.now()
             if let image = await captureFrame(), !Task.isCancelled {
                 let status = await stitcher.add(image)
-                if status == .limitReached {
-                    break
+                switch status {
+                case .accepted,
+                     .ignored(.noMovement),
+                     .ignored(.reverseMovement),
+                     .ignored(.horizontalDrift),
+                     .ignored(.discontinuousMovement):
+                    consecutiveFailures = 0
+                case .ignored(.registrationFailed), .ignored(.incompatibleFrame):
+                    consecutiveFailures += 1
+                case .limitReached:
+                    completionReason = .limitReached
                 }
+            } else if !Task.isCancelled {
+                consecutiveFailures += 1
             }
-            await sleepAfterFrame(startedAt: start)
+
+            if completionReason != nil {
+                break
+            }
+            if consecutiveFailures >= maximumConsecutiveFailures {
+                AppLog.capture.warning("Scrolling capture stopped after repeated frame failures")
+                completionReason = .captureFailed
+                break
+            }
+            await sleepAfterFrame(startedAt: startedAt)
         }
 
         let signpostID = AppSignpost.begin("Scrolling final composition")
         let finalImage = await stitcher.finish()
         AppSignpost.end("Scrolling final composition", id: signpostID)
-        finish(with: finalImage)
+        let reason = completionReason ?? requestedCompletionReason ?? .cancelled
+        finish(with: finalImage, reason: reason)
     }
 
-    private func sleepAfterFrame(startedAt start: Date) async {
-        let elapsed = Date().timeIntervalSince(start)
+    private func sleepAfterFrame(startedAt: ContinuousClock.Instant) async {
+        let elapsed = startedAt.duration(to: clock.now())
         let remaining = targetFrameInterval - elapsed
-        guard remaining > 0 else { return }
-        try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+        guard remaining > .zero else { return }
+        await clock.sleep(remaining)
     }
 
-    private func finish(with image: CGImage?) {
-        stopKeyMonitor()
+    private func finish(with image: CGImage?, reason: ScrollingCompletionReason) {
         let callback = onFinish
         onFinish = nil
         captureTask = nil
-        AccessibilityAnnouncer.announce("Scrolling capture stopped")
-        callback?(image)
-    }
+        requestedCompletionReason = nil
 
-    private func startKeyMonitor() {
-        if keyMonitor == nil {
-            keyMonitor = EventMonitor(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-                let shouldCancel = event.keyCode == KeyboardKeyCode.escape
-                let handled = MainActor.assumeIsolated {
-                    if shouldCancel {
-                        self?.stop()
-                        return true
-                    }
-                    return false
-                }
-                return handled ? nil : event
-            })
+        switch reason {
+        case .limitReached:
+            AccessibilityAnnouncer.announce("Scrolling capture stopped at the size limit")
+        case .captureFailed:
+            AccessibilityAnnouncer.announce("Scrolling capture stopped after repeated capture failures")
+        case .userStopped:
+            AccessibilityAnnouncer.announce("Scrolling capture stopped")
+        case .cancelled:
+            break
         }
-
-        if globalKeyMonitor == nil {
-            let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-                let keyCode = event.keyCode
-                if keyCode == KeyboardKeyCode.escape {
-                    DispatchQueue.main.async {
-                        self?.stop()
-                    }
-                }
-            }
-            globalKeyMonitor = EventMonitor(monitor)
-        }
-    }
-
-    private func stopKeyMonitor() {
-        keyMonitor?.cancel()
-        keyMonitor = nil
-
-        globalKeyMonitor?.cancel()
-        globalKeyMonitor = nil
+        callback?(ScrollingCaptureResult(image: image, reason: reason))
     }
 }

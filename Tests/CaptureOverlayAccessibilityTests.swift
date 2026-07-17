@@ -31,9 +31,61 @@ final class CaptureOverlayAccessibilityTests: XCTestCase {
         XCTAssertEqual(view.accessibilityLabel(), "Window capture overlay")
         XCTAssertEqual(
             view.accessibilityHelp(),
-            "Move the pointer over a window and click to capture it. Press Escape to cancel.",
+            "Move the pointer over a window and click or press Return to capture it. Press Escape to cancel.",
         )
         XCTAssertEqual(view.accessibilityValue() as? String, "No window selected")
+    }
+
+    func testWindowInfoUsesOwnerAndTitleForAccessibility() {
+        let info = WindowInfo(
+            id: 42,
+            bounds: CGRect(x: 10, y: 20, width: 100, height: 80),
+            ownerName: "Example App",
+            title: "Example Document",
+        )
+
+        XCTAssertEqual(info.accessibilityName, "Example App: Example Document")
+    }
+
+    func testWindowHitTestingPreservesFrontToBackOrder() {
+        let front = WindowInfo(id: 1, bounds: CGRect(x: 0, y: 0, width: 100, height: 100))
+        let back = WindowInfo(id: 2, bounds: CGRect(x: 0, y: 0, width: 200, height: 200))
+
+        XCTAssertEqual(
+            WindowInfoProvider.window(at: CGPoint(x: 50, y: 50), in: [front, back]),
+            front,
+        )
+    }
+
+    func testWindowOverlayUsesSnapshotUntilExplicitRefresh() {
+        let initial = WindowInfo(
+            id: 1,
+            bounds: CGRect(x: 0, y: 0, width: 100, height: 100),
+            ownerName: "Initial App",
+        )
+        let refreshed = WindowInfo(
+            id: 2,
+            bounds: CGRect(x: 0, y: 0, width: 100, height: 100),
+            ownerName: "Refreshed App",
+        )
+        var refreshCount = 0
+        let view = WindowCaptureOverlayView(
+            frame: CGRect(x: 0, y: 0, width: 100, height: 100),
+            windowInfos: [initial],
+            refreshWindowInfos: {
+                refreshCount += 1
+                return [refreshed]
+            },
+        )
+
+        view.updateHighlight(at: CGPoint(x: 50, y: 50))
+        view.updateHighlight(at: CGPoint(x: 60, y: 60))
+        XCTAssertEqual(refreshCount, 0)
+        XCTAssertEqual(view.accessibilityValue() as? String, "Initial App")
+
+        view.updateHighlight(at: CGPoint(x: 50, y: 50), refreshing: true)
+        XCTAssertEqual(refreshCount, 1)
+        XCTAssertEqual(view.accessibilityValue() as? String, "Refreshed App")
     }
 
     func testScrollingOverlayExposesAccessibleRegionAndStopControl() throws {
