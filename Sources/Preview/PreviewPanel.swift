@@ -3,25 +3,30 @@ import AppKit
 @MainActor
 final class PreviewPanel: NSPanel {
     private let content: PreviewContentView
+    private let imageSize: NSSize
     private var keyMonitor: EventMonitor?
-    private var globalKeyMonitor: EventMonitor?
 
     private enum Layout {
         static let padding: CGFloat = 16
-        static let desiredPixelSize = CGSize(width: 600, height: 500)
+        static let minimumSize = NSSize(width: 160, height: 120)
+        static let maximumSize = NSSize(width: 300, height: 250)
+        static let maximumScreenFraction: CGFloat = 0.4
     }
 
     init(
         image: NSImage,
         pngData: Data,
         filenamePrefix: String,
-        onClose: @escaping () -> Void,
-        onTrash: @escaping () -> Void,
+        onSave: @escaping () -> Void,
+        onDiscard: @escaping () -> Void,
         onOpen: @escaping () -> Void,
+        onSaveAs: @escaping () -> Void,
+        onCopy: @escaping () -> Void,
         onHoverChanged: @escaping (Bool) -> Void,
         onDragChanged: @escaping (Bool) -> Void,
     ) {
-        let size = PreviewPanel.defaultSize()
+        imageSize = image.size
+        let size = Layout.maximumSize
         content = PreviewContentView(frame: NSRect(origin: .zero, size: size))
         content.autoresizingMask = [.width, .height]
         super.init(
@@ -32,6 +37,7 @@ final class PreviewPanel: NSPanel {
         )
 
         isFloatingPanel = true
+        becomesKeyOnlyIfNeeded = true
         level = .statusBar
         isOpaque = false
         backgroundColor = .clear
@@ -43,9 +49,11 @@ final class PreviewPanel: NSPanel {
             image: image,
             pngData: pngData,
             filenamePrefix: filenamePrefix,
-            onClose: onClose,
-            onTrash: onTrash,
+            onSave: onSave,
+            onDiscard: onDiscard,
             onOpen: onOpen,
+            onSaveAs: onSaveAs,
+            onCopy: onCopy,
             onHoverChanged: onHoverChanged,
             onDragChanged: onDragChanged,
         )
@@ -53,10 +61,21 @@ final class PreviewPanel: NSPanel {
         contentView = content
     }
 
+    override var canBecomeKey: Bool {
+        true
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown || event.type == .rightMouseDown {
+            makeKey()
+        }
+        super.sendEvent(event)
+    }
+
     func show(on screen: NSScreen?) {
         guard let screen = screen ?? PreviewPanel.targetScreen() else {
             center()
-            makeKeyAndOrderFront(nil)
+            orderFrontRegardless()
             startKeyMonitor()
             return
         }
@@ -67,10 +86,17 @@ final class PreviewPanel: NSPanel {
             width: max(safeFrame.width - padding * 2, 1),
             height: max(safeFrame.height - padding * 2, 1),
         )
-        let desiredSize = PreviewPanel.desiredSize(for: screen)
-        let targetSize = NSSize(
-            width: min(desiredSize.width, availableSize.width),
-            height: min(desiredSize.height, availableSize.height),
+        let screenMaximum = NSSize(
+            width: min(Layout.maximumSize.width, safeFrame.width * Layout.maximumScreenFraction),
+            height: min(Layout.maximumSize.height, safeFrame.height * Layout.maximumScreenFraction),
+        )
+        let targetSize = PreviewPanel.preferredSize(
+            imageSize: imageSize,
+            minimumSize: Layout.minimumSize,
+            maximumSize: NSSize(
+                width: min(screenMaximum.width, availableSize.width),
+                height: min(screenMaximum.height, availableSize.height),
+            ),
         )
         let contentRect = NSRect(origin: .zero, size: targetSize)
         content.frame = contentRect
@@ -98,7 +124,6 @@ final class PreviewPanel: NSPanel {
         let targetFrame = NSRect(origin: origin, size: frame.size)
         setFrame(targetFrame, display: false)
         orderFrontRegardless()
-        // AppKit can apply intrinsic sizing on first display; re-apply the fixed frame.
         setFrame(targetFrame, display: false)
         startKeyMonitor()
     }
@@ -108,49 +133,60 @@ final class PreviewPanel: NSPanel {
         super.close()
     }
 
-    private func startKeyMonitor() {
-        if keyMonitor == nil {
-            keyMonitor = EventMonitor(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-                let keyCode = event.keyCode
-                let modifiers = event.modifierFlags
-                let handled = MainActor.assumeIsolated {
-                    guard let self else { return false }
-                    return self.handleKeyCode(keyCode, modifiers: modifiers)
-                }
-                return handled ? nil : event
-            })
-        }
+    func showRecovery(message: String, onRetry: @escaping () -> Void) {
+        content.showRecovery(message: message, onRetry: onRetry)
+    }
 
-        if globalKeyMonitor == nil {
-            let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-                let keyCode = event.keyCode
-                let modifiers = event.modifierFlags
-                DispatchQueue.main.async { [weak self] in
-                    guard let self else { return }
-                    guard !NSApp.isActive else { return }
-                    _ = handleKeyCode(keyCode, modifiers: modifiers)
-                }
+    func showOpenRecovery(
+        message: String,
+        onRetryOpen: @escaping () -> Void,
+        onReveal: @escaping () -> Void,
+        onDismiss: @escaping () -> Void,
+    ) {
+        content.showOpenRecovery(
+            message: message,
+            onRetryOpen: onRetryOpen,
+            onReveal: onReveal,
+            onDismiss: onDismiss,
+        )
+    }
+
+    func clearRecovery() {
+        content.clearRecovery()
+    }
+
+    func showStatus(message: String) {
+        content.showStatus(message: message)
+    }
+
+    func setBusy(_ busy: Bool) {
+        content.setBusy(busy)
+    }
+
+    func setSavedState(_ saved: Bool) {
+        content.setSavedState(saved)
+    }
+
+    private func startKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = EventMonitor(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+            let handled = MainActor.assumeIsolated {
+                guard let self, self.isKeyWindow else { return false }
+                return self.handleKeyCode(event.keyCode, modifiers: event.modifierFlags)
             }
-            globalKeyMonitor = EventMonitor(monitor)
-        }
+            return handled ? nil : event
+        })
     }
 
     private func stopKeyMonitor() {
         keyMonitor?.cancel()
         keyMonitor = nil
-
-        globalKeyMonitor?.cancel()
-        globalKeyMonitor = nil
-    }
-
-    private func handleKeyEvent(_ event: NSEvent) -> Bool {
-        handleKeyCode(event.keyCode, modifiers: event.modifierFlags)
     }
 
     private func handleKeyCode(_ keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
-        guard isVisible else { return false }
+        guard isVisible, isKeyWindow else { return false }
         if keyCode == KeyboardKeyCode.escape {
-            content.performClose()
+            content.performSave()
             return true
         }
         if keyCode == KeyboardKeyCode.returnKey || keyCode == KeyboardKeyCode.keypadEnter {
@@ -158,24 +194,34 @@ final class PreviewPanel: NSPanel {
             return true
         }
         if keyCode == KeyboardKeyCode.delete, modifiers.contains(.command) {
-            content.performTrash()
+            content.performDiscard()
             return true
         }
         return false
     }
 
-    private static func desiredSize(for screen: NSScreen) -> NSSize {
-        let rect = NSRect(origin: .zero, size: Layout.desiredPixelSize)
-        return screen.convertRectFromBacking(rect).size
-    }
-
-    private static func defaultSize() -> NSSize {
-        if let screen = NSScreen.main {
-            return desiredSize(for: screen)
+    static func preferredSize(
+        imageSize: NSSize,
+        minimumSize: NSSize,
+        maximumSize: NSSize,
+    ) -> NSSize {
+        let maximumWidth = max(maximumSize.width, 1)
+        let maximumHeight = max(maximumSize.height, 1)
+        guard imageSize.width > 0, imageSize.height > 0 else {
+            return NSSize(width: maximumWidth, height: maximumHeight)
         }
+
+        let imageAspect = imageSize.width / imageSize.height
+        var width = maximumWidth
+        var height = width / imageAspect
+        if height > maximumHeight {
+            height = maximumHeight
+            width = height * imageAspect
+        }
+
         return NSSize(
-            width: Layout.desiredPixelSize.width,
-            height: Layout.desiredPixelSize.height,
+            width: min(max(width, min(minimumSize.width, maximumWidth)), maximumWidth),
+            height: min(max(height, min(minimumSize.height, maximumHeight)), maximumHeight),
         )
     }
 

@@ -9,7 +9,7 @@ source script/env "$@"
 source "$DIR/script/lib/common.sh"
 
 require_macos error "Release requires macOS."
-require_tool xcodebuild "xcodebuild not found. Install Xcode or Command Line Tools."
+require_full_xcode
 require_tool ditto "ditto not found."
 set_xcodebuild_vars
 
@@ -26,6 +26,7 @@ fi
 echo -e "Release version: ${BLUE}${VERSION}${OFF}"
 
 script/package
+script/verify-package
 
 SHA_FILE="$DIR/dist/${APP_NAME}.zip.sha256"
 if [[ ! -f "$SHA_FILE" ]]; then

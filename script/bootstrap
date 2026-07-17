@@ -8,96 +8,9 @@ source "$DIR/script/lib/common.sh"
 echo -e "${BLUE}🥾 Bootstrapping...${OFF}"
 
 require_macos skip "Skipping bootstrap on non-macOS host."
-
-if ! xcode-select -p >/dev/null 2>&1; then
-  echo -e "${RED}Xcode Command Line Tools not found.${OFF}"
-  echo "Run: xcode-select --install"
-  exit 1
-fi
-
-require_tool brew "Homebrew not found. Install from https://brew.sh/"
-
-export HOMEBREW_NO_AUTO_UPDATE=1
-export HOMEBREW_NO_INSTALL_CLEANUP=1
-
-XCODEGEN_VERSION="${XCODEGEN_VERSION:-2.45.4}"
-XCODEGEN_COMPAT_PREFIX="${XCODEGEN_COMPAT_PREFIX:-2.45.}"
-SWIFTLINT_VERSION="${SWIFTLINT_VERSION:-0.63.2}"
-SWIFTLINT_COMPAT_PREFIX="${SWIFTLINT_COMPAT_PREFIX:-0.63.}"
-SWIFTFORMAT_VERSION="${SWIFTFORMAT_VERSION:-0.61.0}"
-
-deps=(
-  xcodegen
-  swiftlint
-  swiftformat
-)
-versions=(
-  "$XCODEGEN_VERSION"
-  "$SWIFTLINT_VERSION"
-  "$SWIFTFORMAT_VERSION"
-)
-compat_prefixes=(
-  "$XCODEGEN_COMPAT_PREFIX"
-  "$SWIFTLINT_COMPAT_PREFIX"
-  ""
-)
-
-installed_version() {
-  brew list --versions "$1" 2>/dev/null | awk '{print $2}'
-}
-
-ensure_brew_dep() {
-  local dep="$1"
-  local required_version="$2"
-  local compatible_prefix="${3:-}"
-  local current_version=""
-
-  if brew list --formula "$dep" >/dev/null 2>&1; then
-    current_version="$(installed_version "$dep")"
-    if [[ "$current_version" == "$required_version" ]]; then
-      echo -e "${GREEN}OK${OFF} - $dep $current_version"
-      return 0
-    fi
-    if [[ -n "$compatible_prefix" && "$current_version" == "$compatible_prefix"* ]]; then
-      echo -e "${YELLOW}OK${OFF} - $dep $current_version (compatible with ${compatible_prefix}*)"
-      return 0
-    fi
-
-    echo -e "${RED}Version mismatch for ${dep}.${OFF}"
-    echo "Installed: $current_version"
-    echo "Required:  $required_version"
-    if [[ -n "$compatible_prefix" ]]; then
-      echo "Compatible: ${compatible_prefix}*"
-    fi
-    echo "Run: brew upgrade $dep (or update pinned versions in script/bootstrap)."
-    exit 1
-  fi
-
-  echo -e "${BLUE}Installing${OFF} - $dep $required_version"
-  brew install "$dep"
-
-  current_version="$(installed_version "$dep")"
-  if [[ "$current_version" != "$required_version" ]]; then
-    if [[ -n "$compatible_prefix" && "$current_version" == "$compatible_prefix"* ]]; then
-      return 0
-    fi
-    echo -e "${RED}Version mismatch for ${dep}.${OFF}"
-    echo "Installed: $current_version"
-    echo "Required:  $required_version"
-    if [[ -n "$compatible_prefix" ]]; then
-      echo "Compatible: ${compatible_prefix}*"
-    fi
-    echo "Update pinned versions in script/bootstrap."
-    exit 1
-  fi
-}
-
-for index in "${!deps[@]}"; do
-  ensure_brew_dep "${deps[$index]}" "${versions[$index]}" "${compat_prefixes[$index]}"
-done
+require_full_xcode
+install_pinned_tools
 
 generate_xcodeproj
-
-swift build
 
 echo -e "${GREEN}✅ Bootstrap complete!${OFF}"

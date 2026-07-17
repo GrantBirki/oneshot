@@ -46,14 +46,17 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
-      - name: install xcodegen
-        run: |
-          export HOMEBREW_NO_AUTO_UPDATE=1
-          export HOMEBREW_NO_INSTALL_CLEANUP=1
-          brew install xcodegen
+      - name: bootstrap
+        run: script/bootstrap
+
+      - name: test
+        run: script/test
 
       - name: package
         run: script/package
+
+      - name: verify package
+        run: script/verify-package
 
       - name: scan artifact for tokens
         run: |
@@ -97,6 +100,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # pin@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@8.0.1
         with:
@@ -219,18 +223,6 @@ jobs:
             depends_on macos: ">= :tahoe"
 
             app "OneShot.app"
-
-            postflight do
-              result = system_command(
-                "/usr/bin/xattr",
-                args:         ["-dr", "com.apple.quarantine", "#{appdir}/OneShot.app"],
-                print_stderr: true,
-              )
-              unless result.success?
-                opoo "Failed to clear quarantine automatically. " \
-                     "You can run: `xattr -dr com.apple.quarantine #{appdir}/OneShot.app`"
-              end
-            end
 
             zap trash: [
               "~/Library/Preferences/com.grantbirki.oneshot.plist",

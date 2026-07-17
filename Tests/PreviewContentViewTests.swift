@@ -50,6 +50,60 @@ final class PreviewContentViewTests: XCTestCase {
         XCTAssertTrue(hitImage is PreviewImageView)
     }
 
+    func testRecoveryButtonsRemainInteractiveAboveImage() throws {
+        let sut = try makeSUT()
+        var retryCount = 0
+        sut.view.showRecovery(message: "The screenshot could not be saved.") {
+            retryCount += 1
+        }
+        sut.view.layout()
+        sut.view.layoutSubtreeIfNeeded()
+
+        let retryButton = try XCTUnwrap(
+            sut.view.recursiveSubviews.compactMap { $0 as? NSButton }.first { $0.title == "Retry" },
+        )
+        let retryFrame = retryButton.convert(retryButton.bounds, to: sut.view)
+        let retryPoint = NSPoint(x: retryFrame.midX, y: retryFrame.midY)
+
+        XCTAssertTrue(sut.view.hitTest(retryPoint) === retryButton)
+        retryButton.performClick(nil)
+        XCTAssertEqual(retryCount, 1)
+    }
+
+    func testOpenRecoveryProvidesRetryRevealAndDismissActions() throws {
+        let sut = try makeSUT()
+        var actions: [String] = []
+        sut.view.showOpenRecovery(
+            message: "The screenshot was saved, but macOS could not open it.",
+            onRetryOpen: { actions.append("retry") },
+            onReveal: { actions.append("reveal") },
+            onDismiss: { actions.append("dismiss") },
+        )
+
+        let buttons = sut.view.recursiveSubviews.compactMap { $0 as? NSButton }
+        let retry = try XCTUnwrap(buttons.first { $0.title == "Retry Open" })
+        let reveal = try XCTUnwrap(buttons.first { $0.title == "Reveal in Finder" })
+        let dismiss = try XCTUnwrap(buttons.first { $0.title == "Dismiss" })
+        retry.performClick(nil)
+        reveal.performClick(nil)
+        dismiss.performClick(nil)
+
+        XCTAssertEqual(actions, ["retry", "reveal", "dismiss"])
+    }
+
+    func testRecoveryDiscardLabelReflectsEarlySave() throws {
+        let sut = try makeSUT()
+        sut.view.showRecovery(message: "The screenshot could not be saved.", onRetry: {})
+        let buttons = sut.view.recursiveSubviews.compactMap { $0 as? NSButton }
+        let discard = try XCTUnwrap(buttons.first { $0.title == "Don’t Save" })
+
+        sut.view.setSavedState(true)
+
+        XCTAssertEqual(discard.title, "Delete File")
+        XCTAssertEqual(sut.trashButton.accessibilityLabel(), "Delete saved screenshot")
+        XCTAssertEqual(sut.imageView.accessibilityCustomActions()?.last?.name, "Delete saved screenshot")
+    }
+
     func testActionButtonsKeepStableScaleWhenPreviewActionsHide() throws {
         let sut = try makeSUT()
 
@@ -83,7 +137,15 @@ final class PreviewContentViewTests: XCTestCase {
 
         XCTAssertEqual(sut.imageView.accessibilityRole(), .button)
         XCTAssertEqual(sut.imageView.accessibilityLabel(), "Screenshot preview")
-        XCTAssertEqual(sut.imageView.accessibilityHelp(), "Open the screenshot, or drag it to another app.")
+        XCTAssertEqual(
+            sut.imageView.accessibilityHelp(),
+            "Open the screenshot, drag it to another app, save it, or choose not to save it.",
+        )
+        XCTAssertEqual(sut.imageView.accessibilityCustomActions()?.map(\.name), [
+            "Open screenshot",
+            "Save screenshot",
+            "Don't save screenshot",
+        ])
 
         XCTAssertTrue(sut.imageView.accessibilityPerformPress())
         XCTAssertTrue(didOpen)

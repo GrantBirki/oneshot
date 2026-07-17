@@ -22,3 +22,9 @@ jobs:
 
       - name: build
         run: script/build
+
+      - name: package
+        run: SKIP_UPDATE=1 script/package
+
+      - name: verify package
+        run: script/verify-package

@@ -4,8 +4,6 @@ import AppKit
 final class SelectionOverlayController {
     private var windows: [OverlayWindow] = []
     private var views: [SelectionOverlayView] = []
-    private var keyMonitor: EventMonitor?
-    private var globalKeyMonitor: EventMonitor?
 
     init() {}
 
@@ -59,8 +57,7 @@ final class SelectionOverlayController {
 
         ensureKeyWindow(screens: screens, didSetKeyWindow: didSetKeyWindow)
 
-        startKeyMonitor(onCancel: { finish(nil) })
-        if visualCue == .pulse {
+        if visualCue == .pulse, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             views.forEach { $0.showSelectionPulse(at: mouseLocation) }
         }
     }
@@ -71,47 +68,10 @@ final class SelectionOverlayController {
         }
         windows.removeAll()
         views.removeAll()
-        stopKeyMonitor()
     }
 
     func cancel() {
         end()
-    }
-
-    private func startKeyMonitor(onCancel: @escaping () -> Void) {
-        if keyMonitor == nil {
-            keyMonitor = EventMonitor(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
-                let shouldCancel = event.keyCode == KeyboardKeyCode.escape
-                let handled = MainActor.assumeIsolated {
-                    if shouldCancel {
-                        onCancel()
-                        return true
-                    }
-                    return false
-                }
-                return handled ? nil : event
-            })
-        }
-
-        if globalKeyMonitor == nil {
-            globalKeyMonitor = EventMonitor(NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { event in
-                let keyCode = event.keyCode
-                DispatchQueue.main.async {
-                    guard !NSApp.isActive else { return }
-                    if keyCode == KeyboardKeyCode.escape {
-                        onCancel()
-                    }
-                }
-            })
-        }
-    }
-
-    private func stopKeyMonitor() {
-        keyMonitor?.cancel()
-        keyMonitor = nil
-
-        globalKeyMonitor?.cancel()
-        globalKeyMonitor = nil
     }
 
     private func buildOverlayWindows(

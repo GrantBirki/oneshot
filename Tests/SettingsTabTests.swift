@@ -2,6 +2,14 @@
 import XCTest
 
 final class SettingsTabTests: XCTestCase {
+    func testSettingsNavigationCanOpenAboutTab() {
+        let navigation = SettingsNavigation()
+
+        navigation.selectedTab = .about
+
+        XCTAssertEqual(navigation.selectedTab, .about)
+    }
+
     func testSettingsTabsAreInExpectedOrder() {
         XCTAssertEqual(
             SettingsTab.allCases.map(\.title),

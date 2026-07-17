@@ -34,6 +34,11 @@ final class SelectionOverlayView: NSView {
         true
     }
 
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        addCursorRect(bounds, cursor: .crosshair)
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         updateLayerScale()

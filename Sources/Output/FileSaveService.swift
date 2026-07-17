@@ -9,6 +9,14 @@ enum FileSaveService {
     static func save(pngData: Data, to directory: URL, filename: String) throws -> URL {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let fileURL = uniqueURL(for: filename, in: directory)
+        return try save(pngData: pngData, toFile: fileURL)
+    }
+
+    static func save(pngData: Data, toFile fileURL: URL) throws -> URL {
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true,
+        )
         try pngData.write(to: fileURL, options: .atomic)
         return fileURL
     }
@@ -52,9 +60,12 @@ enum FileSaveService {
         pathExtension: String,
         suffix: String,
     ) -> String {
+        let extensionSuffix = pathExtension.isEmpty ? suffix : "\(suffix).\(pathExtension)"
+        let availableBytes = max(FilenameFormatter.maximumComponentBytes - extensionSuffix.utf8.count, 1)
+        let fittedBasename = FilenameFormatter.truncateToUTF8Boundary(basename, maximumBytes: availableBytes)
         guard !pathExtension.isEmpty else {
-            return "\(basename)\(suffix)"
+            return "\(fittedBasename)\(suffix)"
         }
-        return "\(basename)\(suffix).\(pathExtension)"
+        return "\(fittedBasename)\(suffix).\(pathExtension)"
     }
 }

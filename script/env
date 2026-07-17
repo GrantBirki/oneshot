@@ -14,6 +14,14 @@ export YELLOW='\033[0;33m'
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 export DIR
 
+# Project tools are downloaded by script/bootstrap and kept out of the global
+# Homebrew installation. Every script sources this file, so the pinned tools
+# remain available across separate shell and CI steps.
+TOOLS_ROOT="$DIR/.tmp/tools"
+TOOLS_BIN="$TOOLS_ROOT/bin"
+export TOOLS_ROOT TOOLS_BIN
+export PATH="$TOOLS_BIN:$PATH"
+
 # The name of the repository is the name of the directory (usually)
 REPO_NAME=$(basename "$PWD")
 export REPO_NAME

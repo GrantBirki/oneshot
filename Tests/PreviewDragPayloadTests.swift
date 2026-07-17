@@ -11,6 +11,7 @@ final class PreviewDragPayloadTests: XCTestCase {
             "oneshot-preview-drag-tests-\(UUID().uuidString)",
             isDirectory: true,
         )
+        try? FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
     }
 
     override func tearDown() {
@@ -21,77 +22,46 @@ final class PreviewDragPayloadTests: XCTestCase {
         super.tearDown()
     }
 
-    func testPasteboardItemIncludesFileURLAndImageTypes() throws {
-        let cgImage = makeCGImage(width: 1, height: 1)
-        let image = NSImage(cgImage: cgImage, size: NSSize(width: 1, height: 1))
+    @MainActor
+    func testFilePromiseUsesSafeFilenameAndWritesPNG() throws {
+        let cgImage = try XCTUnwrap(makeBitmapRep(width: 1, height: 1).cgImage)
         let pngData = try PNGDataEncoder.encode(cgImage: cgImage)
-
         let payload = PreviewDragPayload(
-            image: image,
+            image: NSImage(cgImage: cgImage, size: NSSize(width: 1, height: 1)),
             pngData: pngData,
             filenamePrefix: "screenshot",
-            baseDirectory: tempDirectory,
-            cleanupDelay: 60,
+            dateProvider: { Date(timeIntervalSince1970: 0) },
         )
+        let provider = NSFilePromiseProvider(fileType: "public.png", delegate: payload)
+        let filename = payload.filePromiseProvider(provider, fileNameForType: "public.png")
+        let completion = expectation(description: "Promise written")
+        var writeError: Error?
 
-        guard let item = payload.makePasteboardItem() else {
-            XCTFail("Expected pasteboard item to be created")
-            return
+        payload.filePromiseProvider(provider, writePromiseTo: tempDirectory) { error in
+            writeError = error
+            completion.fulfill()
         }
 
-        guard let fileURLString = item.string(forType: .fileURL),
-              let fileURL = URL(string: fileURLString)
-        else {
-            XCTFail("Expected file URL on pasteboard item")
-            return
-        }
-
-        XCTAssertTrue(fileURL.path.hasPrefix(tempDirectory.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
-        XCTAssertEqual(item.data(forType: .png), pngData)
-        XCTAssertNotNil(item.data(forType: .tiff))
-        XCTAssertTrue(item.types.contains(.fileURL))
-        XCTAssertTrue(item.types.contains(.png))
+        wait(for: [completion], timeout: 1)
+        XCTAssertNil(writeError)
+        XCTAssertEqual(try Data(contentsOf: tempDirectory.appendingPathComponent(filename)), pngData)
+        XCTAssertLessThanOrEqual(filename.utf8.count, FilenameFormatter.maximumComponentBytes)
     }
 
-    func testPasteboardItemRecreatesFileWhenMissing() throws {
-        let cgImage = makeCGImage(width: 1, height: 1)
-        let image = NSImage(cgImage: cgImage, size: NSSize(width: 1, height: 1))
-        let pngData = try PNGDataEncoder.encode(cgImage: cgImage)
-
-        let payload = PreviewDragPayload(
-            image: image,
-            pngData: pngData,
+    @MainActor
+    func testDraggingItemAdvertisesFilePromiseWithoutCreatingTemporaryFile() throws {
+        let cgImage = try XCTUnwrap(makeBitmapRep(width: 1, height: 1).cgImage)
+        let payload = try PreviewDragPayload(
+            image: NSImage(cgImage: cgImage, size: NSSize(width: 1, height: 1)),
+            pngData: PNGDataEncoder.encode(cgImage: cgImage),
             filenamePrefix: "screenshot",
-            baseDirectory: tempDirectory,
-            cleanupDelay: 60,
         )
 
-        guard let item = payload.makePasteboardItem(),
-              let fileURLString = item.string(forType: .fileURL),
-              let fileURL = URL(string: fileURLString)
-        else {
-            XCTFail("Expected file URL from pasteboard item")
-            return
-        }
+        let item = payload.makeDraggingItem(dragFrame: NSRect(x: 0, y: 0, width: 10, height: 10))
 
-        let parentDirectory = fileURL.deletingLastPathComponent()
-        try FileManager.default.removeItem(at: parentDirectory)
-
-        guard let recreatedItem = payload.makePasteboardItem(),
-              let recreatedURLString = recreatedItem.string(forType: .fileURL),
-              let recreatedURL = URL(string: recreatedURLString)
-        else {
-            XCTFail("Expected recreated file URL from pasteboard item")
-            return
-        }
-
-        XCTAssertTrue(FileManager.default.fileExists(atPath: recreatedURL.path))
-        XCTAssertTrue(recreatedURL.path.hasPrefix(tempDirectory.path))
-    }
-
-    private func makeCGImage(width: Int, height: Int) -> CGImage {
-        makeBitmapRep(width: width, height: height).cgImage!
+        let provider = try XCTUnwrap(item.item as? NSFilePromiseProvider)
+        XCTAssertEqual(payload.operationQueue(for: provider).maxConcurrentOperationCount, 1)
+        XCTAssertTrue(try (FileManager.default.contentsOfDirectory(atPath: tempDirectory.path)).isEmpty)
     }
 
     private func makeBitmapRep(width: Int, height: Int) -> NSBitmapImageRep {

@@ -3,8 +3,11 @@ import AppKit
 @MainActor
 final class WindowCaptureOverlayController {
     private var windows: [OverlayWindow] = []
-    private var keyMonitor: EventMonitor?
-    private var globalKeyMonitor: EventMonitor?
+    private let windowProvider: @MainActor () -> [WindowInfo]
+
+    init(windowProvider: @escaping @MainActor () -> [WindowInfo] = WindowInfoProvider.windows) {
+        self.windowProvider = windowProvider
+    }
 
     func beginSelection(completion: @escaping (WindowInfo?) -> Void) {
         guard windows.isEmpty else {
@@ -17,6 +20,7 @@ final class WindowCaptureOverlayController {
             return
         }
 
+        let selectableWindows = windowProvider()
         var didFinish = false
         let finish: (WindowInfo?) -> Void = { [weak self] result in
             guard let self, !didFinish else { return }
@@ -27,7 +31,11 @@ final class WindowCaptureOverlayController {
 
         for screen in screens {
             let window = OverlayWindow(contentRect: screen.frame)
-            let view = WindowCaptureOverlayView(frame: window.contentView?.bounds ?? .zero)
+            let view = WindowCaptureOverlayView(
+                frame: window.contentView?.bounds ?? .zero,
+                windowInfos: selectableWindows,
+                refreshWindowInfos: windowProvider,
+            )
             view.onSelection = { windowInfo in
                 finish(windowInfo)
             }
@@ -36,11 +44,15 @@ final class WindowCaptureOverlayController {
             }
             window.contentView = view
             window.orderFrontRegardless()
-            window.makeFirstResponder(view)
             windows.append(window)
         }
 
-        startKeyMonitor(onCancel: { finish(nil) })
+        let pointerLocation = NSEvent.mouseLocation
+        let keyWindow = windows.first(where: { $0.frame.contains(pointerLocation) }) ?? windows.first
+        if let keyWindow, let view = keyWindow.contentView {
+            keyWindow.makeKeyAndOrderFront(nil)
+            keyWindow.makeFirstResponder(view)
+        }
     }
 
     private func end() {
@@ -48,47 +60,10 @@ final class WindowCaptureOverlayController {
             window.orderOut(nil)
         }
         windows.removeAll()
-        stopKeyMonitor()
     }
 
     func cancel() {
         end()
-    }
-
-    private func startKeyMonitor(onCancel: @escaping () -> Void) {
-        if keyMonitor == nil {
-            keyMonitor = EventMonitor(NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
-                let shouldCancel = event.keyCode == KeyboardKeyCode.escape
-                let handled = MainActor.assumeIsolated {
-                    if shouldCancel {
-                        onCancel()
-                        return true
-                    }
-                    return false
-                }
-                return handled ? nil : event
-            })
-        }
-
-        if globalKeyMonitor == nil {
-            globalKeyMonitor = EventMonitor(NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { event in
-                let keyCode = event.keyCode
-                DispatchQueue.main.async {
-                    guard !NSApp.isActive else { return }
-                    if keyCode == KeyboardKeyCode.escape {
-                        onCancel()
-                    }
-                }
-            })
-        }
-    }
-
-    private func stopKeyMonitor() {
-        keyMonitor?.cancel()
-        keyMonitor = nil
-
-        globalKeyMonitor?.cancel()
-        globalKeyMonitor = nil
     }
 }
 
@@ -98,12 +73,31 @@ final class WindowCaptureOverlayView: NSView {
     var onCancel: (() -> Void)?
 
     private var highlightedWindow: WindowInfo?
+    private var windowInfos: [WindowInfo]
+    private let refreshWindowInfos: @MainActor () -> [WindowInfo]
     private var hoverTrackingArea: NSTrackingArea?
     private let dimmingLayer = CAShapeLayer()
     private let highlightLayer = CAShapeLayer()
 
     override init(frame frameRect: NSRect) {
+        windowInfos = WindowInfoProvider.windows()
+        refreshWindowInfos = WindowInfoProvider.windows
         super.init(frame: frameRect)
+        configureView()
+    }
+
+    init(
+        frame frameRect: NSRect,
+        windowInfos: [WindowInfo],
+        refreshWindowInfos: @escaping @MainActor () -> [WindowInfo],
+    ) {
+        self.windowInfos = windowInfos
+        self.refreshWindowInfos = refreshWindowInfos
+        super.init(frame: frameRect)
+        configureView()
+    }
+
+    private func configureView() {
         wantsLayer = true
         layer = CALayer()
         layer?.backgroundColor = NSColor.clear.cgColor
@@ -145,8 +139,14 @@ final class WindowCaptureOverlayView: NSView {
         hoverTrackingArea = area
     }
 
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .pointingHand)
+    }
+
     override func mouseMoved(with event: NSEvent) {
         guard let window else { return }
+        window.makeKey()
+        window.makeFirstResponder(self)
         let point = convert(event.locationInWindow, from: nil)
         let screenPoint = window.convertPoint(toScreen: point)
         updateHighlight(at: screenPoint)
@@ -154,9 +154,11 @@ final class WindowCaptureOverlayView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         guard let window else { return }
+        window.makeKey()
+        window.makeFirstResponder(self)
         let point = convert(event.locationInWindow, from: nil)
         let screenPoint = window.convertPoint(toScreen: point)
-        updateHighlight(at: screenPoint)
+        updateHighlight(at: screenPoint, refreshing: true)
     }
 
     override func mouseUp(with _: NSEvent) {
@@ -181,12 +183,22 @@ final class WindowCaptureOverlayView: NSView {
         onCancel?()
     }
 
-    private func updateHighlight(at screenPoint: CGPoint) {
-        let nextWindow = WindowInfoProvider.window(at: screenPoint)
+    func updateHighlight(at screenPoint: CGPoint, refreshing: Bool = false) {
+        if refreshing {
+            windowInfos = refreshWindowInfos()
+        }
+        let nextWindow: WindowInfo? = if let window, !window.frame.contains(screenPoint) {
+            nil
+        } else {
+            WindowInfoProvider.window(at: screenPoint, in: windowInfos)
+        }
         guard nextWindow != highlightedWindow else { return }
         highlightedWindow = nextWindow
         updateLayers()
         updateAccessibilityValue()
+        if let nextWindow {
+            AccessibilityAnnouncer.announce("Selected \(nextWindow.accessibilityName)")
+        }
     }
 
     private func configureLayers() {
@@ -206,7 +218,9 @@ final class WindowCaptureOverlayView: NSView {
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         setAccessibilityLabel("Window capture overlay")
-        setAccessibilityHelp("Move the pointer over a window and click to capture it. Press Escape to cancel.")
+        setAccessibilityHelp(
+            "Move the pointer over a window and click or press Return to capture it. Press Escape to cancel.",
+        )
         updateAccessibilityValue()
     }
 
@@ -251,50 +265,83 @@ final class WindowCaptureOverlayView: NSView {
     }
 
     private func updateAccessibilityValue() {
-        setAccessibilityValue(highlightedWindow == nil ? "No window selected" : "Window selected")
+        setAccessibilityValue(highlightedWindow?.accessibilityName ?? "No window selected")
     }
 }
 
 struct WindowInfo: Equatable {
     let id: CGWindowID
     let bounds: CGRect
+    let ownerName: String?
+    let title: String?
+
+    init(id: CGWindowID, bounds: CGRect, ownerName: String? = nil, title: String? = nil) {
+        self.id = id
+        self.bounds = bounds
+        self.ownerName = ownerName
+        self.title = title
+    }
+
+    var accessibilityName: String {
+        switch (ownerName?.nonEmpty, title?.nonEmpty) {
+        case let (.some(owner), .some(title)):
+            "\(owner): \(title)"
+        case let (.some(owner), .none):
+            owner
+        case let (.none, .some(title)):
+            title
+        case (.none, .none):
+            "Window selected"
+        }
+    }
 }
 
+@MainActor
 enum WindowInfoProvider {
     static func window(at point: CGPoint) -> WindowInfo? {
+        window(at: point, in: windows())
+    }
+
+    static func window(at point: CGPoint, in windows: [WindowInfo]) -> WindowInfo? {
+        windows.first { $0.bounds.contains(point) }
+    }
+
+    static func windows() -> [WindowInfo] {
         guard let list = CGWindowListCopyWindowInfo(
             [.optionOnScreenOnly, .excludeDesktopElements],
             kCGNullWindowID,
         ) as? [[String: Any]] else {
-            return nil
+            return []
         }
 
         let currentPID = getpid()
 
-        for info in list {
+        return list.compactMap { info in
             guard let boundsDict = info[kCGWindowBounds as String] as? [String: CGFloat],
                   let cgBounds = CGRect(dictionaryRepresentation: boundsDict as CFDictionary),
                   let bounds = appKitBounds(for: cgBounds),
-                  bounds.contains(point),
                   let windowID = info[kCGWindowNumber as String] as? CGWindowID,
                   let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
                   ownerPID != currentPID
             else {
-                continue
+                return nil
             }
 
             if let alpha = info[kCGWindowAlpha as String] as? CGFloat, alpha == 0 {
-                continue
+                return nil
             }
 
             if let layer = info[kCGWindowLayer as String] as? Int, layer != 0 {
-                continue
+                return nil
             }
 
-            return WindowInfo(id: windowID, bounds: bounds)
+            return WindowInfo(
+                id: windowID,
+                bounds: bounds,
+                ownerName: info[kCGWindowOwnerName as String] as? String,
+                title: info[kCGWindowName as String] as? String,
+            )
         }
-
-        return nil
     }
 
     private static func appKitBounds(for cgBounds: CGRect) -> CGRect? {
@@ -332,5 +379,12 @@ enum WindowInfoProvider {
             return CGDirectDisplayID(number.uint32Value)
         }
         return nil
+    }
+}
+
+private extension String {
+    var nonEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

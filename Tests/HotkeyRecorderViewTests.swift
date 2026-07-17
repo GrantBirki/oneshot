@@ -7,12 +7,13 @@ import XCTest
 final class HotkeyRecorderViewTests: XCTestCase {
     func testBecomeFirstResponderDoesNotStartRecording() {
         let view = HotkeyRecorderView()
-        view.hotkey = Hotkey(keyCode: UInt16(kVK_ANSI_D), modifiers: [.control])
+        let hotkey = Hotkey(keyCode: UInt16(kVK_ANSI_D), modifiers: [.control])
+        view.hotkey = hotkey
 
         XCTAssertTrue(view.becomeFirstResponder())
 
         XCTAssertFalse(view.isRecordingForTesting)
-        XCTAssertEqual(view.accessibilityValue() as? String, "⌃D")
+        XCTAssertEqual(view.accessibilityValue() as? String, hotkey.displayString)
     }
 
     func testSpaceStartsRecordingForKeyboardActivation() {
@@ -47,7 +48,8 @@ final class HotkeyRecorderViewTests: XCTestCase {
 
     func testEscapeCancelsRecordingAndRestoresInitialHotkey() {
         let view = HotkeyRecorderView()
-        view.hotkey = Hotkey(keyCode: UInt16(kVK_ANSI_D), modifiers: [.control])
+        let hotkey = Hotkey(keyCode: UInt16(kVK_ANSI_D), modifiers: [.control])
+        view.hotkey = hotkey
         var changes: [Hotkey?] = []
         view.onChange = { changes.append($0) }
 
@@ -55,8 +57,8 @@ final class HotkeyRecorderViewTests: XCTestCase {
         view.keyDown(with: makeKeyEvent(keyCode: UInt16(kVK_Escape), characters: ""))
 
         XCTAssertFalse(view.isRecordingForTesting)
-        XCTAssertEqual(view.hotkey, Hotkey(keyCode: UInt16(kVK_ANSI_D), modifiers: [.control]))
-        XCTAssertEqual(view.accessibilityValue() as? String, "⌃D")
+        XCTAssertEqual(view.hotkey, hotkey)
+        XCTAssertEqual(view.accessibilityValue() as? String, hotkey.displayString)
         XCTAssertTrue(changes.isEmpty)
     }
 
@@ -93,7 +95,7 @@ final class HotkeyRecorderViewTests: XCTestCase {
         let expected = Hotkey(keyCode: UInt16(kVK_ANSI_G), modifiers: [.control])
         XCTAssertFalse(view.isRecordingForTesting)
         XCTAssertEqual(view.hotkey, expected)
-        XCTAssertEqual(view.accessibilityValue() as? String, "⌃G")
+        XCTAssertEqual(view.accessibilityValue() as? String, expected.displayString)
         XCTAssertEqual(changes.count, 1)
         XCTAssertEqual(changes[0], expected)
     }

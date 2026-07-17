@@ -1,5 +1,7 @@
 # v0 Specification
 
+> **Historical document:** This records the original v0 design. The current application requires macOS Tahoe 26 and supersedes the macOS 14 and unsigned-MVP decisions below.
+
 This document outlines the specifications for version 0 (v0) of the OneShot macOS screenshot utility.
 
 ## Goals

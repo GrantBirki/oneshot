@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import Combine
 @testable import OneShot
 import XCTest
 
@@ -117,6 +118,82 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.saveDelaySeconds, 0)
     }
 
+    func testSaveDelayClampsToMaximum() {
+        var settings = SettingsStore(defaults: defaults)
+        settings.saveDelaySeconds = 100_000
+        XCTAssertEqual(settings.saveDelaySeconds, 3600)
+
+        settings = SettingsStore(defaults: defaults)
+        XCTAssertEqual(settings.saveDelaySeconds, 3600)
+    }
+
+    func testInvalidSaveDelaysMigrateToDefault() {
+        for invalidValue in [Double.nan, .infinity, -.infinity] {
+            defaults.set(invalidValue, forKey: SettingsStoreKeys.saveDelaySeconds)
+
+            let settings = SettingsStore(defaults: defaults)
+
+            XCTAssertEqual(settings.saveDelaySeconds, SettingsStore.defaultSaveDelaySeconds)
+            XCTAssertEqual(
+                defaults.double(forKey: SettingsStoreKeys.saveDelaySeconds),
+                SettingsStore.defaultSaveDelaySeconds,
+            )
+        }
+    }
+
+    func testHotkeyAssignmentRejectsDuplicateWithoutChangingStoredValue() throws {
+        let settings = SettingsStore(defaults: defaults)
+        let selection = try XCTUnwrap(HotkeyParser.parse("control+g"))
+        let originalWindow = try XCTUnwrap(HotkeyParser.parse("control+w"))
+        settings.hotkeySelection = selection
+        settings.hotkeyWindow = originalWindow
+
+        let result = settings.setHotkey(selection, for: .window)
+
+        XCTAssertEqual(result, .duplicate(.selection))
+        XCTAssertEqual(settings.hotkeyWindow, originalWindow)
+        XCTAssertEqual(
+            settings.hotkeyMessage(for: .window),
+            "This shortcut is already used for selection.",
+        )
+    }
+
+    func testHotkeyConfigurationPublisherEmitsAggregateChanges() throws {
+        let settings = SettingsStore(defaults: defaults)
+        let expected = try XCTUnwrap(HotkeyParser.parse("control+g"))
+        var configurations: [HotkeyConfiguration] = []
+        let cancellable = settings.hotkeyConfigurationPublisher.sink { configurations.append($0) }
+
+        settings.setHotkey(expected, for: .selection)
+
+        XCTAssertEqual(configurations.last?.selection, expected)
+        XCTAssertNil(configurations.last?.window)
+        withExtendedLifetime(cancellable) {}
+    }
+
+    func testLaunchAtLoginFailureRevertsPreferenceToActualState() {
+        let settings = SettingsStore(defaults: defaults)
+        settings.autoLaunchEnabled = true
+
+        settings.applyLaunchAtLoginResult(.failed(actualStatus: .disabled))
+
+        XCTAssertFalse(settings.autoLaunchEnabled)
+        XCTAssertEqual(settings.launchAtLoginStatus, .disabled)
+        XCTAssertNotNil(settings.launchAtLoginMessage)
+    }
+
+    func testLaunchAtLoginStatusRefreshReconcilesToggle() {
+        let settings = SettingsStore(defaults: defaults)
+        settings.autoLaunchEnabled = true
+
+        settings.updateLaunchAtLoginStatus(.disabled)
+        XCTAssertFalse(settings.autoLaunchEnabled)
+
+        settings.updateLaunchAtLoginStatus(.requiresApproval)
+        XCTAssertTrue(settings.autoLaunchEnabled)
+        XCTAssertEqual(settings.launchAtLoginStatus, .requiresApproval)
+    }
+
     func testClearingHotkeyPersists() {
         var settings = SettingsStore(defaults: defaults)
         settings.hotkeySelection = nil
@@ -183,6 +260,27 @@ final class SettingsStoreTests: XCTestCase {
         let settings = SettingsStore(defaults: defaults)
 
         XCTAssertNil(settings.hotkeySelection)
+    }
+
+    func testStoredHotkeyRejectsNegativeModifiersWithoutTrapping() {
+        defaults.set(Int(kVK_ANSI_D), forKey: SettingsStoreKeys.hotkeySelectionKeyCode)
+        defaults.set(-1, forKey: SettingsStoreKeys.hotkeySelectionModifiers)
+
+        let settings = SettingsStore(defaults: defaults)
+
+        XCTAssertNil(settings.hotkeySelection)
+        XCTAssertEqual(defaults.integer(forKey: SettingsStoreKeys.hotkeySelectionKeyCode), -1)
+        XCTAssertEqual(defaults.integer(forKey: SettingsStoreKeys.hotkeySelectionModifiers), 0)
+    }
+
+    func testStoredHotkeyRejectsOversizedUnsignedKeyCodeWithoutTrapping() {
+        defaults.set(UInt.max, forKey: SettingsStoreKeys.hotkeySelectionKeyCode)
+        defaults.set(UInt(NSEvent.ModifierFlags.control.rawValue), forKey: SettingsStoreKeys.hotkeySelectionModifiers)
+
+        let settings = SettingsStore(defaults: defaults)
+
+        XCTAssertNil(settings.hotkeySelection)
+        XCTAssertEqual(defaults.integer(forKey: SettingsStoreKeys.hotkeySelectionKeyCode), -1)
     }
 
     func testInvalidSelectionDimmingColorFallsBackToDefault() {

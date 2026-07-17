@@ -13,18 +13,19 @@ enum SaveLocationResolver {
         case .documents:
             return fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
         case .custom:
-            let trimmed = customPath.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty {
-                return defaultURL
-            }
-
-            let expanded = (trimmed as NSString).expandingTildeInPath
-            if !(expanded as NSString).isAbsolutePath {
-                return defaultURL
-            }
-
-            let customURL = URL(fileURLWithPath: expanded)
-            return customURL.standardizedFileURL.resolvingSymlinksInPath()
+            return customDirectory(path: customPath) ?? defaultURL
         }
+    }
+
+    static func customDirectory(path: String) -> URL? {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let expanded = (trimmed as NSString).expandingTildeInPath
+        guard (expanded as NSString).isAbsolutePath else { return nil }
+
+        return URL(fileURLWithPath: expanded, isDirectory: true)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
     }
 }

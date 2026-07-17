@@ -6,7 +6,8 @@ source script/env "$@"
 source "$DIR/script/lib/common.sh"
 
 require_macos error "Performance checks require macOS."
-require_tool xctrace "xctrace not found. Install Xcode."
+require_full_xcode
+XCTRACE="$(find_xcrun_tool xctrace)"
 
 CONFIGURATION="${CONFIGURATION:-Release}"
 export CONFIGURATION
@@ -36,7 +37,7 @@ echo "- Hover preview controls, drag preview, save, trash, and open."
 echo
 echo "Recording Points of Interest for ${RUN_SECONDS}s..."
 open "$APP_PATH"
-xcrun xctrace record \
+"$XCTRACE" record \
   --template "Points of Interest" \
   --time-limit "${RUN_SECONDS}s" \
   --output "$TRACE_DIR/OneShot-$(date +%Y%m%d-%H%M%S).trace" \

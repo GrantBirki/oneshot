@@ -62,6 +62,17 @@ final class FileSaveServiceTests: XCTestCase {
         XCTAssertEqual(url.lastPathComponent, "screenshot-2")
     }
 
+    func testCollisionSuffixKeepsMultibyteFilenameWithinComponentLimit() throws {
+        let filename = "\(String(repeating: "😀", count: 62)).png"
+        try Data().write(to: tempDirectory.appendingPathComponent(filename))
+
+        let url = FileSaveService.uniqueURL(for: filename, in: tempDirectory)
+
+        XCTAssertLessThanOrEqual(url.lastPathComponent.utf8.count, FilenameFormatter.maximumComponentBytes)
+        XCTAssertTrue(url.lastPathComponent.hasSuffix("-2.png"))
+        XCTAssertNotNil(url.lastPathComponent.data(using: .utf8))
+    }
+
     func testSaveImageWritesPNGFile() throws {
         let directory = tempDirectory.appendingPathComponent("images", isDirectory: true)
         let image = makeImage(width: 3, height: 3)

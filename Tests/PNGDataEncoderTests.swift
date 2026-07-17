@@ -34,6 +34,15 @@ final class PNGDataEncoderTests: XCTestCase {
         XCTAssertEqual(decoded?.pixelsHigh, 3)
     }
 
+    func testEncodeWritesDPIForRetinaScale() throws {
+        let data = try PNGDataEncoder.encode(cgImage: makeCGImage(width: 2, height: 2), scale: 2)
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+        let properties = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
+
+        XCTAssertEqual(try XCTUnwrap(properties[kCGImagePropertyDPIWidth] as? Double), 144, accuracy: 0.1)
+        XCTAssertEqual(try XCTUnwrap(properties[kCGImagePropertyDPIHeight] as? Double), 144, accuracy: 0.1)
+    }
+
     private func makeCGImage(width: Int, height: Int) -> CGImage {
         makeBitmapRep(width: width, height: height).cgImage!
     }

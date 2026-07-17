@@ -1,20 +1,63 @@
 import CoreGraphics
 import Vision
 
-protocol ScrollingOffsetCalculating: Sendable {
-    func verticalOffset(from current: CGImage, to previous: CGImage) -> CGFloat?
+struct ScrollingOffset: Equatable, Sendable {
+    let horizontal: CGFloat
+    let vertical: CGFloat
 }
 
-struct VisionScrollingOffsetCalculator: ScrollingOffsetCalculating {
+protocol ScrollingOffsetCalculating: Sendable {
+    var retainedImagesForMemoryAccounting: [CGImage] { get }
+
+    func retainedImagesDuringOffset(from current: CGImage, to previous: CGImage) -> [CGImage]
+    func projectedAdditionalBytesForOffset(from current: CGImage, to previous: CGImage) -> Int
+    mutating func offset(from current: CGImage, to previous: CGImage) -> ScrollingOffset?
+    mutating func reset()
+}
+
+extension ScrollingOffsetCalculating {
+    var retainedImagesForMemoryAccounting: [CGImage] {
+        []
+    }
+
+    func retainedImagesDuringOffset(from _: CGImage, to _: CGImage) -> [CGImage] {
+        retainedImagesForMemoryAccounting
+    }
+
+    func projectedAdditionalBytesForOffset(from _: CGImage, to _: CGImage) -> Int {
+        0
+    }
+
+    mutating func reset() {}
+}
+
+struct VisionScrollingOffsetCalculator: @unchecked Sendable, ScrollingOffsetCalculating {
+    private struct RegistrationImage {
+        let image: CGImage
+        let scale: CGFloat
+    }
+
     private let maxRegistrationDimension: Int
+    private var cachedRegistrationImage: (source: CGImage, registration: RegistrationImage)?
 
     init(maxRegistrationDimension: Int = 900) {
         self.maxRegistrationDimension = maxRegistrationDimension
     }
 
-    func verticalOffset(from current: CGImage, to previous: CGImage) -> CGFloat? {
-        let currentRegistrationImage = registrationImage(for: current)
-        let previousRegistrationImage = registrationImage(for: previous)
+    mutating func offset(from current: CGImage, to previous: CGImage) -> ScrollingOffset? {
+        let previousRegistrationImage: RegistrationImage
+        if let cachedRegistrationImage, cachedRegistrationImage.source === previous {
+            previousRegistrationImage = cachedRegistrationImage.registration
+        } else {
+            cachedRegistrationImage = nil
+            previousRegistrationImage = registrationImage(for: previous)
+            cachedRegistrationImage = (source: previous, registration: previousRegistrationImage)
+        }
+
+        let currentRegistrationImage = current === previous
+            ? previousRegistrationImage
+            : registrationImage(for: current)
+
         let signpostID = AppSignpost.begin("Vision scrolling offset")
         defer {
             AppSignpost.end("Vision scrolling offset", id: signpostID)
@@ -33,31 +76,84 @@ struct VisionScrollingOffsetCalculator: ScrollingOffsetCalculating {
             return nil
         }
 
-        return observation.alignmentTransform.ty / currentRegistrationImage.scale
+        cachedRegistrationImage = (source: current, registration: currentRegistrationImage)
+        return ScrollingOffset(
+            horizontal: observation.alignmentTransform.tx / currentRegistrationImage.scale,
+            vertical: observation.alignmentTransform.ty / currentRegistrationImage.scale,
+        )
     }
 
-    private func registrationImage(for image: CGImage) -> (image: CGImage, scale: CGFloat) {
+    mutating func reset() {
+        cachedRegistrationImage = nil
+    }
+
+    var retainedImagesForMemoryAccounting: [CGImage] {
+        guard let cachedRegistrationImage else { return [] }
+        return [cachedRegistrationImage.source, cachedRegistrationImage.registration.image]
+    }
+
+    func retainedImagesDuringOffset(from _: CGImage, to previous: CGImage) -> [CGImage] {
+        guard let cachedRegistrationImage, cachedRegistrationImage.source === previous else {
+            return []
+        }
+        return [cachedRegistrationImage.source, cachedRegistrationImage.registration.image]
+    }
+
+    func projectedAdditionalBytesForOffset(from current: CGImage, to previous: CGImage) -> Int {
+        var byteCount = 0
+        if cachedRegistrationImage?.source !== previous {
+            byteCount = registrationImageByteCount(for: previous)
+        }
+        if current !== previous {
+            byteCount = saturatingSum(byteCount, registrationImageByteCount(for: current))
+        }
+        return byteCount
+    }
+
+    private func saturatingSum(_ lhs: Int, _ rhs: Int) -> Int {
+        let result = lhs.addingReportingOverflow(rhs)
+        return result.overflow ? .max : result.partialValue
+    }
+
+    private func registrationImageByteCount(for image: CGImage) -> Int {
+        let longestSide = max(image.width, image.height)
+        guard longestSide > maxRegistrationDimension else { return 0 }
+
+        let scale = CGFloat(maxRegistrationDimension) / CGFloat(longestSide)
+        let width = max(1, Int((CGFloat(image.width) * scale).rounded()))
+        let height = max(1, Int((CGFloat(image.height) * scale).rounded()))
+        guard let bytesPerRow = bitmapBytesPerRow(for: image, width: width) else {
+            return .max
+        }
+        let result = bytesPerRow.multipliedReportingOverflow(by: height)
+        return result.overflow ? .max : result.partialValue
+    }
+
+    private func registrationImage(for image: CGImage) -> RegistrationImage {
         let longestSide = max(image.width, image.height)
         guard longestSide > maxRegistrationDimension else {
-            return (image, 1)
+            return RegistrationImage(image: image, scale: 1)
         }
 
         let scale = CGFloat(maxRegistrationDimension) / CGFloat(longestSide)
         let width = max(1, Int((CGFloat(image.width) * scale).rounded()))
         let height = max(1, Int((CGFloat(image.height) * scale).rounded()))
         guard let scaled = makeScaledImage(image, width: width, height: height) else {
-            return (image, 1)
+            return RegistrationImage(image: image, scale: 1)
         }
-        return (scaled, scale)
+        return RegistrationImage(image: scaled, scale: scale)
     }
 
     private func makeScaledImage(_ image: CGImage, width: Int, height: Int) -> CGImage? {
+        guard let bytesPerRow = bitmapBytesPerRow(for: image, width: width) else {
+            return nil
+        }
         guard let context = CGContext(
             data: nil,
             width: width,
             height: height,
             bitsPerComponent: image.bitsPerComponent,
-            bytesPerRow: 0,
+            bytesPerRow: bytesPerRow,
             space: image.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: image.bitmapInfo.rawValue,
         ) else {
@@ -69,143 +165,232 @@ struct VisionScrollingOffsetCalculator: ScrollingOffsetCalculating {
     }
 }
 
-enum ScrollingStitcherStatus: Equatable {
+enum ScrollingFrameIgnoreReason: Equatable, Sendable {
+    case noMovement
+    case reverseMovement
+    case horizontalDrift
+    case registrationFailed
+    case incompatibleFrame
+    case discontinuousMovement
+}
+
+enum ScrollingStitcherStatus: Equatable, Sendable {
     case accepted
-    case ignored
+    case ignored(ScrollingFrameIgnoreReason)
     case limitReached
 }
 
 actor ScrollingStitcher {
     private struct Segment {
-        var image: CGImage
-        var originY: Int
+        let image: CGImage
     }
 
     private var segments: [Segment] = []
-    private var previousImage: CGImage?
+    private var previousAcceptedImage: CGImage?
     private var width: Int?
     private var height = 0
-    private var retainedPixelCount = 0
-    private var didReachPixelLimit = false
-    private let offsetCalculator: ScrollingOffsetCalculating
-    private let minimumOffset: Int
+    private var retainedByteCount = 0
+    private var retainedSegmentImageIDs: Set<ObjectIdentifier> = []
+    private var destinationBytesPerRow: Int?
+    private var didReachLimit = false
+    private var offsetCalculator: any ScrollingOffsetCalculating
+    private let verticalNoiseTolerance: Int
+    private let maximumHorizontalDrift: Int
+    private let maximumHorizontalDriftRatio: CGFloat
     private let maxPixelCount: Int
-    private let maxRetainedPixelCount: Int
+    private let maxWorkingSetBytes: Int
 
     init(
-        offsetCalculator: ScrollingOffsetCalculating = VisionScrollingOffsetCalculator(),
-        minimumOffset: Int = 1,
+        offsetCalculator: any ScrollingOffsetCalculating = VisionScrollingOffsetCalculator(),
+        verticalNoiseTolerance: Int = 1,
+        maximumHorizontalDrift: Int = 4,
+        maximumHorizontalDriftRatio: CGFloat = 0.01,
         maxPixelCount: Int = 120_000_000,
-        maxRetainedPixelCount: Int? = nil,
+        maxWorkingSetBytes: Int = 480_000_000,
     ) {
         self.offsetCalculator = offsetCalculator
-        self.minimumOffset = minimumOffset
-        self.maxPixelCount = maxPixelCount
-        self.maxRetainedPixelCount = maxRetainedPixelCount ?? maxPixelCount
+        self.verticalNoiseTolerance = max(0, verticalNoiseTolerance)
+        self.maximumHorizontalDrift = max(0, maximumHorizontalDrift)
+        self.maximumHorizontalDriftRatio = max(0, maximumHorizontalDriftRatio)
+        self.maxPixelCount = max(1, maxPixelCount)
+        self.maxWorkingSetBytes = max(1, maxWorkingSetBytes)
     }
 
     func reset() {
-        segments = []
-        previousImage = nil
-        width = nil
-        height = 0
-        retainedPixelCount = 0
-        didReachPixelLimit = false
+        releaseCapturedFrames()
+        didReachLimit = false
+        offsetCalculator.reset()
     }
 
-    func start(with image: CGImage) {
-        segments = [Segment(image: image, originY: 0)]
-        previousImage = image
+    @discardableResult
+    func start(with image: CGImage) -> ScrollingStitcherStatus {
+        releaseCapturedFrames()
+        offsetCalculator.reset()
+
+        let outputPixelCount = safeProduct(image.width, image.height)
+        let imageBytes = estimatedByteCount(for: image)
+        guard let destinationBytesPerRow = bitmapBytesPerRow(for: image, width: image.width) else {
+            didReachLimit = true
+            return .limitReached
+        }
+        let outputByteCount = safeProduct(destinationBytesPerRow, image.height)
+        let projectedWorkingSet = safeSum(imageBytes, outputByteCount)
+        guard outputPixelCount <= maxPixelCount, projectedWorkingSet <= maxWorkingSetBytes else {
+            didReachLimit = true
+            return .limitReached
+        }
+
+        segments = [Segment(image: image)]
+        previousAcceptedImage = image
         width = image.width
         height = image.height
-        retainedPixelCount = image.pixelCount
-        didReachPixelLimit = false
+        retainedByteCount = imageBytes
+        retainedSegmentImageIDs = [ObjectIdentifier(image)]
+        self.destinationBytesPerRow = destinationBytesPerRow
+        didReachLimit = false
+        return .accepted
     }
 
     @discardableResult
     func add(_ image: CGImage) -> ScrollingStitcherStatus {
-        guard !didReachPixelLimit else {
+        guard !didReachLimit else {
             return .limitReached
         }
 
-        guard let previous = previousImage, let width else {
-            start(with: image)
-            return .accepted
+        guard let previousAcceptedImage, let width, let destinationBytesPerRow else {
+            return start(with: image)
         }
 
-        guard image.width == width, image.height == previous.height else {
-            start(with: image)
-            return .accepted
+        guard image.width == width, image.height == previousAcceptedImage.height else {
+            return .ignored(.incompatibleFrame)
         }
 
-        guard let offset = offsetCalculator.verticalOffset(from: image, to: previous) else {
-            previousImage = image
-            return .ignored
+        let currentOutputByteCount = safeProduct(destinationBytesPerRow, height)
+        let frameImages = [previousAcceptedImage, image]
+        let currentWorkingSet = projectedWorkingSet(
+            outputByteCount: currentOutputByteCount,
+            additionalRetainedByteCount: 0,
+            frameImages: frameImages + offsetCalculator.retainedImagesForMemoryAccounting,
+        )
+        guard currentWorkingSet <= maxWorkingSetBytes else {
+            return reachLimit(width: width, height: height)
         }
 
-        let offsetPixels = Int(offset.rounded())
-        if abs(offsetPixels) < minimumOffset {
-            previousImage = image
-            return .ignored
+        let preRegistrationWorkingSet = projectedWorkingSet(
+            outputByteCount: currentOutputByteCount,
+            additionalRetainedByteCount: offsetCalculator.projectedAdditionalBytesForOffset(
+                from: image,
+                to: previousAcceptedImage,
+            ),
+            frameImages: frameImages + offsetCalculator.retainedImagesDuringOffset(
+                from: image,
+                to: previousAcceptedImage,
+            ),
+        )
+        guard preRegistrationWorkingSet <= maxWorkingSetBytes else {
+            return reachLimit(width: width, height: height)
         }
 
-        if abs(offsetPixels) >= image.height {
-            previousImage = image
-            return .ignored
+        let offset = offsetCalculator.offset(from: image, to: previousAcceptedImage)
+        let postRegistrationWorkingSet = projectedWorkingSet(
+            outputByteCount: currentOutputByteCount,
+            additionalRetainedByteCount: 0,
+            frameImages: frameImages + offsetCalculator.retainedImagesForMemoryAccounting,
+        )
+        guard postRegistrationWorkingSet <= maxWorkingSetBytes else {
+            return reachLimit(width: width, height: height)
         }
 
-        if offsetPixels > 0 {
-            let status = acceptDownwardFrame(image, offsetPixels: offsetPixels, width: width)
-            guard status == .accepted else {
-                return status
-            }
-        } else {
-            cropBottom(by: abs(offsetPixels))
+        guard let offset,
+              offset.horizontal.isFinite,
+              offset.vertical.isFinite
+        else {
+            return .ignored(.registrationFailed)
         }
 
-        previousImage = image
-        return .accepted
+        let horizontalLimit = max(
+            CGFloat(maximumHorizontalDrift),
+            CGFloat(width) * maximumHorizontalDriftRatio,
+        )
+        guard abs(offset.horizontal) <= horizontalLimit else {
+            return .ignored(.horizontalDrift)
+        }
+
+        let offsetPixels = Int(offset.vertical.rounded())
+        if abs(offsetPixels) <= verticalNoiseTolerance {
+            return .ignored(.noMovement)
+        }
+        guard offsetPixels > 0 else {
+            return .ignored(.reverseMovement)
+        }
+        guard offsetPixels < image.height else {
+            return .ignored(.discontinuousMovement)
+        }
+
+        return acceptDownwardFrame(
+            image,
+            offsetPixels: offsetPixels,
+            width: width,
+            destinationBytesPerRow: destinationBytesPerRow,
+        )
     }
 
-    private func acceptDownwardFrame(_ image: CGImage, offsetPixels: Int, width: Int) -> ScrollingStitcherStatus {
-        let nextHeight = height + offsetPixels
-        if nextHeight * width > maxPixelCount {
-            didReachPixelLimit = true
-            let dimensions = "\(width)x\(nextHeight)"
-            AppLog.capture.warning(
-                "Scrolling capture pixel limit reached at \(dimensions, privacy: .public)",
-            )
-            return .limitReached
+    private func acceptDownwardFrame(
+        _ image: CGImage,
+        offsetPixels: Int,
+        width: Int,
+        destinationBytesPerRow: Int,
+    ) -> ScrollingStitcherStatus {
+        let nextHeight = safeSum(height, offsetPixels)
+        let nextPixelCount = safeProduct(nextHeight, width)
+        let outputByteCount = safeProduct(destinationBytesPerRow, nextHeight)
+        let stripBytesPerRow = bitmapBytesPerRow(for: image, width: image.width) ?? .max
+        let stripByteCount = safeProduct(stripBytesPerRow, offsetPixels)
+        var frameImages = [image]
+        if let previousAcceptedImage {
+            frameImages.append(previousAcceptedImage)
+        }
+        frameImages.append(contentsOf: offsetCalculator.retainedImagesForMemoryAccounting)
+        let nextWorkingSet = projectedWorkingSet(
+            outputByteCount: outputByteCount,
+            additionalRetainedByteCount: stripByteCount,
+            frameImages: frameImages,
+        )
+
+        guard nextPixelCount <= maxPixelCount, nextWorkingSet <= maxWorkingSetBytes else {
+            return reachLimit(width: width, height: nextHeight)
         }
 
-        let nextRetainedPixelCount = retainedPixelCount + image.pixelCount
-        if nextRetainedPixelCount > maxRetainedPixelCount {
-            didReachPixelLimit = true
-            let retainedPixels = "\(nextRetainedPixelCount) pixels"
-            AppLog.capture.warning(
-                "Scrolling capture retained frame limit reached at \(retainedPixels, privacy: .public)",
-            )
-            return .limitReached
+        guard let strip = copyBottomStrip(from: image, height: offsetPixels) else {
+            return .ignored(.registrationFailed)
         }
 
-        shiftSegments(upBy: offsetPixels)
-        segments.append(Segment(image: image, originY: 0))
-        retainedPixelCount = nextRetainedPixelCount
+        segments.append(Segment(image: strip))
+        retainedSegmentImageIDs.insert(ObjectIdentifier(strip))
+        previousAcceptedImage = image
+        retainedByteCount = safeSum(retainedByteCount, estimatedByteCount(for: strip))
         height = nextHeight
         return .accepted
     }
 
     func finish() -> CGImage? {
+        defer {
+            releaseCapturedFrames()
+            offsetCalculator.reset()
+        }
+
         guard let width, height > 0, let reference = segments.first?.image else { return nil }
         guard let context = makeContext(reference: reference, width: width, height: height) else { return nil }
         context.interpolationQuality = .none
 
+        var destinationY = height
         for segment in segments {
+            destinationY -= segment.image.height
             let drawRect = CGRect(
                 x: 0,
-                y: CGFloat(segment.originY),
-                width: CGFloat(segment.image.width),
-                height: CGFloat(segment.image.height),
+                y: destinationY,
+                width: segment.image.width,
+                height: segment.image.height,
             )
             context.draw(segment.image, in: drawRect)
         }
@@ -214,43 +399,107 @@ actor ScrollingStitcher {
     }
 
     func reachedPixelLimitForTesting() -> Bool {
-        didReachPixelLimit
+        didReachLimit
     }
 
-    private func shiftSegments(upBy amount: Int) {
-        for index in segments.indices {
-            segments[index].originY += amount
-        }
+    func retainedByteCountForTesting() -> Int {
+        retainedByteCount
     }
 
-    private func cropBottom(by amount: Int) {
-        height = max(0, height - amount)
-        for index in segments.indices {
-            segments[index].originY -= amount
+    func retainedSegmentHeightsForTesting() -> [Int] {
+        segments.map(\.image.height)
+    }
+
+    private func releaseCapturedFrames() {
+        segments.removeAll(keepingCapacity: false)
+        previousAcceptedImage = nil
+        width = nil
+        height = 0
+        retainedByteCount = 0
+        retainedSegmentImageIDs.removeAll(keepingCapacity: false)
+        destinationBytesPerRow = nil
+    }
+
+    private func copyBottomStrip(from image: CGImage, height: Int) -> CGImage? {
+        let cropRect = CGRect(x: 0, y: image.height - height, width: image.width, height: height)
+        guard let croppedImage = image.cropping(to: cropRect),
+              let context = makeContext(reference: image, width: image.width, height: height)
+        else {
+            return nil
         }
-        segments.removeAll { segment in
-            segment.originY + segment.image.height <= 0
+        context.interpolationQuality = .none
+        context.draw(croppedImage, in: CGRect(x: 0, y: 0, width: image.width, height: height))
+        return context.makeImage()
+    }
+
+    private func estimatedByteCount(for image: CGImage) -> Int {
+        safeProduct(image.bytesPerRow, image.height)
+    }
+
+    private func projectedWorkingSet(
+        outputByteCount: Int,
+        additionalRetainedByteCount: Int,
+        frameImages: [CGImage],
+    ) -> Int {
+        var additionalImageIDs: Set<ObjectIdentifier> = []
+        var frameByteCount = 0
+        for image in frameImages {
+            let imageID = ObjectIdentifier(image)
+            guard !retainedSegmentImageIDs.contains(imageID),
+                  additionalImageIDs.insert(imageID).inserted
+            else {
+                continue
+            }
+            frameByteCount = safeSum(frameByteCount, estimatedByteCount(for: image))
         }
-        retainedPixelCount = segments.reduce(0) { total, segment in
-            total + segment.image.pixelCount
-        }
+
+        let segmentByteCount = safeSum(retainedByteCount, additionalRetainedByteCount)
+        let retainedImageByteCount = safeSum(segmentByteCount, frameByteCount)
+        return safeSum(retainedImageByteCount, outputByteCount)
+    }
+
+    private func reachLimit(width: Int, height: Int) -> ScrollingStitcherStatus {
+        didReachLimit = true
+        let dimensions = "\(width)x\(height)"
+        AppLog.capture.warning(
+            "Scrolling capture size limit reached at \(dimensions, privacy: .public)",
+        )
+        return .limitReached
+    }
+
+    private func safeProduct(_ lhs: Int, _ rhs: Int) -> Int {
+        let result = lhs.multipliedReportingOverflow(by: rhs)
+        return result.overflow ? .max : result.partialValue
+    }
+
+    private func safeSum(_ lhs: Int, _ rhs: Int) -> Int {
+        let result = lhs.addingReportingOverflow(rhs)
+        return result.overflow ? .max : result.partialValue
     }
 
     private func makeContext(reference image: CGImage, width: Int, height: Int) -> CGContext? {
-        CGContext(
+        guard let bytesPerRow = bitmapBytesPerRow(for: image, width: width) else {
+            return nil
+        }
+        return CGContext(
             data: nil,
             width: width,
             height: height,
             bitsPerComponent: image.bitsPerComponent,
-            bytesPerRow: 0,
+            bytesPerRow: bytesPerRow,
             space: image.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: image.bitmapInfo.rawValue,
         )
     }
 }
 
-private extension CGImage {
-    var pixelCount: Int {
-        width * height
-    }
+private func bitmapBytesPerRow(for image: CGImage, width: Int) -> Int? {
+    guard width > 0, image.bitsPerPixel > 0 else { return nil }
+    let bitCount = width.multipliedReportingOverflow(by: image.bitsPerPixel)
+    guard !bitCount.overflow else { return nil }
+
+    let wholeBytes = bitCount.partialValue / 8
+    let partialByte = bitCount.partialValue % 8 == 0 ? 0 : 1
+    let byteCount = wholeBytes.addingReportingOverflow(partialByte)
+    return byteCount.overflow ? nil : byteCount.partialValue
 }

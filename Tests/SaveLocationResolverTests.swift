@@ -32,7 +32,7 @@ final class SaveLocationResolverTests: XCTestCase {
         let resolved = SaveLocationResolver.resolve(option: .custom, customPath: custom)
         let expected = home.appendingPathComponent(relative).standardizedFileURL.resolvingSymlinksInPath()
 
-        XCTAssertEqual(resolved, expected)
+        XCTAssertEqual(normalizedPath(resolved), normalizedPath(expected))
     }
 
     func testCustomPathRejectsRelativePath() {

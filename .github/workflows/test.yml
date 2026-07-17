@@ -22,3 +22,12 @@ jobs:
 
       - name: test
         run: script/test
+
+      - name: upload coverage result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # pin@v7.0.1
+        with:
+          name: OneShot-coverage-${{ github.run_id }}
+          path: build/TestResults.xcresult
+          retention-days: 5
+          if-no-files-found: warn
