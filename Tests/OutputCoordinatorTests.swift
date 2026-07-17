@@ -30,273 +30,278 @@ final class OutputCoordinatorTests: XCTestCase {
     }
 
     @MainActor
-    func testFinalizeSavesImmediately() {
-        let settings = SettingsStore(defaults: defaults)
-        settings.saveLocationOption = .custom
-        settings.customSavePath = tempDirectory.path
-        settings.saveDelaySeconds = 60
-
-        let queue = DispatchQueue(label: "OutputCoordinatorTests.queue")
-        let saveExpectation = expectation(description: "Saved")
-        var savedURL: URL?
-
+    func testFinalizeSavesAndFinishReleasesOutput() async throws {
+        let settings = makeSettings()
         let coordinator = OutputCoordinator(
             settings: settings,
-            queue: queue,
             dateProvider: { Date(timeIntervalSince1970: 0) },
             clipboardCopy: { _ in },
-            onSave: { _, url in
-                savedURL = url
-                saveExpectation.fulfill()
-            },
         )
-
         let pngData = makeTestPNGData()
-        let id = coordinator.begin(pngData: pngData)
-        coordinator.finalize(id: id)
 
-        wait(for: [saveExpectation], timeout: 2)
-        guard let url = savedURL else {
-            XCTFail("Missing saved URL")
-            return
-        }
-        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
-        let savedData = try? Data(contentsOf: url)
-        XCTAssertEqual(savedData, pngData)
+        let id = await coordinator.begin(pngData: pngData, scheduleSave: false)
+        let result = try await coordinator.finalize(id: id)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: result.url.path))
+        XCTAssertEqual(try Data(contentsOf: result.url), pngData)
+        let pendingBeforeFinish = await coordinator.pendingOutputCountForTesting()
+        XCTAssertEqual(pendingBeforeFinish, 1)
+
+        await coordinator.finish(id: id)
+        let pendingAfterFinish = await coordinator.pendingOutputCountForTesting()
+        XCTAssertEqual(pendingAfterFinish, 0)
     }
 
     @MainActor
-    func testCancelDeletesSavedFileAfterSave() {
-        let settings = SettingsStore(defaults: defaults)
-        settings.saveLocationOption = .custom
-        settings.customSavePath = tempDirectory.path
-        settings.saveDelaySeconds = 0
-
-        let queue = DispatchQueue(label: "OutputCoordinatorTests.queue")
-        let saveExpectation = expectation(description: "Saved")
-        var savedURL: URL?
-
+    func testDiscardDeletesPreviouslySavedFileButDoesNotTouchClipboard() async throws {
+        let settings = makeSettings()
+        settings.autoCopyToClipboard = true
+        var clipboardWrites = 0
         let coordinator = OutputCoordinator(
             settings: settings,
-            queue: queue,
-            dateProvider: { Date(timeIntervalSince1970: 0) },
-            clipboardCopy: { _ in },
-            onSave: { _, url in
-                savedURL = url
-                saveExpectation.fulfill()
-            },
+            clipboardCopy: { _ in clipboardWrites += 1 },
         )
 
-        let id = coordinator.begin(pngData: makeTestPNGData())
-        wait(for: [saveExpectation], timeout: 2)
+        let id = await coordinator.begin(pngData: makeTestPNGData(), scheduleSave: false)
+        let result = try await coordinator.finalize(id: id)
+        try await coordinator.discard(id: id)
 
-        coordinator.cancel(id: id)
-        queue.sync {}
-
-        guard let url = savedURL else {
-            XCTFail("Missing saved URL")
-            return
-        }
-        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        XCTAssertEqual(clipboardWrites, 1)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: result.url.path))
+        let pendingAfterDiscard = await coordinator.pendingOutputCountForTesting()
+        XCTAssertEqual(pendingAfterDiscard, 0)
     }
 
     @MainActor
-    func testBeginCopiesPNGDataToClipboard() {
-        let settings = SettingsStore(defaults: defaults)
-        settings.saveLocationOption = .custom
-        settings.customSavePath = tempDirectory.path
-        settings.saveDelaySeconds = 60
-
-        let queue = DispatchQueue(label: "OutputCoordinatorTests.queue")
-        let pngData = makeTestPNGData()
-        var clipboardData: Data?
-
-        let coordinator = OutputCoordinator(
-            settings: settings,
-            queue: queue,
-            clipboardCopy: { data in
-                clipboardData = data
-            },
-        )
-
-        let id = coordinator.begin(pngData: pngData)
-        coordinator.cancel(id: id)
-        queue.sync {}
-        XCTAssertEqual(clipboardData, pngData)
-    }
-
-    @MainActor
-    func testBeginSkipsClipboardWhenDisabled() {
-        let settings = SettingsStore(defaults: defaults)
+    func testBeginSkipsClipboardWhenDisabled() async throws {
+        let settings = makeSettings()
         settings.autoCopyToClipboard = false
-        settings.saveLocationOption = .custom
-        settings.customSavePath = tempDirectory.path
-        settings.saveDelaySeconds = 60
-
-        let queue = DispatchQueue(label: "OutputCoordinatorTests.queue")
-        let pngData = makeTestPNGData()
-        var clipboardData: Data?
-
+        var clipboardWrites = 0
         let coordinator = OutputCoordinator(
             settings: settings,
-            queue: queue,
-            clipboardCopy: { data in
-                clipboardData = data
-            },
+            clipboardCopy: { _ in clipboardWrites += 1 },
         )
 
-        let id = coordinator.begin(pngData: pngData)
-        coordinator.cancel(id: id)
-        queue.sync {}
-        XCTAssertNil(clipboardData)
+        let id = await coordinator.begin(pngData: makeTestPNGData(), scheduleSave: false)
+        XCTAssertEqual(clipboardWrites, 0)
+        try await coordinator.discard(id: id)
     }
 
     @MainActor
-    func testBeginWithoutSchedulingDefersSaveUntilFinalize() {
-        let settings = SettingsStore(defaults: defaults)
-        settings.saveLocationOption = .custom
-        settings.customSavePath = tempDirectory.path
-        settings.saveDelaySeconds = 0
-
-        let queue = DispatchQueue(label: "OutputCoordinatorTests.queue")
-        let noSaveExpectation = expectation(description: "No save before finalize")
-        noSaveExpectation.isInverted = true
-        let saveExpectation = expectation(description: "Saved after finalize")
-        var didFinalize = false
-
-        let coordinator = OutputCoordinator(
-            settings: settings,
-            queue: queue,
-            clipboardCopy: { _ in },
-            onSave: { _, _ in
-                if !didFinalize {
-                    noSaveExpectation.fulfill()
-                }
-                saveExpectation.fulfill()
-            },
-        )
-
-        let id = coordinator.begin(pngData: makeTestPNGData(), scheduleSave: false)
-        wait(for: [noSaveExpectation], timeout: 0.2)
-        didFinalize = true
-        coordinator.finalize(id: id)
-        wait(for: [saveExpectation], timeout: 2)
-    }
-
-    @MainActor
-    func testFinalizeReturnsSavedURL() {
-        let settings = SettingsStore(defaults: defaults)
-        settings.saveLocationOption = .custom
-        settings.customSavePath = tempDirectory.path
-        settings.saveDelaySeconds = 60
-
-        let queue = DispatchQueue(label: "OutputCoordinatorTests.queue")
-        let saveExpectation = expectation(description: "Finalize completion")
-        var savedURL: URL?
-
-        let coordinator = OutputCoordinator(
-            settings: settings,
-            queue: queue,
-            dateProvider: { Date(timeIntervalSince1970: 0) },
-            clipboardCopy: { _ in },
-        )
-
-        let pngData = makeTestPNGData()
-        let id = coordinator.begin(pngData: pngData, scheduleSave: false)
-        coordinator.finalize(id: id) { url in
-            savedURL = url
-            saveExpectation.fulfill()
-        }
-
-        wait(for: [saveExpectation], timeout: 2)
-        guard let url = savedURL else {
-            XCTFail("Missing saved URL")
-            return
-        }
-        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
-        let savedData = try? Data(contentsOf: url)
-        XCTAssertEqual(savedData, pngData)
-    }
-
-    @MainActor
-    func testFinalizeReturnsSavedURLAfterScheduledSave() {
-        let settings = SettingsStore(defaults: defaults)
-        settings.saveLocationOption = .custom
-        settings.customSavePath = tempDirectory.path
-        settings.saveDelaySeconds = 0
-
-        let queue = DispatchQueue(label: "OutputCoordinatorTests.queue")
-        let saveExpectation = expectation(description: "Saved")
-        let finalizeExpectation = expectation(description: "Finalize completion")
-        var savedURL: URL?
-        var finalizedURL: URL?
-
-        let coordinator = OutputCoordinator(
-            settings: settings,
-            queue: queue,
-            dateProvider: { Date(timeIntervalSince1970: 0) },
-            clipboardCopy: { _ in },
-            onSave: { _, url in
-                savedURL = url
-                saveExpectation.fulfill()
-            },
-        )
-
-        let id = coordinator.begin(pngData: makeTestPNGData())
-        wait(for: [saveExpectation], timeout: 2)
-
-        coordinator.finalize(id: id) { url in
-            finalizedURL = url
-            finalizeExpectation.fulfill()
-        }
-
-        wait(for: [finalizeExpectation], timeout: 2)
-        guard let savedURL else {
-            XCTFail("Missing saved URL")
-            return
-        }
-        XCTAssertEqual(finalizedURL, savedURL)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: savedURL.path))
-    }
-
-    @MainActor
-    func testFinalizeReturnsNilWhenSaveFails() throws {
-        let settings = SettingsStore(defaults: defaults)
+    func testFailedSaveRemainsRecoverableThroughSaveAs() async throws {
+        let settings = makeSettings()
         let invalidDirectory = tempDirectory.appendingPathComponent("not-a-directory")
         try Data("data".utf8).write(to: invalidDirectory)
-        settings.saveLocationOption = .custom
         settings.customSavePath = invalidDirectory.path
-        settings.saveDelaySeconds = 0
-
-        let queue = DispatchQueue(label: "OutputCoordinatorTests.queue")
-        let finalizeExpectation = expectation(description: "Finalize completion")
-        var finalizedURL: URL?
-
         let coordinator = OutputCoordinator(
             settings: settings,
-            queue: queue,
+            clipboardCopy: { _ in },
+        )
+        let id = await coordinator.begin(pngData: makeTestPNGData(), scheduleSave: false)
+
+        do {
+            _ = try await coordinator.finalize(id: id)
+            XCTFail("Expected configured save to fail")
+        } catch {
+            guard case .saveFailed = error else {
+                XCTFail("Unexpected error: \(error)")
+                return
+            }
+        }
+
+        let pendingAfterFailure = await coordinator.pendingOutputCountForTesting()
+        XCTAssertEqual(pendingAfterFailure, 1)
+        let recoveryURL = tempDirectory.appendingPathComponent("recovered.png")
+        let recovered = try await coordinator.saveAndFinish(id: id, destination: .file(recoveryURL))
+        XCTAssertEqual(recovered.url, recoveryURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recoveryURL.path))
+        let pendingAfterRecovery = await coordinator.pendingOutputCountForTesting()
+        XCTAssertEqual(pendingAfterRecovery, 0)
+    }
+
+    @MainActor
+    func testMissingCustomDirectoryIsNotSilentlyRecreated() async throws {
+        let settings = makeSettings()
+        let coordinator = OutputCoordinator(settings: settings, clipboardCopy: { _ in })
+        let id = await coordinator.begin(pngData: makeTestPNGData(), scheduleSave: false)
+        try FileManager.default.removeItem(at: tempDirectory)
+
+        do {
+            _ = try await coordinator.finalize(id: id)
+            XCTFail("Expected the missing custom directory to fail")
+        } catch {
+            guard case .saveFailed = error else {
+                XCTFail("Unexpected error: \(error)")
+                return
+            }
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDirectory.path))
+        let pendingCount = await coordinator.pendingOutputCountForTesting()
+        XCTAssertEqual(pendingCount, 1)
+        try await coordinator.discard(id: id)
+    }
+
+    @MainActor
+    func testInvalidCustomPathDoesNotFallBackToDownloads() async throws {
+        let settings = makeSettings()
+        settings.customSavePath = "relative/path"
+        let saveCounter = LockedCounter()
+        let store = OutputStore(saveFile: { _, _, _ in
+            saveCounter.increment()
+            return URL(fileURLWithPath: "/unused.png")
+        })
+        let coordinator = OutputCoordinator(settings: settings, clipboardCopy: { _ in }, store: store)
+        let id = await coordinator.begin(pngData: makeTestPNGData(), scheduleSave: false)
+
+        do {
+            _ = try await coordinator.finalize(id: id)
+            XCTFail("Expected the invalid custom path to fail")
+        } catch {
+            guard case .saveFailed = error else {
+                XCTFail("Unexpected error: \(error)")
+                return
+            }
+        }
+
+        XCTAssertEqual(saveCounter.value, 0)
+        try await coordinator.discard(id: id)
+    }
+
+    @MainActor
+    func testVanishedEarlySaveIsRecreatedFromPendingPNG() async throws {
+        let settings = makeSettings()
+        let coordinator = OutputCoordinator(
+            settings: settings,
             dateProvider: { Date(timeIntervalSince1970: 0) },
             clipboardCopy: { _ in },
         )
+        let pngData = makeTestPNGData()
+        let id = await coordinator.begin(pngData: pngData, scheduleSave: false)
+        let first = try await coordinator.finalize(id: id)
+        try FileManager.default.removeItem(at: first.url)
 
-        let id = coordinator.begin(pngData: makeTestPNGData(), scheduleSave: false)
-        coordinator.finalize(id: id) { url in
-            finalizedURL = url
-            finalizeExpectation.fulfill()
+        let recovered = try await coordinator.finalize(id: id)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recovered.url.path))
+        XCTAssertEqual(try Data(contentsOf: recovered.url), pngData)
+        await coordinator.finish(id: id)
+    }
+
+    @MainActor
+    func testSaveAndFinishIsTerminalAndLaterDiscardCannotDeleteFile() async throws {
+        let settings = makeSettings()
+        let coordinator = OutputCoordinator(settings: settings, clipboardCopy: { _ in })
+        let id = await coordinator.begin(pngData: makeTestPNGData(), scheduleSave: false)
+
+        let saved = try await coordinator.saveAndFinish(id: id)
+        try await coordinator.discard(id: id)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: saved.url.path))
+    }
+
+    @MainActor
+    func testConcurrentFinalizeWritesExactlyOnce() async throws {
+        let settings = makeSettings()
+        let counter = LockedCounter()
+        let store = OutputStore(
+            saveFile: { data, directory, filename in
+                counter.increment()
+                return try FileSaveService.save(pngData: data, to: directory, filename: filename)
+            },
+        )
+        let coordinator = OutputCoordinator(settings: settings, clipboardCopy: { _ in }, store: store)
+        let id = await coordinator.begin(pngData: makeTestPNGData(), scheduleSave: false)
+
+        async let first = coordinator.finalize(id: id)
+        async let second = coordinator.finalize(id: id)
+        let results = try await (first, second)
+
+        XCTAssertEqual(results.0.url, results.1.url)
+        XCTAssertEqual(counter.value, 1)
+        await coordinator.finish(id: id)
+    }
+
+    @MainActor
+    func testScheduledSaveUsesInjectedSleeperWithoutFixedDelay() async throws {
+        let settings = makeSettings()
+        settings.saveDelaySeconds = 60
+        let sleepStarted = expectation(description: "Sleep requested")
+        let saveFinished = expectation(description: "Save finished")
+        let sleeper = ManualSleeper(onStart: { sleepStarted.fulfill() })
+        let coordinator = OutputCoordinator(
+            settings: settings,
+            clipboardCopy: { _ in },
+            sleeper: { duration in try await sleeper.sleep(duration) },
+            onSave: { _, _ in saveFinished.fulfill() },
+        )
+
+        let id = await coordinator.begin(pngData: makeTestPNGData())
+        await fulfillment(of: [sleepStarted], timeout: 1)
+        let pendingWhileScheduled = await coordinator.pendingOutputCountForTesting()
+        XCTAssertEqual(pendingWhileScheduled, 1)
+        sleeper.resume()
+        await fulfillment(of: [saveFinished], timeout: 1)
+        try await coordinator.discard(id: id)
+    }
+
+    @MainActor
+    private func makeSettings() -> SettingsStore {
+        let settings = SettingsStore(defaults: defaults)
+        settings.saveLocationOption = .custom
+        settings.customSavePath = tempDirectory.path
+        settings.saveDelaySeconds = 60
+        settings.autoCopyToClipboard = false
+        return settings
+    }
+}
+
+private final class LockedCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage = 0
+
+    var value: Int {
+        lock.withLock { storage }
+    }
+
+    func increment() {
+        lock.withLock { storage += 1 }
+    }
+}
+
+private final class ManualSleeper: @unchecked Sendable {
+    private let lock = NSLock()
+    private let onStart: @Sendable () -> Void
+    private var continuation: CheckedContinuation<Void, Error>?
+
+    init(onStart: @escaping @Sendable () -> Void) {
+        self.onStart = onStart
+    }
+
+    func sleep(_: Duration) async throws {
+        onStart()
+        try await withCheckedThrowingContinuation { continuation in
+            lock.withLock {
+                self.continuation = continuation
+            }
         }
+    }
 
-        wait(for: [finalizeExpectation], timeout: 2)
-        XCTAssertNil(finalizedURL)
-        XCTAssertEqual(coordinator.pendingSaveCountForTesting(), 0)
+    func resume() {
+        let continuation = lock.withLock {
+            let value = self.continuation
+            self.continuation = nil
+            return value
+        }
+        continuation?.resume()
     }
 }
 
 private func makeTestPNGData() -> Data {
-    let size = NSSize(width: 2, height: 2)
     let rep = NSBitmapImageRep(
         bitmapDataPlanes: nil,
-        pixelsWide: Int(size.width),
-        pixelsHigh: Int(size.height),
+        pixelsWide: 2,
+        pixelsHigh: 2,
         bitsPerSample: 8,
         samplesPerPixel: 4,
         hasAlpha: true,

@@ -3,38 +3,27 @@ import XCTest
 
 final class PreviewAutoDismissGateTests: XCTestCase {
     func testDeadlineReachedDismissesWhenNotInteracting() {
-        let deadline = Date(timeIntervalSince1970: 10)
-        var gate = PreviewAutoDismissGate(deadline: deadline)
+        var gate = PreviewAutoDismissGate()
 
-        XCTAssertTrue(gate.deadlineReached(now: Date(timeIntervalSince1970: 11)))
+        XCTAssertTrue(gate.deadlineReached())
         XCTAssertFalse(gate.pending)
     }
 
     func testDeadlineReachedDefersWhileHoveredThenDismissesOnHoverExit() {
-        let deadline = Date(timeIntervalSince1970: 10)
-        var gate = PreviewAutoDismissGate(deadline: deadline)
-        gate.isHovered = true
+        var gate = PreviewAutoDismissGate(isHovered: true)
 
-        XCTAssertFalse(gate.deadlineReached(now: Date(timeIntervalSince1970: 10)))
+        XCTAssertFalse(gate.deadlineReached())
         XCTAssertTrue(gate.pending)
-
-        XCTAssertTrue(gate.interactionChanged(isHovered: false, now: Date(timeIntervalSince1970: 12)))
-        XCTAssertTrue(gate.pending)
-        XCTAssertTrue(gate.deadlineReached(now: Date(timeIntervalSince1970: 12)))
+        XCTAssertTrue(gate.interactionChanged(isHovered: false))
         XCTAssertFalse(gate.pending)
     }
 
     func testDeadlineReachedDefersWhileDraggingThenDismissesOnDragEnd() {
-        let deadline = Date(timeIntervalSince1970: 10)
-        var gate = PreviewAutoDismissGate(deadline: deadline)
-        gate.isDragging = true
+        var gate = PreviewAutoDismissGate(isDragging: true)
 
-        XCTAssertFalse(gate.deadlineReached(now: Date(timeIntervalSince1970: 10)))
+        XCTAssertFalse(gate.deadlineReached())
         XCTAssertTrue(gate.pending)
-
-        XCTAssertTrue(gate.interactionChanged(isDragging: false, now: Date(timeIntervalSince1970: 12)))
-        XCTAssertTrue(gate.pending)
-        XCTAssertTrue(gate.deadlineReached(now: Date(timeIntervalSince1970: 12)))
+        XCTAssertTrue(gate.interactionChanged(isDragging: false))
         XCTAssertFalse(gate.pending)
     }
 }

@@ -3,17 +3,17 @@ import ImageIO
 import UniformTypeIdentifiers
 
 enum PNGDataEncoder {
-    static func encodeAsync(cgImage: CGImage) async throws -> Data {
+    static func encodeAsync(cgImage: CGImage, scale: CGFloat = 1) async throws -> Data {
         try await Task.detached(priority: .userInitiated) {
             let signpostID = AppSignpost.begin("PNG encode")
             defer {
                 AppSignpost.end("PNG encode", id: signpostID)
             }
-            return try encode(cgImage: cgImage)
+            return try encode(cgImage: cgImage, scale: scale)
         }.value
     }
 
-    static func encode(cgImage: CGImage) throws -> Data {
+    static func encode(cgImage: CGImage, scale: CGFloat = 1) throws -> Data {
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
             data,
@@ -28,7 +28,7 @@ enum PNGDataEncoder {
             )
         }
 
-        let options = pngOptions(for: cgImage)
+        let options = pngOptions(for: cgImage, scale: scale)
         CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
         guard CGImageDestinationFinalize(destination) else {
             throw NSError(
@@ -65,7 +65,8 @@ enum PNGDataEncoder {
         return image.cgImage(forProposedRect: &rect, context: nil, hints: nil)
     }
 
-    private static func pngOptions(for cgImage: CGImage) -> [CFString: Any] {
+    private static func pngOptions(for cgImage: CGImage, scale: CGFloat) -> [CFString: Any] {
+        let dpi = 72 * max(scale, 1)
         var properties: [CFString: Any] = [
             kCGImagePropertyPixelWidth: cgImage.width,
             kCGImagePropertyPixelHeight: cgImage.height,
@@ -74,6 +75,8 @@ enum PNGDataEncoder {
             kCGImagePropertyHasAlpha: hasAlpha(for: cgImage),
             kCGImagePropertyIsFloat: cgImage.bitmapInfo.contains(.floatComponents),
             kCGImagePropertyIsIndexed: isIndexedColorSpace(for: cgImage),
+            kCGImagePropertyDPIWidth: dpi,
+            kCGImagePropertyDPIHeight: dpi,
             kCGImagePropertyPNGDictionary: [
                 kCGImagePropertyPNGInterlaceType: 0,
                 kCGImagePropertyPNGCompressionFilter: IMAGEIO_PNG_NO_FILTERS,

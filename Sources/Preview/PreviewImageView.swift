@@ -2,11 +2,21 @@ import AppKit
 
 final class PreviewImageView: NSImageView, NSDraggingSource {
     var onOpen: (() -> Void)?
+    var onSave: (() -> Void)? {
+        didSet { updateAccessibilityActions() }
+    }
+
+    var onDiscard: (() -> Void)? {
+        didSet { updateAccessibilityActions() }
+    }
+
+    var onFocusChanged: ((Bool) -> Void)?
     var dragPayload: PreviewDragPayload?
     var shouldIgnoreEvent: ((NSEvent) -> Bool)?
     var onDragStateChanged: ((Bool) -> Void)?
     private var didDrag = false
     private var draggingSessionStarted = false
+    private var isOutputSaved = false
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -19,6 +29,8 @@ final class PreviewImageView: NSImageView, NSDraggingSource {
     }
 
     override func mouseDown(with event: NSEvent) {
+        window?.makeKey()
+        window?.makeFirstResponder(self)
         didDrag = false
         draggingSessionStarted = false
         guard !shouldIgnore(event) else { return }
@@ -27,7 +39,7 @@ final class PreviewImageView: NSImageView, NSDraggingSource {
     override func mouseDragged(with event: NSEvent) {
         guard !shouldIgnore(event) else { return }
         guard !draggingSessionStarted, let payload = dragPayload else { return }
-        guard let draggingItem = payload.makeDraggingItem(dragFrame: bounds) else { return }
+        let draggingItem = payload.makeDraggingItem(dragFrame: bounds)
         didDrag = true
         draggingSessionStarted = true
         onDragStateChanged?(true)
@@ -49,12 +61,35 @@ final class PreviewImageView: NSImageView, NSDraggingSource {
     func draggingSession(_: NSDraggingSession, endedAt _: NSPoint, operation _: NSDragOperation) {
         draggingSessionStarted = false
         onDragStateChanged?(false)
-        dragPayload?.rescheduleCleanup()
+    }
+
+    override var acceptsFirstResponder: Bool {
+        true
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        onFocusChanged?(true)
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        onFocusChanged?(false)
+        return true
     }
 
     override func accessibilityPerformPress() -> Bool {
         onOpen?()
         return true
+    }
+
+    func setSavedState(_ saved: Bool) {
+        isOutputSaved = saved
+        setAccessibilityHelp(
+            saved
+                ? "Open or drag the screenshot, save another copy, or delete the saved file. Clipboard copies are kept."
+                : "Open the screenshot, drag it to another app, save it, or choose not to save it.",
+        )
+        updateAccessibilityActions()
     }
 
     private func shouldIgnore(_ event: NSEvent) -> Bool {
@@ -65,6 +100,27 @@ final class PreviewImageView: NSImageView, NSDraggingSource {
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
         setAccessibilityLabel("Screenshot preview")
-        setAccessibilityHelp("Open the screenshot, or drag it to another app.")
+        setAccessibilityHelp("Open the screenshot, drag it to another app, save it, or choose not to save it.")
+        updateAccessibilityActions()
+    }
+
+    private func updateAccessibilityActions() {
+        let actions = [
+            NSAccessibilityCustomAction(name: "Open screenshot") { [weak self] in
+                self?.onOpen?()
+                return self?.onOpen != nil
+            },
+            NSAccessibilityCustomAction(name: "Save screenshot") { [weak self] in
+                self?.onSave?()
+                return self?.onSave != nil
+            },
+            NSAccessibilityCustomAction(
+                name: isOutputSaved ? "Delete saved screenshot" : "Don't save screenshot",
+            ) { [weak self] in
+                self?.onDiscard?()
+                return self?.onDiscard != nil
+            },
+        ]
+        setAccessibilityCustomActions(actions)
     }
 }

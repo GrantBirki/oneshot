@@ -3,23 +3,25 @@ import AppKit
 import XCTest
 
 final class ClipboardServiceTests: XCTestCase {
-    func testCopyWritesPNGAndTIFF() {
+    @MainActor
+    func testCopyWritesPNGAndTIFF() async throws {
         let pasteboard = NSPasteboard.withUniqueName()
         pasteboard.clearContents()
 
         let pngData = makePNGData(width: 1, height: 1)
-        ClipboardService.copy(pngData: pngData, to: pasteboard)
+        try await ClipboardService.copy(pngData: pngData, to: pasteboard)
 
         XCTAssertNotNil(pasteboard.data(forType: .png))
         XCTAssertNotNil(pasteboard.data(forType: .tiff))
     }
 
-    func testCopyWritesPNGForInvalidData() {
+    @MainActor
+    func testCopyWritesPNGForInvalidData() async throws {
         let pasteboard = NSPasteboard.withUniqueName()
         pasteboard.clearContents()
 
         let pngData = Data([0x00, 0x01, 0x02])
-        ClipboardService.copy(pngData: pngData, to: pasteboard)
+        try await ClipboardService.copy(pngData: pngData, to: pasteboard)
 
         XCTAssertEqual(pasteboard.data(forType: .png), pngData)
         XCTAssertTrue(pasteboard.types?.contains(.png) ?? false)

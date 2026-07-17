@@ -31,4 +31,25 @@ final class FilenameFormatterTests: XCTestCase {
 
         XCTAssertTrue(filename.hasPrefix("screenshot_"))
     }
+
+    func testFilenameNeverExceedsFilesystemComponentLimit() {
+        let filename = FilenameFormatter.makeFilename(
+            prefix: String(repeating: "very-long-prefix", count: 40),
+            date: Date(timeIntervalSince1970: 0),
+        )
+
+        XCTAssertLessThanOrEqual(filename.utf8.count, FilenameFormatter.maximumComponentBytes)
+        XCTAssertTrue(filename.hasSuffix(".png"))
+    }
+
+    func testFilenameTruncatesAtUnicodeCharacterBoundary() {
+        let filename = FilenameFormatter.makeFilename(
+            prefix: String(repeating: "📷", count: 100),
+            date: Date(timeIntervalSince1970: 0),
+        )
+
+        XCTAssertLessThanOrEqual(filename.utf8.count, FilenameFormatter.maximumComponentBytes)
+        XCTAssertNotNil(filename.data(using: .utf8))
+        XCTAssertTrue(filename.hasSuffix(".png"))
+    }
 }

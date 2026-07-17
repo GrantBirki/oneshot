@@ -1,6 +1,8 @@
 import Foundation
 
 enum FilenameFormatter {
+    static let maximumComponentBytes = 255
+
     static func makeFilename(prefix: String, date: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
@@ -15,9 +17,23 @@ enum FilenameFormatter {
         let hours = absOffset / 3600
         let minutes = (absOffset % 3600) / 60
         let timeZoneOffset = String(format: "%02d_%02d", hours, minutes)
+        let suffix = "_\(timestamp)_\(sign)_\(timeZoneOffset).png"
 
         let sanitizedPrefix = sanitizePrefix(prefix)
-        return "\(sanitizedPrefix)_\(timestamp)_\(sign)_\(timeZoneOffset).png"
+        let availablePrefixBytes = max(maximumComponentBytes - suffix.utf8.count, 1)
+        let fittedPrefix = truncateToUTF8Boundary(sanitizedPrefix, maximumBytes: availablePrefixBytes)
+        return "\(fittedPrefix)\(suffix)"
+    }
+
+    static func truncateToUTF8Boundary(_ value: String, maximumBytes: Int) -> String {
+        guard maximumBytes > 0 else { return "" }
+        guard value.utf8.count > maximumBytes else { return value }
+
+        var result = value
+        while result.utf8.count > maximumBytes, !result.isEmpty {
+            result.removeLast()
+        }
+        return result
     }
 
     private static func sanitizePrefix(_ prefix: String) -> String {

@@ -98,13 +98,6 @@ final class ScrollingCaptureSession {
         return true
     }
 
-    @discardableResult
-    func start(rect: CGRect, onFinish: @escaping (CGImage?) -> Void) -> Bool {
-        start(rect: rect) { result in
-            onFinish(result.reason == .cancelled ? nil : result.image)
-        }
-    }
-
     func stop() {
         requestStop(reason: .userStopped)
     }

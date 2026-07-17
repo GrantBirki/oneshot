@@ -64,4 +64,47 @@ final class CaptureSessionTrackerTests: XCTestCase {
 
         XCTAssertEqual(tracker.state, .idle)
     }
+
+    @MainActor
+    func testTaskCompletionRaceReturnsAtTimeoutWithoutWaitingForObservedTask() async {
+        let blocker = AsyncBlocker()
+        let task = Task { @MainActor in
+            await blocker.wait()
+        }
+
+        let completed = await TaskCompletionRace.wait(
+            for: task,
+            timeout: .seconds(5),
+            sleeper: { _ in },
+        )
+
+        XCTAssertFalse(completed)
+        blocker.resume()
+        await task.value
+    }
+}
+
+@MainActor
+private final class AsyncBlocker {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var isResolved = false
+
+    func wait() async {
+        if isResolved {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            if isResolved {
+                continuation.resume()
+            } else {
+                self.continuation = continuation
+            }
+        }
+    }
+
+    func resume() {
+        isResolved = true
+        continuation?.resume()
+        continuation = nil
+    }
 }
