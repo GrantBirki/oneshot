@@ -21,10 +21,31 @@ final class ScrollingStitcherTests: XCTestCase {
         var calculator = VisionScrollingOffsetCalculator(maxRegistrationDimension: 150)
 
         let firstOffset = try XCTUnwrap(calculator.offset(from: second, to: first))
+        let retainedImages = calculator.retainedImagesDuringOffset(from: third, to: second)
+        let projectedBytes = calculator.projectedAdditionalBytesForOffset(from: third, to: second)
         let secondOffset = try XCTUnwrap(calculator.offset(from: third, to: second))
 
         XCTAssertEqual(firstOffset.vertical, 24, accuracy: 3)
         XCTAssertEqual(secondOffset.vertical, 24, accuracy: 3)
+        XCTAssertEqual(retainedImages.count, 2)
+        XCTAssertEqual(projectedBytes, 72000)
+        XCTAssertEqual(calculator.retainedImagesForMemoryAccounting.count, 2)
+        calculator.reset()
+        XCTAssertTrue(calculator.retainedImagesForMemoryAccounting.isEmpty)
+    }
+
+    func testVisionRegistrationProjectsOnlyDownscaledBitmapBytes() {
+        let previous = makeSplitImage(width: 4, height: 4, topColor: .red, bottomColor: .blue)
+        let current = makeSplitImage(width: 4, height: 4, topColor: .green, bottomColor: .yellow)
+        let calculator = VisionScrollingOffsetCalculator(maxRegistrationDimension: 2)
+
+        let projectedBytes = calculator.projectedAdditionalBytesForOffset(
+            from: current,
+            to: previous,
+        )
+
+        XCTAssertEqual(projectedBytes, 32)
+        XCTAssertTrue(calculator.retainedImagesDuringOffset(from: current, to: previous).isEmpty)
     }
 
     func testStitcherAppendsOnlyNewBottomStripForDownwardOffset() async {
@@ -134,7 +155,7 @@ final class ScrollingStitcherTests: XCTestCase {
         let stitcher = ScrollingStitcher(
             offsetCalculator: StubOffsetCalculator(vertical: 2),
             maxPixelCount: 1000,
-            maxWorkingSetBytes: 170,
+            maxWorkingSetBytes: 255,
         )
         let base = makeSplitImage(width: 4, height: 4, topColor: .red, bottomColor: .blue)
         let next = makeSplitImage(width: 4, height: 4, topColor: .green, bottomColor: .yellow)
@@ -145,6 +166,46 @@ final class ScrollingStitcherTests: XCTestCase {
         XCTAssertEqual(addStatus, .limitReached)
 
         let result = await stitcher.finish()
+        XCTAssertEqual(result?.height, 4)
+    }
+
+    func testStitcherAcceptsExactWorkingSetLimit() async {
+        let stitcher = ScrollingStitcher(
+            offsetCalculator: StubOffsetCalculator(vertical: 2),
+            maxPixelCount: 1000,
+            maxWorkingSetBytes: 256,
+        )
+        let base = makeSplitImage(width: 4, height: 4, topColor: .red, bottomColor: .blue)
+        let next = makeSplitImage(width: 4, height: 4, topColor: .green, bottomColor: .yellow)
+
+        let startStatus = await stitcher.start(with: base)
+        let addStatus = await stitcher.add(next)
+        let retainedByteCount = await stitcher.retainedByteCountForTesting()
+        let result = await stitcher.finish()
+
+        XCTAssertEqual(startStatus, .accepted)
+        XCTAssertEqual(addStatus, .accepted)
+        XCTAssertEqual(retainedByteCount, 96)
+        XCTAssertEqual(result?.height, 6)
+        XCTAssertEqual(result?.bytesPerRow, 16)
+    }
+
+    func testStitcherCountsRegistrationCacheInWorkingSetLimit() async {
+        let cachedImage = makeSplitImage(width: 4, height: 4, topColor: .purple, bottomColor: .orange)
+        let stitcher = ScrollingStitcher(
+            offsetCalculator: RetainingOffsetCalculator(vertical: 2, retainedImage: cachedImage),
+            maxPixelCount: 1000,
+            maxWorkingSetBytes: 319,
+        )
+        let base = makeSplitImage(width: 4, height: 4, topColor: .red, bottomColor: .blue)
+        let next = makeSplitImage(width: 4, height: 4, topColor: .green, bottomColor: .yellow)
+
+        let startStatus = await stitcher.start(with: base)
+        let addStatus = await stitcher.add(next)
+        let result = await stitcher.finish()
+
+        XCTAssertEqual(startStatus, .accepted)
+        XCTAssertEqual(addStatus, .limitReached)
         XCTAssertEqual(result?.height, 4)
     }
 
@@ -258,6 +319,19 @@ private struct StubOffsetCalculator: ScrollingOffsetCalculating {
 
     mutating func offset(from _: CGImage, to _: CGImage) -> ScrollingOffset? {
         vertical.map { ScrollingOffset(horizontal: horizontal, vertical: $0) }
+    }
+}
+
+private struct RetainingOffsetCalculator: ScrollingOffsetCalculating {
+    let vertical: CGFloat
+    let retainedImage: CGImage
+
+    var retainedImagesForMemoryAccounting: [CGImage] {
+        [retainedImage]
+    }
+
+    mutating func offset(from _: CGImage, to _: CGImage) -> ScrollingOffset? {
+        ScrollingOffset(horizontal: 0, vertical: vertical)
     }
 }
 

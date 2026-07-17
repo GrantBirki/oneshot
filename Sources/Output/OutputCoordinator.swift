@@ -164,6 +164,8 @@ actor OutputStore {
         if let savedURL = output.savedURL {
             do {
                 try deleteFile(savedURL)
+            } catch where Self.isMissingFileError(error) {
+                // The requested terminal state has already been reached.
             } catch {
                 throw .deleteFailed(String(describing: error))
             }
@@ -177,6 +179,25 @@ actor OutputStore {
 
     func isSaved(id: UUID) -> Bool {
         outputs[id]?.savedURL != nil
+    }
+
+    private static func isMissingFileError(_ error: Error) -> Bool {
+        let error = error as NSError
+        if error.domain == NSCocoaErrorDomain,
+           error.code == CocoaError.fileNoSuchFile.rawValue
+           || error.code == CocoaError.fileReadNoSuchFile.rawValue
+        {
+            return true
+        }
+        if error.domain == NSPOSIXErrorDomain,
+           error.code == Int(POSIXErrorCode.ENOENT.rawValue)
+        {
+            return true
+        }
+        guard let underlyingError = error.userInfo[NSUnderlyingErrorKey] as? Error else {
+            return false
+        }
+        return isMissingFileError(underlyingError)
     }
 }
 

@@ -73,6 +73,64 @@ final class OutputCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testDiscardTreatsCocoaMissingFileAsSuccess() async throws {
+        let deleteCounter = LockedCounter()
+        let coordinator = makeCoordinatorForDeleteTest { _ in
+            deleteCounter.increment()
+            throw CocoaError(.fileNoSuchFile)
+        }
+        let id = await coordinator.begin(pngData: makeTestPNGData(), scheduleSave: false)
+        _ = try await coordinator.finalize(id: id)
+
+        try await coordinator.discard(id: id)
+        let pendingCount = await coordinator.pendingOutputCountForTesting()
+
+        XCTAssertEqual(deleteCounter.value, 1)
+        XCTAssertEqual(pendingCount, 0)
+    }
+
+    @MainActor
+    func testDiscardTreatsWrappedPOSIXMissingFileAsSuccess() async throws {
+        let coordinator = makeCoordinatorForDeleteTest { _ in
+            throw NSError(
+                domain: NSCocoaErrorDomain,
+                code: CocoaError.fileReadUnknown.rawValue,
+                userInfo: [NSUnderlyingErrorKey: POSIXError(.ENOENT)],
+            )
+        }
+        let id = await coordinator.begin(pngData: makeTestPNGData(), scheduleSave: false)
+        _ = try await coordinator.finalize(id: id)
+
+        try await coordinator.discard(id: id)
+        let pendingCount = await coordinator.pendingOutputCountForTesting()
+
+        XCTAssertEqual(pendingCount, 0)
+    }
+
+    @MainActor
+    func testDiscardPreservesPendingOutputForRealDeleteFailure() async throws {
+        let coordinator = makeCoordinatorForDeleteTest { _ in
+            throw CocoaError(.fileWriteNoPermission)
+        }
+        let id = await coordinator.begin(pngData: makeTestPNGData(), scheduleSave: false)
+        _ = try await coordinator.finalize(id: id)
+
+        do {
+            try await coordinator.discard(id: id)
+            XCTFail("Expected deletion to fail")
+        } catch {
+            guard case .deleteFailed = error else {
+                XCTFail("Unexpected error: \(error)")
+                return
+            }
+        }
+
+        let pendingCount = await coordinator.pendingOutputCountForTesting()
+        XCTAssertEqual(pendingCount, 1)
+        await coordinator.finish(id: id)
+    }
+
+    @MainActor
     func testBeginSkipsClipboardWhenDisabled() async throws {
         let settings = makeSettings()
         settings.autoCopyToClipboard = false
@@ -253,6 +311,22 @@ final class OutputCoordinatorTests: XCTestCase {
         settings.saveDelaySeconds = 60
         settings.autoCopyToClipboard = false
         return settings
+    }
+
+    @MainActor
+    private func makeCoordinatorForDeleteTest(
+        deleteFile: @escaping OutputStore.DeleteFile,
+    ) -> OutputCoordinator {
+        let savedURL = tempDirectory.appendingPathComponent("saved.png")
+        let store = OutputStore(
+            saveFile: { _, _, _ in savedURL },
+            deleteFile: deleteFile,
+        )
+        return OutputCoordinator(
+            settings: makeSettings(),
+            clipboardCopy: { _ in },
+            store: store,
+        )
     }
 }
 
