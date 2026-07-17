@@ -87,6 +87,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             } else {
                 button.title = "OneShot"
             }
+            button.setAccessibilityLabel("OneShot")
+            button.setAccessibilityHelp("Open OneShot capture and settings commands.")
         } else {
             AppLog.app.error("Status item button unavailable")
         }
@@ -117,10 +119,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         let settingsItem = NSMenuItem(
-            title: "Settings...",
+            title: "Settings…",
             action: #selector(openSettings),
-            keyEquivalent: "",
+            keyEquivalent: ",",
         )
+        settingsItem.keyEquivalentModifierMask = .command
         settingsItem.target = self
         menu.addItem(settingsItem)
 

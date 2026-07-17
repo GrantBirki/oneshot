@@ -4,16 +4,82 @@ import Foundation
 final class HotkeyManager {
     private var hotKeyRefs: [UInt32: EventHotKeyRef] = [:]
     private var handlers: [UInt32: () -> Void] = [:]
-    private var nextID: UInt32 = 1
+    private var nextID: UInt32 = 100
     private var eventHandlerRef: EventHandlerRef?
+    private var eventHandlerInstallStatus: OSStatus = noErr
 
     init() {
         installHandlerIfNeeded()
     }
 
-    func register(hotkey: Hotkey, handler: @escaping () -> Void) {
+    deinit {
+        shutdown()
+    }
+
+    @discardableResult
+    func register(hotkey: Hotkey, handler: @escaping () -> Void) -> HotkeyRegistrationStatus {
         let id = nextID
         nextID += 1
+
+        return register(hotkey: hotkey, id: id, handler: handler)
+    }
+
+    func replaceRegistrations(
+        configuration: HotkeyConfiguration,
+        handlers: HotkeyHandlers,
+    ) -> [HotkeyAction: HotkeyRegistrationStatus] {
+        unregisterAll()
+
+        var statuses: [HotkeyAction: HotkeyRegistrationStatus] = [:]
+        let duplicateActions = duplicateActions(in: configuration)
+
+        for action in HotkeyAction.registrationOrder {
+            guard let hotkey = configuration[action] else {
+                statuses[action] = .notConfigured
+                continue
+            }
+            guard hotkey.isValid else {
+                statuses[action] = .invalid
+                continue
+            }
+            if let duplicate = duplicateActions[action] {
+                statuses[action] = .duplicate(duplicate)
+                continue
+            }
+
+            statuses[action] = register(
+                hotkey: hotkey,
+                id: action.registrationID,
+                handler: handlers[action],
+            )
+        }
+
+        return statuses
+    }
+
+    func shutdown() {
+        unregisterAll()
+        if let eventHandlerRef {
+            RemoveEventHandler(eventHandlerRef)
+            self.eventHandlerRef = nil
+        }
+    }
+
+    static func status(forRegistrationResult status: OSStatus, hasReference: Bool) -> HotkeyRegistrationStatus {
+        status == noErr && hasReference ? .registered : .unavailable(status)
+    }
+
+    private func register(
+        hotkey: Hotkey,
+        id: UInt32,
+        handler: @escaping () -> Void,
+    ) -> HotkeyRegistrationStatus {
+        guard hotkey.isValid else {
+            return .invalid
+        }
+        guard eventHandlerRef != nil else {
+            return .unavailable(eventHandlerInstallStatus)
+        }
 
         let hotKeyID = EventHotKeyID(signature: HotkeyManager.signature, id: id)
         var hotKeyRef: EventHotKeyRef?
@@ -26,16 +92,18 @@ final class HotkeyManager {
             &hotKeyRef,
         )
 
-        guard status == noErr, let ref = hotKeyRef else {
+        let registrationStatus = Self.status(forRegistrationResult: status, hasReference: hotKeyRef != nil)
+        guard case .registered = registrationStatus, let ref = hotKeyRef else {
             AppLog.hotkeys.error(
                 "Hotkey register failed (\(status, privacy: .public)) for \(hotkey.displayString, privacy: .public)",
             )
-            return
+            return registrationStatus
         }
 
         hotKeyRefs[id] = ref
         handlers[id] = handler
         AppLog.hotkeys.info("Hotkey registered: \(hotkey.displayString, privacy: .public)")
+        return .registered
     }
 
     func unregisterAll() {
@@ -62,8 +130,26 @@ final class HotkeyManager {
         )
 
         if status != noErr {
+            eventHandlerInstallStatus = status
             eventHandlerRef = nil
         }
+    }
+
+    private func duplicateActions(in configuration: HotkeyConfiguration) -> [HotkeyAction: HotkeyAction] {
+        var firstActionForHotkey: [Hotkey: HotkeyAction] = [:]
+        var duplicates: [HotkeyAction: HotkeyAction] = [:]
+
+        for action in HotkeyAction.registrationOrder {
+            guard let hotkey = configuration[action], hotkey.isValid else { continue }
+            if let firstAction = firstActionForHotkey[hotkey] {
+                duplicates[firstAction] = action
+                duplicates[action] = firstAction
+            } else {
+                firstActionForHotkey[hotkey] = action
+            }
+        }
+
+        return duplicates
     }
 
     private func handleHotKey(id: UInt32) {

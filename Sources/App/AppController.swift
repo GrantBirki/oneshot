@@ -1,6 +1,16 @@
 import Cocoa
 import Combine
 
+enum LaunchContext: Equatable, Sendable {
+    case foreground
+    case loginItem
+
+    static func current(event: NSAppleEventDescriptor? = NSAppleEventManager.shared().currentAppleEvent) -> LaunchContext {
+        let descriptor = event?.paramDescriptor(forKeyword: AEKeyword(keyAELaunchedAsLogInItem))
+        return descriptor?.booleanValue == true ? .loginItem : .foreground
+    }
+}
+
 @MainActor
 final class AppController {
     private let settings: SettingsStore
@@ -8,16 +18,16 @@ final class AppController {
     private let captureManager: CaptureManager
     private let menuBarController: MenuBarController
     private let settingsWindowController: SettingsWindowController
-    private let aboutWindowController: AboutWindowController
     private let launchAtLoginManager: LaunchAtLoginManager
+    private let launchContext: LaunchContext
     private var cancellables = Set<AnyCancellable>()
 
-    init() {
+    init(launchContext: LaunchContext = .current()) {
+        self.launchContext = launchContext
         settings = SettingsStore()
         hotkeyManager = HotkeyManager()
         captureManager = CaptureManager(settings: settings)
         settingsWindowController = SettingsWindowController(settings: settings)
-        aboutWindowController = AboutWindowController()
         launchAtLoginManager = LaunchAtLoginManager()
 
         menuBarController = MenuBarController(
@@ -25,15 +35,27 @@ final class AppController {
             onCaptureFullScreen: { [weak captureManager] in captureManager?.captureFullScreen() },
             onCaptureWindow: { [weak captureManager] in captureManager?.captureWindow() },
             onCaptureScrolling: { [weak captureManager] in captureManager?.captureScrolling() },
-            onAbout: { [weak aboutWindowController] in aboutWindowController?.show() },
+            onAbout: { [weak settingsWindowController] in settingsWindowController?.showAbout() },
             onSettings: { [weak settingsWindowController] in settingsWindowController?.show() },
             onQuit: { NSApp.terminate(nil) },
             hotkeyProvider: { [weak settings] in
-                MenuBarController.HotkeyBindings(
-                    selection: settings?.hotkeySelection,
-                    fullScreen: settings?.hotkeyFullScreen,
-                    window: settings?.hotkeyWindow,
-                    scrolling: settings?.hotkeyScrolling,
+                guard let settings else {
+                    return MenuBarController.HotkeyBindings(
+                        selection: nil,
+                        fullScreen: nil,
+                        window: nil,
+                        scrolling: nil,
+                    )
+                }
+                return MenuBarController.HotkeyBindings(
+                    selection: settings.hotkeyRegistrationStatuses[.selection] == .registered
+                        ? settings.hotkeySelection : nil,
+                    fullScreen: settings.hotkeyRegistrationStatuses[.fullScreen] == .registered
+                        ? settings.hotkeyFullScreen : nil,
+                    window: settings.hotkeyRegistrationStatuses[.window] == .registered
+                        ? settings.hotkeyWindow : nil,
+                    scrolling: settings.hotkeyRegistrationStatuses[.scrolling] == .registered
+                        ? settings.hotkeyScrolling : nil,
                 )
             },
         )
@@ -45,11 +67,9 @@ final class AppController {
 
     func start() {
         AppLog.app.info("OneShot AppController start")
-        menuBarController.start()
         menuBarController.setVisible(!settings.menuBarIconHidden)
-        registerHotkeys()
+        menuBarController.start()
         observeSettings()
-        launchAtLoginManager.setEnabled(settings.autoLaunchEnabled)
         maybeShowSettingsOnLaunch()
     }
 
@@ -57,91 +77,59 @@ final class AppController {
         settingsWindowController.show()
     }
 
+    func prepareForTermination() async -> Bool {
+        await captureManager.prepareForTermination()
+    }
+
+    var hasPendingTerminationWork: Bool {
+        captureManager.hasPendingTerminationWork
+    }
+
     func stop() {
+        cancellables.removeAll()
         captureManager.cleanup()
-        hotkeyManager.unregisterAll()
+        hotkeyManager.shutdown()
     }
 
     private func observeSettings() {
         settings.$autoLaunchEnabled
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] enabled in
-                self?.launchAtLoginManager.setEnabled(enabled)
+                guard let self else { return }
+                let result = launchAtLoginManager.setEnabled(enabled)
+                settings.applyLaunchAtLoginResult(result)
             }
             .store(in: &cancellables)
 
         settings.$menuBarIconHidden
+            .removeDuplicates()
             .sink { [weak self] hidden in
                 self?.menuBarController.setVisible(!hidden)
             }
             .store(in: &cancellables)
 
-        settings.$hotkeySelection
-            .sink { [weak self] _ in self?.registerHotkeys() }
-            .store(in: &cancellables)
-        settings.$hotkeyFullScreen
-            .sink { [weak self] _ in self?.registerHotkeys() }
-            .store(in: &cancellables)
-        settings.$hotkeyWindow
-            .sink { [weak self] _ in self?.registerHotkeys() }
-            .store(in: &cancellables)
-        settings.$hotkeyScrolling
-            .sink { [weak self] _ in self?.registerHotkeys() }
+        settings.hotkeyConfigurationPublisher
+            .sink { [weak self] configuration in
+                self?.registerHotkeys(configuration)
+            }
             .store(in: &cancellables)
     }
 
     private func maybeShowSettingsOnLaunch() {
-        if settings.menuBarIconHidden {
-            settingsWindowController.show()
-            return
-        }
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            if NSApp.isActive {
-                settingsWindowController.show()
-            }
-        }
+        guard launchContext == .foreground else { return }
+        settingsWindowController.show()
     }
 
-    private func registerHotkeys() {
-        hotkeyManager.unregisterAll()
-
-        if let selectionHotkey = settings.hotkeySelection, selectionHotkey.isValid {
-            AppLog.hotkeys.debug("Registering selection hotkey: \(selectionHotkey.displayString, privacy: .public)")
-            hotkeyManager.register(hotkey: selectionHotkey) { [weak self] in
-                self?.captureManager.captureSelection()
-            }
-        } else {
-            AppLog.hotkeys.debug("Selection hotkey not set or invalid")
-        }
-
-        if let fullScreenHotkey = settings.hotkeyFullScreen, fullScreenHotkey.isValid {
-            AppLog.hotkeys.debug("Registering full screen hotkey: \(fullScreenHotkey.displayString, privacy: .public)")
-            hotkeyManager.register(hotkey: fullScreenHotkey) { [weak self] in
-                self?.captureManager.captureFullScreen()
-            }
-        } else {
-            AppLog.hotkeys.debug("Full screen hotkey not set or invalid")
-        }
-
-        if let windowHotkey = settings.hotkeyWindow, windowHotkey.isValid {
-            AppLog.hotkeys.debug("Registering window hotkey: \(windowHotkey.displayString, privacy: .public)")
-            hotkeyManager.register(hotkey: windowHotkey) { [weak self] in
-                self?.captureManager.captureWindow()
-            }
-        } else {
-            AppLog.hotkeys.debug("Window hotkey not set or invalid")
-        }
-
-        if let scrollingHotkey = settings.hotkeyScrolling, scrollingHotkey.isValid {
-            AppLog.hotkeys.debug("Registering scrolling hotkey: \(scrollingHotkey.displayString, privacy: .public)")
-            hotkeyManager.register(hotkey: scrollingHotkey) { [weak self] in
-                self?.captureManager.captureScrolling()
-            }
-        } else {
-            AppLog.hotkeys.debug("Scrolling hotkey not set or invalid")
-        }
-
+    private func registerHotkeys(_ configuration: HotkeyConfiguration) {
+        let handlers = HotkeyHandlers(
+            selection: { [weak self] in self?.captureManager.captureSelection() },
+            scrolling: { [weak self] in self?.captureManager.captureScrolling() },
+            window: { [weak self] in self?.captureManager.captureWindow() },
+            fullScreen: { [weak self] in self?.captureManager.captureFullScreen() },
+        )
+        let statuses = hotkeyManager.replaceRegistrations(configuration: configuration, handlers: handlers)
+        settings.updateHotkeyRegistrationStatuses(statuses)
         menuBarController.refreshHotkeys()
     }
 }

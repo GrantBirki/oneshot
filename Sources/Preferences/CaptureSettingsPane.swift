@@ -29,7 +29,7 @@ struct CaptureSettingsPane: View {
     var body: some View {
         SettingsForm {
             Section("Selection") {
-                Toggle("Show selection coordinates", isOn: $settings.showSelectionCoordinates)
+                Toggle("Show selection size", isOn: $settings.showSelectionCoordinates)
                     .help("Show the selection size next to the cursor.")
                 Picker("Selection dimming", selection: $settings.selectionDimmingMode) {
                     ForEach(SelectionDimmingMode.allCases) { mode in
@@ -45,6 +45,7 @@ struct CaptureSettingsPane: View {
                             supportsOpacity: true,
                         )
                         .labelsHidden()
+                        .accessibilityLabel("Selection color")
                         TextField("", text: $selectionDimmingHexInput)
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 120)
@@ -59,7 +60,12 @@ struct CaptureSettingsPane: View {
                         .help("Reset to the default selection color.")
                     }
                 }
-                .help("Choose the selection-only fill color (RGBA hex).")
+                .disabled(settings.selectionDimmingMode != .selectionOnly)
+                .help(
+                    settings.selectionDimmingMode == .selectionOnly
+                        ? "Choose the selection-only fill color (RGBA hex)."
+                        : "Choose Selection only dimming to customize the fill color.",
+                )
                 Picker("Selection visual cue", selection: $settings.selectionVisualCue) {
                     ForEach(SelectionVisualCue.allCases) { cue in
                         Text(cue.title).tag(cue)

@@ -83,7 +83,7 @@ struct SettingsTabStrip: View {
     }
 
     private var currentAnimation: Animation? {
-        reduceMotion ? .linear(duration: 0.08) : Layout.animation
+        reduceMotion ? nil : Layout.animation
     }
 }
 

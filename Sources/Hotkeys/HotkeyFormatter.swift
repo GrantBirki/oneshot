@@ -1,6 +1,12 @@
 import AppKit
 import Carbon.HIToolbox
 
+extension Notification.Name {
+    static let keyboardInputSourceChanged = Notification.Name(
+        rawValue: kTISNotifySelectedKeyboardInputSourceChanged as String,
+    )
+}
+
 enum HotkeyFormatter {
     private static let modifierOrder: [NSEvent.ModifierFlags] = [
         .command,
@@ -29,6 +35,9 @@ enum HotkeyFormatter {
         if let special = specialKeyNames[keyCode] {
             return special
         }
+        if let translated = translatedKeyString(for: keyCode) {
+            return translated.uppercased()
+        }
         guard let key = keyCodeToKey[keyCode] else {
             return nil
         }
@@ -42,6 +51,9 @@ enum HotkeyFormatter {
     static func keyEquivalent(for keyCode: UInt16) -> String? {
         if let special = specialKeyEquivalents[keyCode] {
             return special
+        }
+        if let translated = translatedKeyString(for: keyCode) {
+            return translated.lowercased()
         }
         return keyCodeToKey[keyCode]
     }
@@ -63,6 +75,43 @@ enum HotkeyFormatter {
         default:
             nil
         }
+    }
+
+    private static func translatedKeyString(for keyCode: UInt16) -> String? {
+        guard let inputSource = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let property = TISGetInputSourceProperty(inputSource, kTISPropertyUnicodeKeyLayoutData)
+        else {
+            return nil
+        }
+
+        let data = Unmanaged<CFData>.fromOpaque(property).takeUnretainedValue()
+        guard let bytes = CFDataGetBytePtr(data) else {
+            return nil
+        }
+
+        let keyboardLayout = UnsafeRawPointer(bytes).assumingMemoryBound(to: UCKeyboardLayout.self)
+        var deadKeyState: UInt32 = 0
+        var actualLength = 0
+        var characters = [UniChar](repeating: 0, count: 4)
+        let status = characters.withUnsafeMutableBufferPointer { buffer in
+            UCKeyTranslate(
+                keyboardLayout,
+                keyCode,
+                UInt16(kUCKeyActionDisplay),
+                0,
+                UInt32(LMGetKbdType()),
+                OptionBits(kUCKeyTranslateNoDeadKeysMask),
+                &deadKeyState,
+                buffer.count,
+                &actualLength,
+                buffer.baseAddress,
+            )
+        }
+
+        guard status == noErr, actualLength > 0 else {
+            return nil
+        }
+        return String(utf16CodeUnits: characters, count: Int(actualLength))
     }
 
     private static let keyCodeToKey: [UInt16: String] = [

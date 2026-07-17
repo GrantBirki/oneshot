@@ -1,10 +1,14 @@
 import AppKit
+import Combine
 import Foundation
 
 private typealias Keys = SettingsStoreKeys
 private typealias LegacyKeys = SettingsStoreLegacyKeys
 
 final class SettingsStore: ObservableObject {
+    static let defaultSaveDelaySeconds: Double = 7
+    static let maximumSaveDelaySeconds: Double = 3600
+
     @Published var autoLaunchEnabled: Bool {
         didSet { defaults.set(autoLaunchEnabled, forKey: Keys.autoLaunchEnabled) }
     }
@@ -121,6 +125,11 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    @Published private(set) var hotkeyRegistrationStatuses: [HotkeyAction: HotkeyRegistrationStatus] = [:]
+    @Published private(set) var hotkeyAssignmentErrors: [HotkeyAction: HotkeyAssignmentResult] = [:]
+    @Published private(set) var launchAtLoginStatus: LaunchAtLoginStatus = .unknown
+    @Published private(set) var launchAtLoginMessage: String?
+
     var previewTimeout: TimeInterval? {
         previewTimeoutEnabled ? saveDelaySeconds : nil
     }
@@ -132,6 +141,42 @@ final class SettingsStore: ObservableObject {
         set {
             selectionDimmingColorHex = ColorHexCodec.hex(from: newValue)
         }
+    }
+
+    var hotkeyConfiguration: HotkeyConfiguration {
+        HotkeyConfiguration(
+            selection: hotkeySelection,
+            scrolling: hotkeyScrolling,
+            window: hotkeyWindow,
+            fullScreen: hotkeyFullScreen,
+        )
+    }
+
+    var hotkeyConfigurationPublisher: AnyPublisher<HotkeyConfiguration, Never> {
+        Publishers.CombineLatest4(
+            $hotkeySelection,
+            $hotkeyScrolling,
+            $hotkeyWindow,
+            $hotkeyFullScreen,
+        )
+        .map { selection, scrolling, window, fullScreen in
+            HotkeyConfiguration(
+                selection: selection,
+                scrolling: scrolling,
+                window: window,
+                fullScreen: fullScreen,
+            )
+        }
+        .removeDuplicates()
+        .eraseToAnyPublisher()
+    }
+
+    var usesClipboardOnlyOutput: Bool {
+        !previewEnabled && previewDisabledOutputBehavior == .clipboardOnly
+    }
+
+    var usesDiskOutput: Bool {
+        !usesClipboardOnlyOutput
     }
 
     private let defaults: UserDefaults
@@ -184,6 +229,92 @@ final class SettingsStore: ObservableObject {
             defaultValue: nil,
         )
     }
+
+    @discardableResult
+    func setHotkey(_ hotkey: Hotkey?, for action: HotkeyAction) -> HotkeyAssignmentResult {
+        if let hotkey,
+           let duplicate = hotkeyConfiguration.duplicateAction(for: hotkey, excluding: action)
+        {
+            let result = HotkeyAssignmentResult.duplicate(duplicate)
+            hotkeyAssignmentErrors[action] = result
+            return result
+        }
+
+        hotkeyAssignmentErrors.removeAll()
+        switch action {
+        case .selection:
+            hotkeySelection = hotkey
+        case .scrolling:
+            hotkeyScrolling = hotkey
+        case .window:
+            hotkeyWindow = hotkey
+        case .fullScreen:
+            hotkeyFullScreen = hotkey
+        }
+        return .accepted
+    }
+
+    func updateHotkeyRegistrationStatuses(_ statuses: [HotkeyAction: HotkeyRegistrationStatus]) {
+        hotkeyRegistrationStatuses = statuses
+    }
+
+    func hotkeyMessage(for action: HotkeyAction) -> String? {
+        if case let .duplicate(duplicate)? = hotkeyAssignmentErrors[action] {
+            return "This shortcut is already used for \(duplicate.title.lowercased())."
+        }
+        return hotkeyRegistrationStatuses[action]?.message
+    }
+
+    func applyLaunchAtLoginResult(_ result: LaunchAtLoginUpdateResult) {
+        launchAtLoginStatus = result.status
+
+        switch result {
+        case let .enabled(changed):
+            if changed {
+                launchAtLoginMessage = nil
+            }
+            if !autoLaunchEnabled {
+                autoLaunchEnabled = true
+            }
+        case let .disabled(changed):
+            if changed {
+                launchAtLoginMessage = nil
+            }
+            if autoLaunchEnabled {
+                autoLaunchEnabled = false
+            }
+        case .requiresApproval:
+            launchAtLoginMessage = result.message
+            if !autoLaunchEnabled {
+                autoLaunchEnabled = true
+            }
+        case let .failed(actualStatus):
+            launchAtLoginMessage = result.message
+            let actualValue = actualStatus.isRequestedEnabled
+            if autoLaunchEnabled != actualValue {
+                autoLaunchEnabled = actualValue
+            }
+        }
+    }
+
+    func updateLaunchAtLoginStatus(_ status: LaunchAtLoginStatus) {
+        launchAtLoginStatus = status
+        launchAtLoginMessage = status == .requiresApproval
+            ? "Approval is required in System Settings."
+            : nil
+        switch status {
+        case .enabled, .requiresApproval:
+            if !autoLaunchEnabled {
+                autoLaunchEnabled = true
+            }
+        case .disabled:
+            if autoLaunchEnabled {
+                autoLaunchEnabled = false
+            }
+        case .unknown, .unavailable:
+            break
+        }
+    }
 }
 
 private extension SettingsStore {
@@ -191,13 +322,19 @@ private extension SettingsStore {
 
     static func loadSaveDelaySeconds(from defaults: UserDefaults) -> Double {
         if let saveDelay = defaults.object(forKey: Keys.saveDelaySeconds) as? Double {
-            return clampSaveDelaySeconds(saveDelay)
+            let normalized = clampSaveDelaySeconds(saveDelay)
+            if normalized != saveDelay || !saveDelay.isFinite {
+                defaults.set(normalized, forKey: Keys.saveDelaySeconds)
+            }
+            return normalized
         }
         if let legacyDelay = defaults.object(forKey: LegacyKeys.previewTimeoutSeconds) as? Double {
             defaults.removeObject(forKey: LegacyKeys.previewTimeoutSeconds)
-            return clampSaveDelaySeconds(legacyDelay)
+            let normalized = clampSaveDelaySeconds(legacyDelay)
+            defaults.set(normalized, forKey: Keys.saveDelaySeconds)
+            return normalized
         }
-        return 7
+        return defaultSaveDelaySeconds
     }
 
     static func loadSelectionDimmingColorHex(from defaults: UserDefaults) -> String {
@@ -310,12 +447,17 @@ private extension SettingsStore {
             return nil
         }
 
-        let keyCodeInt = if let intValue = keyCodeValue as? Int {
-            intValue
+        let keyCodeInt: Int
+        if let intValue = keyCodeValue as? Int {
+            keyCodeInt = intValue
         } else if let uintValue = keyCodeValue as? UInt {
-            Int(uintValue)
+            guard let exactValue = Int(exactly: uintValue) else {
+                persistHotkey(nil, keyCodeKey: keyCodeKey, modifiersKey: modifiersKey)
+                return nil
+            }
+            keyCodeInt = exactValue
         } else {
-            defaults.integer(forKey: keyCodeKey)
+            keyCodeInt = defaults.integer(forKey: keyCodeKey)
         }
 
         if keyCodeInt < 0 || keyCodeInt > Int(UInt16.max) {
@@ -323,19 +465,27 @@ private extension SettingsStore {
         }
 
         let keyCode = UInt16(keyCodeInt)
-        let rawValue = modifierRawValue(forKey: modifiersKey)
+        guard let rawValue = modifierRawValue(forKey: modifiersKey) else {
+            persistHotkey(nil, keyCodeKey: keyCodeKey, modifiersKey: modifiersKey)
+            return nil
+        }
         let hotkey = Hotkey(keyCode: keyCode, modifiers: NSEvent.ModifierFlags(rawValue: rawValue))
-        return hotkey.isValid ? hotkey : nil
+        guard hotkey.isValid else {
+            persistHotkey(nil, keyCodeKey: keyCodeKey, modifiersKey: modifiersKey)
+            return nil
+        }
+        return hotkey
     }
 
-    func modifierRawValue(forKey key: String) -> UInt {
+    func modifierRawValue(forKey key: String) -> UInt? {
         if let value = defaults.object(forKey: key) as? UInt {
             return value
         }
         if let value = defaults.object(forKey: key) as? Int {
-            return UInt(value)
+            return value >= 0 ? UInt(value) : nil
         }
-        return UInt(defaults.integer(forKey: key))
+        let value = defaults.integer(forKey: key)
+        return value >= 0 ? UInt(value) : nil
     }
 
     func persistHotkey(_ hotkey: Hotkey?, keyCodeKey: String, modifiersKey: String) {
@@ -352,7 +502,6 @@ private extension SettingsStore {
         let clamped = Self.clampVolume(shutterSoundVolume)
         if clamped != shutterSoundVolume {
             shutterSoundVolume = clamped
-            return
         }
         defaults.set(clamped, forKey: Keys.shutterSoundVolume)
     }
@@ -361,7 +510,6 @@ private extension SettingsStore {
         let clamped = Self.clampSaveDelaySeconds(saveDelaySeconds)
         if clamped != saveDelaySeconds {
             saveDelaySeconds = clamped
-            return
         }
         defaults.set(clamped, forKey: Keys.saveDelaySeconds)
     }
@@ -371,7 +519,10 @@ private extension SettingsStore {
     }
 
     static func clampSaveDelaySeconds(_ value: Double) -> Double {
-        max(value, 0)
+        guard value.isFinite else {
+            return defaultSaveDelaySeconds
+        }
+        return min(max(value, 0), maximumSaveDelaySeconds)
     }
 
     static let unsetKeyCodeSentinel = -1
