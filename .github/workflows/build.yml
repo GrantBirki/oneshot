@@ -17,12 +17,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: cache pinned tools
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # pin@v6.1.0
-        with:
-          path: .tmp/tools/downloads
-          key: tools-${{ runner.os }}-${{ runner.arch }}-xcodegen-2.46.0-4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806-swiftlint-0.65.0-d6cb0aa7a2f5f1ef306fc9e37bcb54dc9a26facc8f7784ac0c3dd3eccf5c6ba6-swiftformat-0.62.1-7cb1cb1fae04932047c7015441c543848e8e60e1572d808d080e0a1f1661114a
-
       - name: bootstrap
         run: script/bootstrap
 
