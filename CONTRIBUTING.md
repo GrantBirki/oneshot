@@ -4,11 +4,13 @@ Thanks for helping improve OneShot! This project uses the `script/` tools for al
 
 ## Setup
 
+Install full Xcode 26 and select it with `xcode-select`. Command Line Tools alone are not sufficient.
+
 ```bash
 script/bootstrap
 ```
 
-This installs required tools (XcodeGen, SwiftLint, SwiftFormat) and generates the Xcode project.
+This downloads checksum-pinned versions of XcodeGen, SwiftLint, and SwiftFormat into the ignored `.tmp/tools` directory, then generates the Xcode project. It does not install or modify global Homebrew packages.
 
 ## Development
 
@@ -16,6 +18,8 @@ This installs required tools (XcodeGen, SwiftLint, SwiftFormat) and generates th
 - Test: `script/test`
 - Lint/format checks: `script/lint`
 - Run the app (Debug): `script/server`
+- Build a universal Release archive: `script/package`
+- Verify a Release archive: `script/verify-package`
 
 If you change `project.yml`, run `script/update` to regenerate the Xcode project.
 
@@ -25,8 +29,11 @@ Versioning is driven by the `VERSION` file. Bump it manually (X.Y.Z) in a commit
 
 Releases are created by GitHub Actions when `VERSION` changes on `main`. The workflow:
 
-- Builds the release zip via `script/package`
+- Runs the test suite
+- Builds and verifies a universal Apple silicon and Intel release zip
 - Creates the GitHub release + tag
+
+Release archives use Developer ID signing and notarization when the maintainer provides credentials. Otherwise, packaging applies an ad-hoc bundle signature so integrity verification still succeeds; Gatekeeper may require the user to approve that unnotarized build.
 
 Update the Homebrew cask manually in `grantbirki/homebrew-tap` after each release.
 

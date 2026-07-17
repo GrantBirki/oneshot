@@ -6,12 +6,16 @@ source script/env "$@"
 source "$DIR/script/lib/common.sh"
 
 require_macos error "Tests require macOS."
-require_tool xcodebuild "xcodebuild not found. Install Xcode or Command Line Tools."
+require_full_xcode
 
 script/update
 
 PROJECT_PATH=$(find_project)
 set_xcodebuild_vars
+RESULT_BUNDLE="$DIR/build/TestResults.xcresult"
+
+mkdir -p "$DIR/build"
+rm -rf "$RESULT_BUNDLE"
 
 echo -e "${BLUE}Testing ${SCHEME} (${CONFIGURATION})...${OFF}"
 
@@ -21,8 +25,13 @@ xcodebuild \
   -configuration "$CONFIGURATION" \
   -derivedDataPath "$DERIVED_DATA" \
   -destination "platform=macOS" \
+  -enableCodeCoverage YES \
+  -resultBundlePath "$RESULT_BUNDLE" \
   test \
   CODE_SIGNING_ALLOWED=NO \
   MARKETING_VERSION="$VERSION" \
   CURRENT_PROJECT_VERSION="$VERSION" \
   GIT_SHA="$GIT_SHA"
+
+echo -e "${BLUE}Coverage by target...${OFF}"
+xcrun xccov view --report --only-targets "$RESULT_BUNDLE"

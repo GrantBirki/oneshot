@@ -7,9 +7,9 @@
 
 Open source screenshot utility for macOS with QoL improvements over the native Apple screenshot utility.
 
-Requires macOS Tahoe 26 or later.
+Requires macOS Tahoe 26 or later on Apple silicon or Intel Macs.
 
-![oneshot](docs/assets/oneshot.png)
+<img src="docs/assets/oneshot.png" alt="OneShot app icon" width="192">
 
 ## 🎯 Goals
 
@@ -37,17 +37,17 @@ Homebrew (recommended):
 brew install --cask grantbirki/tap/oneshot
 ```
 
-## Demos 📹
+## 📹 Demos
 
 ### Area Selection
 
 <https://github.com/user-attachments/assets/4690d728-9f7f-42df-897e-9499c429ee84>
 
-## Scrolling Selection
+### Scrolling Selection
 
 <https://github.com/user-attachments/assets/13024d4d-faf4-4778-ab92-02847ba71e52>
 
-## Settings
+### Settings
 
 <https://github.com/user-attachments/assets/4e60b74c-bfa0-4008-b46a-47f4dc1aba42>
 
@@ -80,21 +80,14 @@ You can also verify the checksum:
 shasum -a 256 OneShot.zip
 ```
 
-## Unsigned Builds
+## Signing and Gatekeeper
 
-OneShot releases are currently unsigned. macOS Gatekeeper may block the first launch.
+Release archives always contain a code-signed application. Maintainer builds use Developer ID signing and notarization when credentials are available; other builds use an ad-hoc signature, which verifies bundle integrity but is not trusted by Gatekeeper.
 
-To open it:
+If Gatekeeper blocks an ad-hoc, unnotarized build:
 
 1) Right-click `OneShot.app` and choose Open.
 2) Or go to System Settings → Privacy & Security and click Open Anyway.
-3) If neither shows, remove the quarantine attribute:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/OneShot.app
-```
-
-> Why? Apple Developer ID certs cost $99/year, and I don't want to pay Apple.
 
 ## 👩‍💻 Contributing
 

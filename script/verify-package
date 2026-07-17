@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source script/env "$@"
+source "$DIR/script/lib/common.sh"
+
+require_macos error "Package verification requires macOS."
+require_tool codesign "codesign not found."
+require_tool ditto "ditto not found."
+require_tool lipo "lipo not found."
+require_tool plutil "plutil not found."
+require_tool shasum "shasum not found."
+
+APP_NAME="${APP_NAME:-OneShot}"
+ZIP_PATH="${1:-$DIR/dist/${APP_NAME}.zip}"
+CHECKSUM_PATH="${CHECKSUM_PATH:-${ZIP_PATH}.sha256}"
+EXPECTED_VERSION="${EXPECTED_VERSION:-$VERSION}"
+
+if [[ ! -f "$ZIP_PATH" ]]; then
+  echo -e "${RED}Package not found at $ZIP_PATH${OFF}"
+  exit 1
+fi
+
+if [[ ! -f "$CHECKSUM_PATH" ]]; then
+  echo -e "${RED}Checksum not found at $CHECKSUM_PATH${OFF}"
+  exit 1
+fi
+
+if [[ ! "$EXPECTED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo -e "${RED}Expected version must be in X.Y.Z format; got ${EXPECTED_VERSION}.${OFF}"
+  exit 1
+fi
+
+expected_sha="$(awk 'NF {print $1; exit}' "$CHECKSUM_PATH")"
+if [[ ! "$expected_sha" =~ ^[0-9a-fA-F]{64}$ ]]; then
+  echo -e "${RED}Invalid SHA256 in $CHECKSUM_PATH${OFF}"
+  exit 1
+fi
+
+actual_sha="$(archive_sha256 "$ZIP_PATH")"
+if [[ "$actual_sha" != "$expected_sha" ]]; then
+  echo -e "${RED}Checksum mismatch for $ZIP_PATH${OFF}"
+  echo "Expected: $expected_sha"
+  echo "Actual:   $actual_sha"
+  exit 1
+fi
+
+VERIFY_BASE="${TMPDIR:-/tmp}"
+VERIFY_DIR="$(mktemp -d "${VERIFY_BASE%/}/oneshot-package.XXXXXX")"
+cleanup() {
+  rm -rf "$VERIFY_DIR"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM HUP
+
+ditto -x -k "$ZIP_PATH" "$VERIFY_DIR"
+
+APP_PATH="$VERIFY_DIR/${APP_NAME}.app"
+top_level_count="$(find "$VERIFY_DIR" -mindepth 1 -maxdepth 1 -print | wc -l | tr -d ' ')"
+if [[ "$top_level_count" != "1" || ! -d "$APP_PATH" ]]; then
+  echo -e "${RED}Package must contain exactly one top-level ${APP_NAME}.app bundle.${OFF}"
+  exit 1
+fi
+
+codesign --verify --deep --strict "$APP_PATH"
+
+PLIST_PATH="$APP_PATH/Contents/Info.plist"
+EXECUTABLE_PATH="$APP_PATH/Contents/MacOS/$APP_NAME"
+if [[ ! -f "$PLIST_PATH" ]]; then
+  echo -e "${RED}Info.plist is missing from the application bundle.${OFF}"
+  exit 1
+fi
+if [[ ! -x "$EXECUTABLE_PATH" ]]; then
+  echo -e "${RED}Application executable is missing or not executable.${OFF}"
+  exit 1
+fi
+
+architectures="$(lipo -archs "$EXECUTABLE_PATH")"
+architecture_count=0
+has_arm64=0
+has_x86_64=0
+for architecture in $architectures; do
+  architecture_count=$((architecture_count + 1))
+  case "$architecture" in
+    arm64) has_arm64=1 ;;
+    x86_64) has_x86_64=1 ;;
+    *)
+      echo -e "${RED}Unexpected executable architecture: $architecture${OFF}"
+      exit 1
+      ;;
+  esac
+done
+if (( architecture_count != 2 || has_arm64 != 1 || has_x86_64 != 1 )); then
+  echo -e "${RED}Expected exactly arm64 and x86_64; found: ${architectures:-none}.${OFF}"
+  exit 1
+fi
+
+plist_value() {
+  plutil -extract "$1" raw -o - "$PLIST_PATH" 2>/dev/null || true
+}
+
+bundle_identifier="$(plist_value CFBundleIdentifier)"
+short_version="$(plist_value CFBundleShortVersionString)"
+build_version="$(plist_value CFBundleVersion)"
+minimum_system="$(plist_value LSMinimumSystemVersion)"
+ui_element="$(plist_value LSUIElement)"
+usage_description="$(plist_value NSScreenCaptureUsageDescription)"
+icon_name="$(plist_value CFBundleIconName)"
+
+if [[ "$bundle_identifier" != "com.grantbirki.oneshot" ]]; then
+  echo -e "${RED}Unexpected bundle identifier: ${bundle_identifier:-missing}.${OFF}"
+  exit 1
+fi
+if [[ "$short_version" != "$EXPECTED_VERSION" || "$build_version" != "$EXPECTED_VERSION" ]]; then
+  echo -e "${RED}Bundle version mismatch; expected $EXPECTED_VERSION, found ${short_version:-missing}/${build_version:-missing}.${OFF}"
+  exit 1
+fi
+if [[ "$minimum_system" != "26.0" ]]; then
+  echo -e "${RED}Unexpected minimum macOS version: ${minimum_system:-missing}.${OFF}"
+  exit 1
+fi
+if [[ "$ui_element" != "true" ]]; then
+  echo -e "${RED}LSUIElement must be true.${OFF}"
+  exit 1
+fi
+if [[ -z "$usage_description" ]]; then
+  echo -e "${RED}NSScreenCaptureUsageDescription is missing or empty.${OFF}"
+  exit 1
+fi
+if [[ "$icon_name" != "AppIcon" || ! -f "$APP_PATH/Contents/Resources/AppIcon.icns" || ! -f "$APP_PATH/Contents/Resources/Assets.car" ]]; then
+  echo -e "${RED}Compiled app icon assets are missing or misconfigured.${OFF}"
+  exit 1
+fi
+
+resources=(
+  shutter.wav
+  canon70d.wav
+  sony_a7ii.wav
+  pop-pop_canon_ae-1.wav
+)
+for resource in "${resources[@]}"; do
+  if [[ ! -f "$APP_PATH/Contents/Resources/$resource" ]]; then
+    echo -e "${RED}Required resource is missing: $resource${OFF}"
+    exit 1
+  fi
+done
+
+echo -e "${GREEN}✅ Package verification complete.${OFF}"
+echo "Version: $EXPECTED_VERSION"
+echo "Architectures: $architectures"
+echo "SHA256: $actual_sha"

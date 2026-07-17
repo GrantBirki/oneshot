@@ -6,7 +6,7 @@ source script/env "$@"
 source "$DIR/script/lib/common.sh"
 
 require_macos error "Build requires macOS."
-require_tool xcodebuild "xcodebuild not found. Install Xcode or Command Line Tools."
+require_full_xcode
 
 script/update
 

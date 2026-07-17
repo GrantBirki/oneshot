@@ -6,8 +6,9 @@ source script/env "$@"
 source "$DIR/script/lib/common.sh"
 
 require_macos error "Packaging requires macOS."
-require_tool xcodebuild "xcodebuild not found. Install Xcode or Command Line Tools."
+require_full_xcode
 require_tool ditto "ditto not found."
+require_tool codesign "codesign not found."
 
 CONFIGURATION="${CONFIGURATION:-Release}"
 
@@ -47,7 +48,7 @@ mkdir -p "$DIST_DIR" "$STAGING_DIR"
 
 echo -e "${BLUE}Packaging ${APP_NAME} (${CONFIGURATION})...${OFF}"
 
-xcodebuild \
+build_args=(
   -project "$PROJECT_PATH" \
   -scheme "$SCHEME" \
   -configuration "$CONFIGURATION" \
@@ -57,6 +58,11 @@ xcodebuild \
   MARKETING_VERSION="$VERSION" \
   CURRENT_PROJECT_VERSION="$VERSION" \
   GIT_SHA="$GIT_SHA"
+)
+if [[ "$CONFIGURATION" == "Release" ]]; then
+  build_args+=(ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO)
+fi
+xcodebuild "${build_args[@]}"
 
 APP_PATH="$DERIVED_DATA/Build/Products/${CONFIGURATION}/${APP_NAME}.app"
 if [[ ! -d "$APP_PATH" ]]; then
@@ -73,7 +79,6 @@ if [[ -n "$NOTARY_PROFILE" && -z "$CODESIGN_IDENTITY" ]]; then
 fi
 
 if [[ -n "$CODESIGN_IDENTITY" ]]; then
-  require_tool codesign "codesign not found."
   codesign_args=(--force --options runtime --timestamp --sign "$CODESIGN_IDENTITY")
   if [[ -n "$ENTITLEMENTS_PATH" ]]; then
     if [[ ! -f "$ENTITLEMENTS_PATH" ]]; then
@@ -83,8 +88,11 @@ if [[ -n "$CODESIGN_IDENTITY" ]]; then
     codesign_args+=(--entitlements "$ENTITLEMENTS_PATH")
   fi
   codesign "${codesign_args[@]}" "$STAGING_APP"
-  codesign --verify --strict "$STAGING_APP"
+else
+  codesign --force --sign - "$STAGING_APP"
 fi
+
+codesign --verify --deep --strict "$STAGING_APP"
 
 if [[ -n "$NOTARY_PROFILE" ]]; then
   require_tool xcrun "xcrun not found."
@@ -92,6 +100,7 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
   ditto -c -k --sequesterRsrc --keepParent "$STAGING_APP" "$NOTARY_ZIP"
   xcrun notarytool submit "$NOTARY_ZIP" --wait --keychain-profile "$NOTARY_PROFILE"
   xcrun stapler staple "$STAGING_APP"
+  codesign --verify --deep --strict "$STAGING_APP"
 fi
 
 rm -f "$ZIP_PATH"

@@ -5,8 +5,9 @@ source script/env "$@"
 source "$DIR/script/lib/common.sh"
 
 require_macos skip "Skipping lint on non-macOS host."
-require_tool swiftlint "swiftlint not found. Run script/bootstrap."
-require_tool swiftformat "swiftformat not found. Run script/bootstrap."
+require_full_xcode
+require_pinned_tool swiftlint
+require_pinned_tool swiftformat
 
 if ! has_swift_files; then
   echo -e "${YELLOW}No Swift files found; skipping lint.${OFF}"
@@ -14,9 +15,9 @@ if ! has_swift_files; then
 fi
 
 echo -e "${BLUE}Running SwiftLint...${OFF}"
-swiftlint lint --quiet "$DIR"
+"$TOOLS_BIN/swiftlint" lint --quiet "$DIR"
 
 echo -e "${BLUE}Running SwiftFormat (lint)...${OFF}"
-swiftformat \
+"$TOOLS_BIN/swiftformat" \
   --lint "$DIR" \
   --exclude ".build,build,DerivedData,.tmp,tmp"
