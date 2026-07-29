@@ -59,6 +59,49 @@ if grep -R -h -E 'uses:[[:space:]]*openai/fence@' "$WORKFLOW_DIR" | grep -v -F '
   fail "Fence must use the v0.9.2 release distribution commit"
 fi
 
+while IFS= read -r workflow; do
+  if ! awk '
+    function finish_step() {
+      if (fence && audit && artifacts) {
+        printf "%s:%d\n", FILENAME, step_line
+        invalid = 1
+      }
+    }
+
+    /^[[:space:]]*-[[:space:]]/ {
+      indent = match($0, /[^[:space:]]/) - 1
+      if (!in_step || indent <= step_indent) {
+        finish_step()
+        in_step = 1
+        step_indent = indent
+        step_line = FNR
+        fence = 0
+        audit = 0
+        artifacts = 0
+      }
+    }
+
+    in_step && /uses:[[:space:]]*openai\/fence@/ {
+      fence = 1
+    }
+
+    in_step && /^[[:space:]]*mode:[[:space:]]*audit[[:space:]]*(#.*)?$/ {
+      audit = 1
+    }
+
+    in_step && /^[[:space:]]*allow_github_artifacts:[[:space:]]*true[[:space:]]*(#.*)?$/ {
+      artifacts = 1
+    }
+
+    END {
+      finish_step()
+      exit invalid
+    }
+  ' "$workflow"; then
+    fail "allow_github_artifacts: true can only be used with Fence block mode"
+  fi
+done < <(find "$WORKFLOW_DIR" -type f \( -name "*.yml" -o -name "*.yaml" \) -print)
+
 grep -q "branches:" "$RELEASE_WORKFLOW" || fail "release workflow must restrict its branch"
 grep -q -- "- main" "$RELEASE_WORKFLOW" || fail "release workflow must target main"
 if grep -q "workflow_dispatch:" "$RELEASE_WORKFLOW"; then
