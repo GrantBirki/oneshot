@@ -231,7 +231,7 @@ jobs:
 
   release_info:
     needs: [build, release]
-    if: ${{ always() && needs.build.result == 'success' }}
+    if: ${{ always() && needs.build.result == 'success' && needs.release.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions: {}
