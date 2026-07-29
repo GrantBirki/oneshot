@@ -5,6 +5,8 @@ set -euo pipefail
 source script/env "$@"
 source "$DIR/script/lib/common.sh"
 
+"$DIR/script/ci-policy"
+
 require_macos error "Tests require macOS."
 require_full_xcode
 

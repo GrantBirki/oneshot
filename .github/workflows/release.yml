@@ -9,14 +9,17 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: release-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
-    if: github.repository == 'grantbirki/oneshot' # change this to your repository
+    if: github.repository == 'GrantBirki/oneshot' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
-      id-token: write
-      attestations: write
     runs-on: macos-26
+    timeout-minutes: 30
     outputs:
       artifact-id: ${{ steps.upload-artifact.outputs.artifact-id }}
       version: ${{ steps.version.outputs.version }}
@@ -76,11 +79,6 @@ jobs:
             exit 1
           fi
 
-      - name: attest build provenance
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # pin@v4.1.0
-        with:
-          subject-path: "dist/OneShot.zip"
-
       - name: upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # pin@v7.0.1
         id: upload-artifact
@@ -90,49 +88,49 @@ jobs:
           retention-days: 5
           if-no-files-found: error
 
-  release:
+  attest:
     needs: build
-    runs-on: ubuntu-latest
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
-      contents: write
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
-      - name: checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # pin@v6
+      - name: restrict network
+        uses: openai/fence@2cf00d32716021a106bb59fcdc1c978c22a3def3 # pin@v0.9.2
         with:
-          fetch-depth: 0
-          persist-credentials: false
+          mode: audit
+          allow_github_artifacts: true
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@8.0.1
+      - name: download artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@v8.0.1
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: "dist/"
 
-      - name: ensure tag does not exist
-        env:
-          TAG: ${{ needs.build.outputs.tag }}
-        run: |
-          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "Tag already exists: ${TAG}"
-            exit 1
-          fi
-
-      - name: create release
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # pin@v3.0.0
+      - name: attest build provenance
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # pin@v4.2.0
         with:
-          tag_name: ${{ needs.build.outputs.tag }}
-          name: ${{ needs.build.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          files: |
-            dist/OneShot.zip
-            dist/OneShot.zip.sha256
-          generate_release_notes: true
+          subject-path: "dist/OneShot.zip"
 
   verify:
-    permissions: {}
-    runs-on: ubuntu-latest
-    needs: [build, release]
+    needs: [build, attest]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@8.0.1
+      - name: restrict network
+        uses: openai/fence@2cf00d32716021a106bb59fcdc1c978c22a3def3 # pin@v0.9.2
+        with:
+          mode: audit
+          allow_github_artifacts: true
+
+      - name: download artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@v8.0.1
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: "dist/"
@@ -142,8 +140,9 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
           ARTIFACT_PATH: "dist/OneShot.zip"
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SOURCE_REF: refs/heads/${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_REF: ${{ github.ref }}
+          SOURCE_DIGEST: ${{ github.sha }}
         run: |
           if [[ ! -f "$ARTIFACT_PATH" ]]; then
             echo "Expected artifact not found at $ARTIFACT_PATH"
@@ -156,7 +155,7 @@ jobs:
           fi
 
           expected_sha=$(cat "${ARTIFACT_PATH}.sha256")
-          actual_sha=$(shasum -a 256 "$ARTIFACT_PATH" | awk '{print $1}')
+          actual_sha=$(sha256sum "$ARTIFACT_PATH" | awk '{print $1}')
           if [[ "$expected_sha" != "$actual_sha" ]]; then
             echo "Checksum mismatch: expected $expected_sha but got $actual_sha"
             exit 1
@@ -165,16 +164,80 @@ jobs:
           gh attestation verify "$ARTIFACT_PATH" \
             --repo "${OWNER}/${REPO}" \
             --signer-workflow "${OWNER}/${REPO}/.github/workflows/release.yml" \
+            --signer-digest "$SOURCE_DIGEST" \
             --source-ref "$SOURCE_REF" \
+            --source-digest "$SOURCE_DIGEST" \
             --deny-self-hosted-runners
 
-  release_info:
-    permissions: {}
-    runs-on: ubuntu-latest
-    needs: [build, release, verify]
-    if: ${{ always() }}
+  release:
+    needs: [build, verify]
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@8.0.1
+      - name: restrict network
+        uses: openai/fence@2cf00d32716021a106bb59fcdc1c978c22a3def3 # pin@v0.9.2
+        with:
+          mode: audit
+          allow_github_artifacts: true
+
+      - name: download artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@v8.0.1
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: "dist/"
+
+      - name: ensure tag does not exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          set +e
+          tag_lookup=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" 2>&1)
+          tag_lookup_status=$?
+          set -e
+
+          if [[ "$tag_lookup_status" -eq 0 ]]; then
+            echo "Tag already exists: ${TAG}"
+            exit 1
+          fi
+
+          if [[ "$tag_lookup" != *"HTTP 404"* ]]; then
+            echo "Unable to confirm that tag ${TAG} does not exist."
+            printf '%s\n' "$tag_lookup"
+            exit 1
+          fi
+
+      - name: create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            "dist/OneShot.zip" \
+            "dist/OneShot.zip.sha256" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
+            --generate-notes
+
+  release_info:
+    needs: [build, release]
+    if: ${{ always() && needs.build.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions: {}
+    steps:
+      - name: restrict network
+        uses: openai/fence@2cf00d32716021a106bb59fcdc1c978c22a3def3 # pin@v0.9.2
+        with:
+          mode: audit
+          allow_github_artifacts: true
+
+      - name: download artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@v8.0.1
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: "dist/"
