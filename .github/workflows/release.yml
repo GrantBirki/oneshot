@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.repository == 'GrantBirki/oneshot' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.repository == 'GrantBirki/oneshot' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.workflow_sha == github.sha
     permissions:
       contents: read
     runs-on: macos-26
@@ -112,7 +112,6 @@ jobs:
         uses: openai/fence@2cf00d32716021a106bb59fcdc1c978c22a3def3 # pin@v0.9.2
         with:
           mode: audit
-          allow_github_artifacts: true
 
       - name: download artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@v8.0.1
@@ -136,7 +135,6 @@ jobs:
         uses: openai/fence@2cf00d32716021a106bb59fcdc1c978c22a3def3 # pin@v0.9.2
         with:
           mode: audit
-          allow_github_artifacts: true
 
       - name: download artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@v8.0.1
@@ -190,7 +188,6 @@ jobs:
         uses: openai/fence@2cf00d32716021a106bb59fcdc1c978c22a3def3 # pin@v0.9.2
         with:
           mode: audit
-          allow_github_artifacts: true
 
       - name: download artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@v8.0.1
@@ -243,7 +240,6 @@ jobs:
         uses: openai/fence@2cf00d32716021a106bb59fcdc1c978c22a3def3 # pin@v0.9.2
         with:
           mode: audit
-          allow_github_artifacts: true
 
       - name: download artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@v8.0.1

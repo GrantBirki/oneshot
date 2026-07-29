@@ -64,6 +64,7 @@ grep -q -- "- main" "$RELEASE_WORKFLOW" || fail "release workflow must target ma
 if grep -q "workflow_dispatch:" "$RELEASE_WORKFLOW"; then
   fail "release workflow must not have a manual dispatch path"
 fi
+grep -Fq 'github.workflow_sha == github.sha' "$RELEASE_WORKFLOW" || fail "release workflow must come from the event commit"
 grep -Fq 'ref: ${{ github.sha }}' "$RELEASE_WORKFLOW" || fail "release checkout must use the event commit"
 grep -q -E '^[[:space:]]+fetch-depth:[[:space:]]+1[[:space:]]*$' "$RELEASE_WORKFLOW" || fail "release checkout must be shallow"
 grep -Fq 'actual_sha=$(git rev-parse HEAD)' "$RELEASE_WORKFLOW" || fail "release checkout must verify HEAD"
