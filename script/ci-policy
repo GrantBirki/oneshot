@@ -49,11 +49,24 @@ if [[ "$checkout_count" != "$nonpersisted_count" ]]; then
   fail "every checkout must set persist-credentials: false"
 fi
 
+fence_count=$(grep -R -h -E 'uses:[[:space:]]*openai/fence@' "$WORKFLOW_DIR" | wc -l | tr -d ' ')
+named_fence_count=$(grep -R -h -E '^[[:space:]]+- name:[[:space:]]+fence[[:space:]]*$' "$WORKFLOW_DIR" | wc -l | tr -d ' ')
+if [[ "$fence_count" != "$named_fence_count" ]]; then
+  fail "every Fence step must be named fence"
+fi
+
+if grep -R -h -E 'uses:[[:space:]]*openai/fence@' "$WORKFLOW_DIR" | grep -v -F 'openai/fence@2cf00d32716021a106bb59fcdc1c978c22a3def3 # pin@v0.9.2' >/dev/null; then
+  fail "Fence must use the v0.9.2 release distribution commit"
+fi
+
 grep -q "branches:" "$RELEASE_WORKFLOW" || fail "release workflow must restrict its branch"
 grep -q -- "- main" "$RELEASE_WORKFLOW" || fail "release workflow must target main"
 if grep -q "workflow_dispatch:" "$RELEASE_WORKFLOW"; then
   fail "release workflow must not have a manual dispatch path"
 fi
+grep -Fq 'ref: ${{ github.sha }}' "$RELEASE_WORKFLOW" || fail "release checkout must use the event commit"
+grep -q -E '^[[:space:]]+fetch-depth:[[:space:]]+1[[:space:]]*$' "$RELEASE_WORKFLOW" || fail "release checkout must be shallow"
+grep -Fq 'actual_sha=$(git rev-parse HEAD)' "$RELEASE_WORKFLOW" || fail "release checkout must verify HEAD"
 
 [[ "$(grep -c 'id-token: write' "$RELEASE_WORKFLOW")" == "1" ]] || fail "OIDC permission must exist in exactly one isolated job"
 [[ "$(grep -c 'attestations: write' "$RELEASE_WORKFLOW")" == "1" ]] || fail "attestation permission must exist in exactly one isolated job"
