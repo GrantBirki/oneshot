@@ -14,8 +14,6 @@ jobs:
     steps:
       - name: restrict network
         uses: openai/fence@2cf00d32716021a106bb59fcdc1c978c22a3def3 # pin@v0.9.2
-        with:
-          mode: audit
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # pin@v6
         with:
