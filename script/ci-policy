@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 WORKFLOW_DIR="$ROOT_DIR/.github/workflows"
 RELEASE_WORKFLOW="$WORKFLOW_DIR/release.yml"
-readonly FENCE_REF="openai/fence@2cf00d32716021a106bb59fcdc1c978c22a3def3"
+readonly FENCE_REF="openai/fence@e6b39c80c51cb2b2a39448ddeff74b3b886c0a63"
 
 fail() {
   echo "GitHub Actions policy: $1" >&2
@@ -72,7 +72,7 @@ validate_workflow_steps() {
           report("Fence step must be named fence")
         }
         if (action_ref != fence_ref || !fence_pin_comment) {
-          report("Fence must use the v0.9.2 release distribution commit")
+          report("Fence must use the v0.10.0 release distribution commit")
         }
         if (step_number != 1) {
           report("Fence must be the first meaningful step")
@@ -159,7 +159,7 @@ validate_workflow_steps() {
           action_ref = value
           checkout = action_ref ~ /^actions\/checkout@/
           fence = action_ref ~ /^openai\/fence@/
-          fence_pin_comment = raw ~ /#[[:space:]]*pin@v0[.]9[.]2[[:space:]]*$/
+          fence_pin_comment = raw ~ /#[[:space:]]*pin@v0[.]10[.]0[[:space:]]*$/
         } else if (key == "with") {
           with_indent = key_indent
         }
@@ -213,7 +213,7 @@ if validate_workflow_steps <(printf '%s\n' \
   "    name: fence" \
   "    steps:" \
   "      - name: restrict network" \
-  "        uses: $FENCE_REF # pin@v0.9.2") 2>/dev/null; then
+  "        uses: $FENCE_REF # pin@v0.10.0") 2>/dev/null; then
   fail "step policy accepted Fence metadata spoofed by another step"
 fi
 
