@@ -338,14 +338,14 @@ fi
 grep -Fq 'artifact-id: ${{ steps.upload-artifact.outputs.artifact-id }}' <<< "$finalize_job" || fail "finalize job must export its artifact ID"
 
 verify_line=$(grep -nF '      - name: verify unnotarized artifact' "$RELEASE_WORKFLOW" | cut -d: -f1)
-signing_line=$(grep -nF '      - name: sign and notarize release artifact' "$RELEASE_WORKFLOW" | cut -d: -f1)
+signing_line=$(grep -nF '      - name: sign + notarize' "$RELEASE_WORKFLOW" | cut -d: -f1)
 if [[ -z "$verify_line" || -z "$signing_line" || "$verify_line" -ge "$signing_line" ]]; then
   fail "finalize must validate the unnotarized artifact before exposing signing credentials"
 fi
 
 signing_step=$(awk '
-  /^      - name: sign and notarize release artifact$/ { in_step = 1 }
-  in_step && /^      - name:/ && $0 != "      - name: sign and notarize release artifact" { exit }
+  /^      - name: sign [+] notarize$/ { in_step = 1 }
+  in_step && /^      - name:/ && $0 != "      - name: sign + notarize" { exit }
   in_step { print }
 ' "$RELEASE_WORKFLOW")
 [[ -n "$signing_step" ]] || fail "release workflow must have a signing and notarization step"

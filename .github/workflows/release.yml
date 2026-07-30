@@ -181,7 +181,7 @@ jobs:
             exit 1
           fi
 
-      - name: sign and notarize release artifact
+      - name: sign + notarize
         env:
           APPLE_DEVELOPER_ID_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 }}
           APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
