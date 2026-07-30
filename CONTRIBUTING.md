@@ -30,10 +30,10 @@ Versioning is driven by the `VERSION` file. Bump it manually (X.Y.Z) in a commit
 Releases are created by GitHub Actions when `VERSION` changes on `main`. The workflow:
 
 - Runs the test suite
-- Builds and verifies a universal Apple silicon and Intel release zip
-- Creates the GitHub release + tag
-
-Release archives use Developer ID signing and notarization when the maintainer provides credentials. Otherwise, packaging applies an ad-hoc bundle signature so integrity verification still succeeds; Gatekeeper may require the user to approve that unnotarized build.
+- Builds and verifies a universal Apple silicon and Intel application
+- Verifies the build artifact before the protected job receives credentials
+- Applies Developer ID signing, notarization, ticket stapling, and Gatekeeper verification
+- Attests the finalized archive and creates the GitHub release and tag
 
 Update the Homebrew cask manually in `grantbirki/homebrew-tap` after each release.
 

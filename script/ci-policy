@@ -324,7 +324,7 @@ finalize_job=$(awk '
   in_job { print }
 ' "$RELEASE_WORKFLOW")
 [[ -n "$finalize_job" ]] || fail "release workflow must have a finalize job"
-grep -Fq '    environment: apple-signing' <<< "$finalize_job" || fail "finalize job must use the protected apple-signing environment"
+grep -Fq '    environment: release' <<< "$finalize_job" || fail "finalize job must use the protected release environment"
 grep -Fq '    runs-on: macos-26' <<< "$finalize_job" || fail "finalize job must use the pinned macOS runner label"
 grep -Fq '    permissions: {}' <<< "$finalize_job" || fail "finalize job must not receive a GitHub token"
 if grep -q 'actions/checkout@' <<< "$finalize_job"; then
@@ -336,6 +336,55 @@ fi
 [[ "$(grep -Fc 'artifact-ids: ${{ needs.build.outputs.artifact-id }}' "$RELEASE_WORKFLOW")" == "1" ]] || fail "only finalize may download the unnotarized build artifact"
 [[ "$(grep -Fc 'artifact-ids: ${{ needs.finalize.outputs.artifact-id }}' "$RELEASE_WORKFLOW")" == "4" ]] || fail "all downstream jobs must download the finalized artifact by ID"
 grep -Fq 'artifact-id: ${{ steps.upload-artifact.outputs.artifact-id }}' <<< "$finalize_job" || fail "finalize job must export its artifact ID"
+
+verify_line=$(grep -nF '      - name: verify unnotarized artifact' "$RELEASE_WORKFLOW" | cut -d: -f1)
+signing_line=$(grep -nF '      - name: sign and notarize release artifact' "$RELEASE_WORKFLOW" | cut -d: -f1)
+if [[ -z "$verify_line" || -z "$signing_line" || "$verify_line" -ge "$signing_line" ]]; then
+  fail "finalize must validate the unnotarized artifact before exposing signing credentials"
+fi
+
+signing_step=$(awk '
+  /^      - name: sign and notarize release artifact$/ { in_step = 1 }
+  in_step && /^      - name:/ && $0 != "      - name: sign and notarize release artifact" { exit }
+  in_step { print }
+' "$RELEASE_WORKFLOW")
+[[ -n "$signing_step" ]] || fail "release workflow must have a signing and notarization step"
+
+for secret in \
+  APPLE_DEVELOPER_ID_P12_BASE64 \
+  APPLE_DEVELOPER_ID_P12_PASSWORD \
+  APPLE_NOTARY_KEY_P8_BASE64 \
+  APPLE_NOTARY_KEY_ID \
+  APPLE_NOTARY_ISSUER_ID; do
+  reference="${secret}: \${{ secrets.${secret} }}"
+  [[ "$(grep -Fc "$reference" "$RELEASE_WORKFLOW")" == "1" ]] || fail "$secret must be referenced exactly once"
+  grep -Fq "$reference" <<< "$signing_step" || fail "$secret must be scoped to the signing step"
+done
+
+team_reference='APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}'
+[[ "$(grep -Fc "$team_reference" "$RELEASE_WORKFLOW")" == "1" ]] || fail "APPLE_TEAM_ID must be referenced exactly once"
+grep -Fq "$team_reference" <<< "$signing_step" || fail "APPLE_TEAM_ID must be scoped to the signing step"
+
+for command in \
+  'trap cleanup EXIT' \
+  'security create-keychain' \
+  'security import "$certificate_path"' \
+  'security set-key-partition-list' \
+  'security find-identity' \
+  'Developer ID Application:' \
+  '--options runtime' \
+  '--timestamp' \
+  '--keychain "$keychain_path"' \
+  'TeamIdentifier=$APPLE_TEAM_ID' \
+  'xcrun notarytool submit' \
+  '--wait' \
+  'xcrun notarytool log' \
+  '"$notarization_status" != "Accepted"' \
+  'xcrun stapler staple' \
+  'xcrun stapler validate' \
+  'spctl --assess --type execute'; do
+  grep -Fq -- "$command" <<< "$signing_step" || fail "signing step must include: $command"
+done
 
 [[ "$(grep -c 'id-token: write' "$RELEASE_WORKFLOW")" == "1" ]] || fail "OIDC permission must exist in exactly one isolated job"
 [[ "$(grep -c 'attestations: write' "$RELEASE_WORKFLOW")" == "1" ]] || fail "attestation permission must exist in exactly one isolated job"

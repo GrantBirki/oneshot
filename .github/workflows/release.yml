@@ -103,10 +103,10 @@ jobs:
 
   finalize:
     needs: build
-    environment: apple-signing
+    environment: release
     permissions: {}
     runs-on: macos-26
-    timeout-minutes: 10
+    timeout-minutes: 30
     outputs:
       artifact-id: ${{ steps.upload-artifact.outputs.artifact-id }}
 
@@ -117,7 +117,7 @@ jobs:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: "input/"
 
-      - name: finalize release artifact
+      - name: verify unnotarized artifact
         env:
           EXPECTED_GIT_SHA: ${{ github.sha }}
           EXPECTED_VERSION: ${{ needs.build.outputs.version }}
@@ -138,8 +138,9 @@ jobs:
             exit 1
           fi
 
-          staging_dir=$(mktemp -d)
-          trap 'rm -rf "$staging_dir"' EXIT
+          staging_dir="$RUNNER_TEMP/oneshot-finalize"
+          rm -rf "$staging_dir"
+          mkdir -p "$staging_dir"
           ditto -x -k "$input_zip" "$staging_dir"
 
           app_path="$staging_dir/OneShot.app"
@@ -180,9 +181,182 @@ jobs:
             exit 1
           fi
 
-          mkdir -p dist
-          ditto -c -k --sequesterRsrc --keepParent "$app_path" dist/OneShot.zip
-          shasum -a 256 dist/OneShot.zip | awk '{print $1}' > dist/OneShot.zip.sha256
+      - name: sign and notarize release artifact
+        env:
+          APPLE_DEVELOPER_ID_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          for variable in \
+            APPLE_DEVELOPER_ID_P12_BASE64 \
+            APPLE_DEVELOPER_ID_P12_PASSWORD \
+            APPLE_NOTARY_KEY_P8_BASE64 \
+            APPLE_NOTARY_KEY_ID \
+            APPLE_NOTARY_ISSUER_ID \
+            APPLE_TEAM_ID; do
+            if [[ -z "${!variable:-}" ]]; then
+              echo "${variable} is not configured."
+              exit 1
+            fi
+          done
+
+          if [[ ! "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+            echo "APPLE_TEAM_ID must be a 10-character identifier."
+            exit 1
+          fi
+          if [[ ! "$APPLE_NOTARY_KEY_ID" =~ ^[A-Z0-9]{10,}$ ]]; then
+            echo "APPLE_NOTARY_KEY_ID must be an identifier of at least 10 characters."
+            exit 1
+          fi
+          if [[ ! "$APPLE_NOTARY_ISSUER_ID" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]]; then
+            echo "APPLE_NOTARY_ISSUER_ID must be a UUID."
+            exit 1
+          fi
+
+          app_path="$RUNNER_TEMP/oneshot-finalize/OneShot.app"
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+          notary_key_path="$RUNNER_TEMP/AuthKey_${APPLE_NOTARY_KEY_ID}.p8"
+          keychain_path="$RUNNER_TEMP/oneshot-signing.keychain-db"
+          notary_zip="$RUNNER_TEMP/OneShot-notary.zip"
+          notary_result="$RUNNER_TEMP/notary-result.json"
+          notary_log="$RUNNER_TEMP/notary-log.json"
+          dist_dir="$GITHUB_WORKSPACE/dist"
+
+          cleanup() {
+            security delete-keychain "$keychain_path" >/dev/null 2>&1 || true
+            rm -f \
+              "$certificate_path" \
+              "$notary_key_path" \
+              "$notary_zip" \
+              "$notary_result" \
+              "$notary_log"
+            rm -rf "$RUNNER_TEMP/oneshot-finalize"
+          }
+          trap cleanup EXIT
+
+          if [[ ! -d "$app_path" ]]; then
+            echo "Validated application is missing."
+            exit 1
+          fi
+
+          printf '%s' "$APPLE_DEVELOPER_ID_P12_BASE64" | /usr/bin/base64 --decode > "$certificate_path"
+          printf '%s' "$APPLE_NOTARY_KEY_P8_BASE64" | /usr/bin/base64 --decode > "$notary_key_path"
+          if [[ ! -s "$certificate_path" || ! -s "$notary_key_path" ]]; then
+            echo "Decoded Apple credential files must not be empty."
+            exit 1
+          fi
+          if ! grep -Fq -- "-----BEGIN PRIVATE KEY-----" "$notary_key_path"; then
+            echo "Decoded notarization key is not an App Store Connect private key."
+            exit 1
+          fi
+
+          keychain_password=$(/usr/bin/openssl rand -hex 32)
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 1800 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" \
+            -k "$keychain_path" \
+            -P "$APPLE_DEVELOPER_ID_P12_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain_path" >/dev/null
+
+          identity_hashes=$(security find-identity -v -p codesigning "$keychain_path" |
+            awk -v team="$APPLE_TEAM_ID" '$0 ~ /Developer ID Application:/ && index($0, "(" team ")") { print $2 }')
+          identity_count=$(printf '%s\n' "$identity_hashes" | awk 'NF { count++ } END { print count + 0 }')
+          if [[ "$identity_count" != "1" ]]; then
+            echo "Expected exactly one Developer ID Application identity for APPLE_TEAM_ID."
+            exit 1
+          fi
+          identity_hash=$(printf '%s\n' "$identity_hashes" | awk 'NF { print; exit }')
+
+          codesign \
+            --force \
+            --options runtime \
+            --timestamp \
+            --keychain "$keychain_path" \
+            --sign "$identity_hash" \
+            "$app_path"
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+
+          signature_details=$(codesign -d --verbose=4 "$app_path" 2>&1)
+          if [[ "$signature_details" != *"Authority=Developer ID Application:"* ]]; then
+            echo "Application is not signed with a Developer ID Application certificate."
+            exit 1
+          fi
+          if [[ "$signature_details" != *"flags="*"runtime"* ]]; then
+            echo "Developer ID signature must enable the hardened runtime."
+            exit 1
+          fi
+          if [[ "$signature_details" != *"TeamIdentifier=$APPLE_TEAM_ID"* ]]; then
+            echo "Application signature does not match APPLE_TEAM_ID."
+            exit 1
+          fi
+          if [[ "$signature_details" != *"Timestamp="* ]]; then
+            echo "Application signature does not contain a secure timestamp."
+            exit 1
+          fi
+
+          entitlements=$(codesign -d --entitlements :- "$app_path" 2>/dev/null || true)
+          if [[ "$entitlements" == *"com.apple.security.get-task-allow"* ]]; then
+            echo "Release application must not contain get-task-allow."
+            exit 1
+          fi
+
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" "$notary_zip"
+
+          submit_status=0
+          xcrun notarytool submit "$notary_zip" \
+            --key "$notary_key_path" \
+            --key-id "$APPLE_NOTARY_KEY_ID" \
+            --issuer "$APPLE_NOTARY_ISSUER_ID" \
+            --wait \
+            --output-format json > "$notary_result" || submit_status=$?
+
+          submission_id=$(plutil -extract id raw -o - "$notary_result" 2>/dev/null || true)
+          notarization_status=$(plutil -extract status raw -o - "$notary_result" 2>/dev/null || true)
+          if [[ -n "$submission_id" ]]; then
+            log_status=0
+            xcrun notarytool log "$submission_id" \
+              --key "$notary_key_path" \
+              --key-id "$APPLE_NOTARY_KEY_ID" \
+              --issuer "$APPLE_NOTARY_ISSUER_ID" \
+              "$notary_log" || log_status=$?
+            if [[ -s "$notary_log" ]]; then
+              cat "$notary_log"
+            fi
+          else
+            log_status=1
+          fi
+
+          if [[ "$submit_status" -ne 0 || "$notarization_status" != "Accepted" ]]; then
+            echo "Apple notarization was not accepted."
+            cat "$notary_result"
+            exit 1
+          fi
+          if [[ "$log_status" -ne 0 || ! -s "$notary_log" ]]; then
+            echo "Unable to retrieve the Apple notarization log."
+            exit 1
+          fi
+
+          xcrun stapler staple "$app_path"
+          xcrun stapler validate "$app_path"
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          spctl --assess --type execute --verbose=4 "$app_path"
+
+          rm -rf "$dist_dir"
+          mkdir -p "$dist_dir"
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" "$dist_dir/OneShot.zip"
+          shasum -a 256 "$dist_dir/OneShot.zip" | awk '{print $1}' > "$dist_dir/OneShot.zip.sha256"
 
       - name: scan finalized artifact for tokens
         run: |
