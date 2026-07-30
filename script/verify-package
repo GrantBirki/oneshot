@@ -16,6 +16,7 @@ APP_NAME="${APP_NAME:-OneShot}"
 ZIP_PATH="${1:-$DIR/dist/${APP_NAME}.zip}"
 CHECKSUM_PATH="${CHECKSUM_PATH:-${ZIP_PATH}.sha256}"
 EXPECTED_VERSION="${EXPECTED_VERSION:-$VERSION}"
+EXPECTED_GIT_SHA="${EXPECTED_GIT_SHA:-$GIT_SHA}"
 
 if [[ ! -f "$ZIP_PATH" ]]; then
   echo -e "${RED}Package not found at $ZIP_PATH${OFF}"
@@ -64,6 +65,17 @@ if [[ "$top_level_count" != "1" || ! -d "$APP_PATH" ]]; then
 fi
 
 codesign --verify --deep --strict "$APP_PATH"
+signature_details="$(codesign -d --verbose=4 "$APP_PATH" 2>&1)"
+if [[ "$signature_details" != *"flags="*"runtime"* ]]; then
+  echo -e "${RED}Application signature must enable the hardened runtime.${OFF}"
+  exit 1
+fi
+
+entitlements="$(codesign -d --entitlements :- "$APP_PATH" 2>/dev/null || true)"
+if [[ "$entitlements" == *"com.apple.security.get-task-allow"* ]]; then
+  echo -e "${RED}Release application must not contain get-task-allow.${OFF}"
+  exit 1
+fi
 
 PLIST_PATH="$APP_PATH/Contents/Info.plist"
 EXECUTABLE_PATH="$APP_PATH/Contents/MacOS/$APP_NAME"
@@ -107,6 +119,7 @@ minimum_system="$(plist_value LSMinimumSystemVersion)"
 ui_element="$(plist_value LSUIElement)"
 usage_description="$(plist_value NSScreenCaptureUsageDescription)"
 icon_name="$(plist_value CFBundleIconName)"
+git_sha="$(plist_value GIT_SHA)"
 
 if [[ "$bundle_identifier" != "com.grantbirki.oneshot" ]]; then
   echo -e "${RED}Unexpected bundle identifier: ${bundle_identifier:-missing}.${OFF}"
@@ -114,6 +127,10 @@ if [[ "$bundle_identifier" != "com.grantbirki.oneshot" ]]; then
 fi
 if [[ "$short_version" != "$EXPECTED_VERSION" || "$build_version" != "$EXPECTED_VERSION" ]]; then
   echo -e "${RED}Bundle version mismatch; expected $EXPECTED_VERSION, found ${short_version:-missing}/${build_version:-missing}.${OFF}"
+  exit 1
+fi
+if [[ "$git_sha" != "$EXPECTED_GIT_SHA" ]]; then
+  echo -e "${RED}Bundle commit mismatch; expected $EXPECTED_GIT_SHA, found ${git_sha:-missing}.${OFF}"
   exit 1
 fi
 if [[ "$minimum_system" != "26.0" ]]; then
