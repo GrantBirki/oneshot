@@ -350,47 +350,33 @@ signing_step=$(awk '
 ' "$RELEASE_WORKFLOW")
 [[ -n "$signing_step" ]] || fail "release workflow must have a signing and notarization step"
 
-for secret in \
-  APPLE_DEVELOPER_ID_P12_BASE64 \
-  APPLE_DEVELOPER_ID_P12_PASSWORD \
-  APPLE_NOTARY_KEY_P8_BASE64 \
-  APPLE_NOTARY_KEY_ID \
-  APPLE_NOTARY_ISSUER_ID; do
-  reference="${secret}: \${{ secrets.${secret} }}"
-  [[ "$(grep -Fc "$reference" "$RELEASE_WORKFLOW")" == "1" ]] || fail "$secret must be referenced exactly once"
-  grep -Fq "$reference" <<< "$signing_step" || fail "$secret must be scoped to the signing step"
+for reference in \
+  'APPLE_DEVELOPER_ID_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 }}' \
+  'APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}' \
+  'APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}' \
+  'APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}' \
+  'APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}' \
+  'APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}'; do
+  [[ "$(grep -Fc "$reference" "$RELEASE_WORKFLOW")" == "1" ]] || fail "$reference must appear exactly once"
+  grep -Fq "$reference" <<< "$signing_step" || fail "$reference must be scoped to the signing step"
 done
-
-team_reference='APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}'
-[[ "$(grep -Fc "$team_reference" "$RELEASE_WORKFLOW")" == "1" ]] || fail "APPLE_TEAM_ID must be referenced exactly once"
-grep -Fq "$team_reference" <<< "$signing_step" || fail "APPLE_TEAM_ID must be scoped to the signing step"
 
 for command in \
   'trap cleanup EXIT' \
   'security create-keychain' \
-  'security import "$certificate_path"' \
-  'security set-key-partition-list' \
-  'security find-identity' \
-  'Developer ID Application:' \
-  '--options runtime' \
-  '--timestamp' \
-  '--keychain "$keychain_path"' \
-  'TeamIdentifier=$APPLE_TEAM_ID' \
+  'codesign \' \
   'xcrun notarytool submit' \
-  '--wait' \
-  'xcrun notarytool log' \
-  '"$notarization_status" != "Accepted"' \
   'xcrun stapler staple' \
-  'xcrun stapler validate' \
   'spctl --assess --type execute'; do
-  grep -Fq -- "$command" <<< "$signing_step" || fail "signing step must include: $command"
+  grep -Fq -- "$command" <<< "$signing_step" || fail "signing step is missing a required phase: $command"
 done
 
 [[ "$(grep -c 'id-token: write' "$RELEASE_WORKFLOW")" == "1" ]] || fail "OIDC permission must exist in exactly one isolated job"
 [[ "$(grep -c 'attestations: write' "$RELEASE_WORKFLOW")" == "1" ]] || fail "attestation permission must exist in exactly one isolated job"
 [[ "$(grep -c 'artifact-metadata: write' "$RELEASE_WORKFLOW")" == "1" ]] || fail "artifact metadata permission must exist in exactly one isolated job"
 [[ "$(grep -c 'contents: write' "$RELEASE_WORKFLOW")" == "1" ]] || fail "contents write permission must exist in exactly one publication job"
-[[ "$(grep -c 'environment: release' "$RELEASE_WORKFLOW")" -ge 2 ]] || fail "attestation and publication must use the protected release environment"
+[[ "$(grep -c 'environment: release' "$RELEASE_WORKFLOW")" == "1" ]] || fail "only finalize may use the secret-bearing release environment"
+[[ "$(grep -c 'environment: publish' "$RELEASE_WORKFLOW")" == "2" ]] || fail "attestation and publication must use the protected publish environment"
 grep -q -- "--source-digest" "$RELEASE_WORKFLOW" || fail "attestation verification must bind the source commit"
 grep -q -- "--signer-digest" "$RELEASE_WORKFLOW" || fail "attestation verification must bind the signer workflow commit"
 grep -Fq 'bundle_artifact_id: ${{ steps.upload_bundle.outputs.artifact-id }}' "$RELEASE_WORKFLOW" || fail "attestation bundle artifact ID must be passed to verification"

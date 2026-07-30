@@ -381,7 +381,7 @@ jobs:
 
   attest:
     needs: [build, finalize]
-    environment: release
+    environment: publish
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
@@ -493,7 +493,7 @@ jobs:
 
   release:
     needs: [build, finalize, verify]
-    environment: release
+    environment: publish
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
