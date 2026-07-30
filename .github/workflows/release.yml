@@ -263,7 +263,8 @@ jobs:
           security import "$certificate_path" \
             -k "$keychain_path" \
             -P "$APPLE_DEVELOPER_ID_P12_PASSWORD" \
-            -T /usr/bin/codesign
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
           security set-key-partition-list \
             -S apple-tool:,apple: \
             -k "$keychain_password" \
