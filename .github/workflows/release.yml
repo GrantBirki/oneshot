@@ -102,6 +102,8 @@ jobs:
     environment: release
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    outputs:
+      bundle_artifact_id: ${{ steps.upload_bundle.outputs.artifact-id }}
     permissions:
       contents: read
       id-token: write
@@ -123,9 +125,19 @@ jobs:
           path: "dist/"
 
       - name: attest build provenance
+        id: attest
         uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # pin@v4.2.0
         with:
           subject-path: "dist/OneShot.zip"
+
+      - name: upload attestation bundle
+        id: upload_bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # pin@v7.0.1
+        with:
+          name: attestation-bundle
+          path: ${{ steps.attest.outputs.bundle-path }}
+          retention-days: 5
+          if-no-files-found: error
 
   verify:
     needs: [build, attest]
@@ -148,11 +160,18 @@ jobs:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: "dist/"
 
+      - name: download attestation bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@v8.0.1
+        with:
+          artifact-ids: ${{ needs.attest.outputs.bundle_artifact_id }}
+          path: "attestation/"
+
       - name: verify
         env:
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
           ARTIFACT_PATH: "dist/OneShot.zip"
+          BUNDLE_DIR: "attestation"
           GH_TOKEN: ${{ github.token }}
           SOURCE_REF: ${{ github.ref }}
           SOURCE_DIGEST: ${{ github.sha }}
@@ -174,7 +193,15 @@ jobs:
             exit 1
           fi
 
+          mapfile -d '' bundle_files < <(find "$BUNDLE_DIR" -type f -print0)
+          if [[ "${#bundle_files[@]}" -ne 1 ]]; then
+            echo "Expected exactly one attestation bundle, found ${#bundle_files[@]}."
+            exit 1
+          fi
+          bundle_path="${bundle_files[0]}"
+
           gh attestation verify "$ARTIFACT_PATH" \
+            --bundle "$bundle_path" \
             --repo "${OWNER}/${REPO}" \
             --signer-workflow "${OWNER}/${REPO}/.github/workflows/release.yml" \
             --signer-digest "$SOURCE_DIGEST" \

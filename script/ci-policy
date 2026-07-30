@@ -325,5 +325,9 @@ grep -Fq "if: \${{ always() && needs.build.result == 'success' && needs.release.
 [[ "$(grep -c 'environment: release' "$RELEASE_WORKFLOW")" -ge 2 ]] || fail "attestation and publication must use the protected release environment"
 grep -q -- "--source-digest" "$RELEASE_WORKFLOW" || fail "attestation verification must bind the source commit"
 grep -q -- "--signer-digest" "$RELEASE_WORKFLOW" || fail "attestation verification must bind the signer workflow commit"
+grep -Fq 'bundle_artifact_id: ${{ steps.upload_bundle.outputs.artifact-id }}' "$RELEASE_WORKFLOW" || fail "attestation bundle artifact ID must be passed to verification"
+grep -Fq 'path: ${{ steps.attest.outputs.bundle-path }}' "$RELEASE_WORKFLOW" || fail "the exact generated attestation bundle must be uploaded"
+grep -Fq 'artifact-ids: ${{ needs.attest.outputs.bundle_artifact_id }}' "$RELEASE_WORKFLOW" || fail "verification must download the generated attestation bundle"
+grep -q -- '--bundle "$bundle_path"' "$RELEASE_WORKFLOW" || fail "verification must use the downloaded attestation bundle"
 
 echo "GitHub Actions policy: OK"
