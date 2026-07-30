@@ -48,6 +48,22 @@ validate_workflow_steps() {
       invalid = 1
     }
 
+    function expected_release_allowlist(job) {
+      if (job == "attest") {
+        return "fulcio.sigstore.dev\nrekor.sigstore.dev"
+      }
+      if (job == "verify") {
+        return "tuf-repo-cdn.sigstore.dev\ntuf-repo.github.com"
+      }
+      if (job == "release") {
+        return "uploads.github.com"
+      }
+      if (job == "release_info") {
+        return ""
+      }
+      return "__unexpected_release_job__"
+    }
+
     function finish_step() {
       if (!have_step) {
         return
@@ -77,8 +93,19 @@ validate_workflow_steps() {
         if (step_number != 1) {
           report("Fence must be the first meaningful step")
         }
-        if (mode == "audit" && allow_github_artifacts == "true") {
-          report("allow_github_artifacts: true can only be used with Fence block mode")
+        if (mode != "") {
+          report("Fence must use default block mode without a mode override")
+        }
+        if (FILENAME ~ /\/release[.]yml$/) {
+          if (allow_github_artifacts != "true") {
+            report("release Fence jobs must enable bounded GitHub artifact access")
+          }
+          expected_allowlist = expected_release_allowlist(job_id)
+          if (expected_allowlist == "__unexpected_release_job__") {
+            report("Fence is not expected in this release job")
+          } else if (allowlist != expected_allowlist) {
+            report("release Fence job has an unexpected allowlist")
+          }
         }
       }
     }
@@ -91,6 +118,7 @@ validate_workflow_steps() {
 
     FNR == 1 {
       finish_steps()
+      job_id = ""
     }
 
     {
@@ -102,8 +130,14 @@ validate_workflow_steps() {
       }
 
       indent = match(line, /[^[:space:]]/) - 1
+      content = substr(line, indent + 1)
       if (in_steps && indent <= steps_indent) {
         finish_steps()
+      }
+
+      if (indent == 2 && content ~ /^[A-Za-z0-9_-]+:[[:space:]]*$/) {
+        job_id = content
+        sub(/:.*/, "", job_id)
       }
 
       if (line ~ /^[[:space:]]*steps:[[:space:]]*$/) {
@@ -117,7 +151,6 @@ validate_workflow_steps() {
         next
       }
 
-      content = substr(line, indent + 1)
       key_indent = indent
       if (indent == steps_indent + 2 && content ~ /^-[[:space:]]+/) {
         finish_step()
@@ -136,9 +169,20 @@ validate_workflow_steps() {
         fetch_depth = ""
         mode = ""
         allow_github_artifacts = ""
+        allowlist = ""
+        allowlist_indent = -1
         sub(/^-[[:space:]]+/, "", content)
         key_indent = indent + 2
       } else if (!have_step) {
+        next
+      }
+
+      if (allowlist_indent >= 0 && indent > allowlist_indent) {
+        allowlist_item = trim(content)
+        if (allowlist != "") {
+          allowlist = allowlist "\n"
+        }
+        allowlist = allowlist allowlist_item
         next
       }
 
@@ -174,6 +218,11 @@ validate_workflow_steps() {
           mode = value
         } else if (key == "allow_github_artifacts") {
           allow_github_artifacts = value
+        } else if (key == "allowlist") {
+          if (value != "|") {
+            report("Fence allowlist must use a multiline block")
+          }
+          allowlist_indent = key_indent
         }
       }
     }
@@ -210,11 +259,12 @@ fi
 if validate_workflow_steps <(printf '%s\n' \
   "jobs:" \
   "  test:" \
-  "    name: fence" \
   "    steps:" \
-  "      - name: restrict network" \
-  "        uses: $FENCE_REF # pin@v0.10.0") 2>/dev/null; then
-  fail "step policy accepted Fence metadata spoofed by another step"
+  "      - name: fence" \
+  "        uses: $FENCE_REF # pin@v0.10.0" \
+  "        with:" \
+  "          mode: audit") 2>/dev/null; then
+  fail "step policy accepted Fence audit mode"
 fi
 
 if grep -R -n -E '^[[:space:]]*pull_request_target:' "$WORKFLOW_DIR" >/dev/null; then
@@ -252,6 +302,12 @@ done < <(grep -R -h -E "^[[:space:]]*(-[[:space:]]+)?(uses|\"uses\"|'uses')[[:sp
 while IFS= read -r workflow; do
   validate_workflow_steps "$workflow" || fail "workflow step policy failed"
 done < <(find "$WORKFLOW_DIR" -type f \( -name "*.yml" -o -name "*.yaml" \) -print)
+
+[[ "$(grep -c "uses: $FENCE_REF" "$RELEASE_WORKFLOW")" == "4" ]] || fail "release workflow must protect all four Linux jobs with Fence"
+[[ "$(grep -c 'allow_github_artifacts: true' "$RELEASE_WORKFLOW")" == "4" ]] || fail "release Fence jobs must enable bounded GitHub artifact access"
+if grep -q -E '^[[:space:]]+mode:' "$RELEASE_WORKFLOW"; then
+  fail "release Fence jobs must use default block mode"
+fi
 
 grep -q "branches:" "$RELEASE_WORKFLOW" || fail "release workflow must restrict its branch"
 grep -q -- "- main" "$RELEASE_WORKFLOW" || fail "release workflow must target main"
