@@ -318,6 +318,25 @@ grep -Fq 'github.workflow_sha == github.sha' "$RELEASE_WORKFLOW" || fail "releas
 grep -Fq 'actual_sha=$(git rev-parse HEAD)' "$RELEASE_WORKFLOW" || fail "release checkout must verify HEAD"
 grep -Fq "if: \${{ always() && needs.build.result == 'success' && needs.release.result == 'success' }}" "$RELEASE_WORKFLOW" || fail "release info must require successful publication"
 
+finalize_job=$(awk '
+  /^  finalize:$/ { in_job = 1 }
+  in_job && /^  [A-Za-z0-9_-]+:$/ && $0 != "  finalize:" { exit }
+  in_job { print }
+' "$RELEASE_WORKFLOW")
+[[ -n "$finalize_job" ]] || fail "release workflow must have a finalize job"
+grep -Fq '    environment: apple-signing' <<< "$finalize_job" || fail "finalize job must use the protected apple-signing environment"
+grep -Fq '    runs-on: macos-26' <<< "$finalize_job" || fail "finalize job must use the pinned macOS runner label"
+grep -Fq '    permissions: {}' <<< "$finalize_job" || fail "finalize job must not receive a GitHub token"
+if grep -q 'actions/checkout@' <<< "$finalize_job"; then
+  fail "finalize job must not check out repository code"
+fi
+if grep -q -E 'run:[[:space:]]+script/|^[[:space:]]+script/' <<< "$finalize_job"; then
+  fail "finalize job must not execute repository scripts"
+fi
+[[ "$(grep -Fc 'artifact-ids: ${{ needs.build.outputs.artifact-id }}' "$RELEASE_WORKFLOW")" == "1" ]] || fail "only finalize may download the unnotarized build artifact"
+[[ "$(grep -Fc 'artifact-ids: ${{ needs.finalize.outputs.artifact-id }}' "$RELEASE_WORKFLOW")" == "4" ]] || fail "all downstream jobs must download the finalized artifact by ID"
+grep -Fq 'artifact-id: ${{ steps.upload-artifact.outputs.artifact-id }}' <<< "$finalize_job" || fail "finalize job must export its artifact ID"
+
 [[ "$(grep -c 'id-token: write' "$RELEASE_WORKFLOW")" == "1" ]] || fail "OIDC permission must exist in exactly one isolated job"
 [[ "$(grep -c 'attestations: write' "$RELEASE_WORKFLOW")" == "1" ]] || fail "attestation permission must exist in exactly one isolated job"
 [[ "$(grep -c 'artifact-metadata: write' "$RELEASE_WORKFLOW")" == "1" ]] || fail "artifact metadata permission must exist in exactly one isolated job"

@@ -89,7 +89,7 @@ if [[ -n "$CODESIGN_IDENTITY" ]]; then
   fi
   codesign "${codesign_args[@]}" "$STAGING_APP"
 else
-  codesign --force --sign - "$STAGING_APP"
+  codesign --force --options runtime --sign - "$STAGING_APP"
 fi
 
 codesign --verify --deep --strict "$STAGING_APP"
