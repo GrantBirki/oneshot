@@ -9,7 +9,7 @@ This guide explains how to use OneShot day to day. For every setting and toggle,
 2) Launch OneShot from Applications (it runs as a menu bar app).
 3) When prompted, grant Screen Recording permission in System Settings.
 
-If Gatekeeper blocks an ad-hoc, unnotarized build, right-click `OneShot.app` and choose Open, or use Open Anyway in System Settings → Privacy & Security.
+Official releases are Developer ID-signed and Apple-notarized. If Gatekeeper blocks an official release, do not disable Gatekeeper or clear quarantine; verify the release checksum and provenance, then report the failure.
 
 ## Permissions
 

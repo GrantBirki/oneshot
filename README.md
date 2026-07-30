@@ -82,12 +82,9 @@ shasum -a 256 OneShot.zip
 
 ## Signing and Gatekeeper
 
-Release archives always contain a code-signed application. Maintainer builds use Developer ID signing and notarization when credentials are available; other builds use an ad-hoc signature, which verifies bundle integrity but is not trusted by Gatekeeper.
+Official GitHub release archives contain a Developer ID-signed and Apple-notarized application with a stapled notarization ticket. The protected release job verifies the unsigned build artifact before it receives signing credentials, performs signing and notarization without checking out repository code, and publishes only the finalized archive.
 
-If Gatekeeper blocks an ad-hoc, unnotarized build:
-
-1) Right-click `OneShot.app` and choose Open.
-2) Or go to System Settings → Privacy & Security and click Open Anyway.
+Local builds created without maintainer credentials use an ad-hoc signature, which verifies bundle integrity but is not trusted by Gatekeeper. If Gatekeeper blocks an official release, do not disable Gatekeeper or clear quarantine; verify the release checksum and provenance, then report the failure.
 
 ## 👩‍💻 Contributing
 
