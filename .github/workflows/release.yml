@@ -267,6 +267,7 @@ jobs:
             -T /usr/bin/security
           security set-key-partition-list \
             -S apple-tool:,apple: \
+            -s \
             -k "$keychain_password" \
             "$keychain_path" >/dev/null
 
