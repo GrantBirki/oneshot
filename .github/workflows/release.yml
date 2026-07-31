@@ -265,6 +265,7 @@ jobs:
             -P "$APPLE_DEVELOPER_ID_P12_PASSWORD" \
             -T /usr/bin/codesign \
             -T /usr/bin/security
+          security list-keychains -d user -s "$keychain_path"
           security set-key-partition-list \
             -S apple-tool:,apple: \
             -s \
