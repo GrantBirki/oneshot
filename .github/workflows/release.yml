@@ -384,7 +384,7 @@ jobs:
           if-no-files-found: error
 
   attest:
-    needs: sign
+    needs: [build, sign]
     environment: publish
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -426,7 +426,7 @@ jobs:
           if-no-files-found: error
 
   verify:
-    needs: [sign, attest]
+    needs: [build, sign, attest]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
