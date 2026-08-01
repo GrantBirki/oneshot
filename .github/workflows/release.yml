@@ -85,10 +85,11 @@ jobs:
           scan_dir="$(mktemp -d)"
           trap 'rm -rf "$scan_dir"' EXIT
           ditto -x -k "$artifact" "$scan_dir"
+          token_pattern='gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}'
 
-          if grep -R -a -E -n 'gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}' "$scan_dir" >/dev/null; then
+          if grep -R -a -E -n "$token_pattern" "$scan_dir" >/dev/null; then
             echo "Potential token found in release artifact (file paths only):"
-            grep -R -a -E -l 'gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}' "$scan_dir"
+            grep -R -a -E -l "$token_pattern" "$scan_dir"
             exit 1
           fi
 
@@ -365,10 +366,11 @@ jobs:
           scan_dir="$(mktemp -d)"
           trap 'rm -rf "$scan_dir"' EXIT
           ditto -x -k dist/OneShot.zip "$scan_dir"
+          token_pattern='gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}'
 
-          if grep -R -a -E -n 'gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}' "$scan_dir" >/dev/null; then
-            echo "Potential token found in finalized release artifact (file paths only):"
-            grep -R -a -E -l 'gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}' "$scan_dir"
+          if grep -R -a -E -n "$token_pattern" "$scan_dir" >/dev/null; then
+            echo "Potential token found in signed release artifact (file paths only):"
+            grep -R -a -E -l "$token_pattern" "$scan_dir"
             exit 1
           fi
 
@@ -382,7 +384,7 @@ jobs:
           if-no-files-found: error
 
   attest:
-    needs: [build, sign]
+    needs: sign
     environment: publish
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -424,7 +426,7 @@ jobs:
           if-no-files-found: error
 
   verify:
-    needs: [build, sign, attest]
+    needs: [sign, attest]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -448,17 +450,13 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@v8.0.1
         with:
           artifact-ids: ${{ needs.attest.outputs.bundle_artifact_id }}
-          path: "attestation/"
+          path: "dist/attestation/"
 
       - name: verify
         env:
-          OWNER: ${{ github.repository_owner }}
-          REPO: ${{ github.event.repository.name }}
           ARTIFACT_PATH: "dist/OneShot.zip"
-          BUNDLE_DIR: "attestation"
+          BUNDLE_PATH: "dist/attestation/attestation.json"
           GH_TOKEN: ${{ github.token }}
-          SOURCE_REF: ${{ github.ref }}
-          SOURCE_DIGEST: ${{ github.sha }}
         run: |
           if [[ ! -f "$ARTIFACT_PATH" ]]; then
             echo "Expected artifact not found at $ARTIFACT_PATH"
@@ -470,6 +468,11 @@ jobs:
             exit 1
           fi
 
+          if [[ ! -f "$BUNDLE_PATH" ]]; then
+            echo "Expected attestation bundle not found at $BUNDLE_PATH"
+            exit 1
+          fi
+
           expected_sha=$(cat "${ARTIFACT_PATH}.sha256")
           actual_sha=$(sha256sum "$ARTIFACT_PATH" | awk '{print $1}')
           if [[ "$expected_sha" != "$actual_sha" ]]; then
@@ -477,20 +480,13 @@ jobs:
             exit 1
           fi
 
-          mapfile -d '' bundle_files < <(find "$BUNDLE_DIR" -type f -print0)
-          if [[ "${#bundle_files[@]}" -ne 1 ]]; then
-            echo "Expected exactly one attestation bundle, found ${#bundle_files[@]}."
-            exit 1
-          fi
-          bundle_path="${bundle_files[0]}"
-
           gh attestation verify "$ARTIFACT_PATH" \
-            --bundle "$bundle_path" \
-            --repo "${OWNER}/${REPO}" \
-            --signer-workflow "${OWNER}/${REPO}/.github/workflows/release.yml" \
-            --signer-digest "$SOURCE_DIGEST" \
-            --source-ref "$SOURCE_REF" \
-            --source-digest "$SOURCE_DIGEST" \
+            --bundle "$BUNDLE_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+            --signer-digest "$GITHUB_SHA" \
+            --source-ref "$GITHUB_REF" \
+            --source-digest "$GITHUB_SHA" \
             --deny-self-hosted-runners
 
   release:
@@ -547,73 +543,3 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "$TAG" \
             --generate-notes
-
-  release_info:
-    needs: [build, sign, release]
-    if: ${{ always() && needs.build.result == 'success' && needs.release.result == 'success' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions: {}
-    steps:
-      - name: fence
-        uses: openai/fence@e6b39c80c51cb2b2a39448ddeff74b3b886c0a63 # pin@v0.10.0
-        with:
-          allow_github_artifacts: true
-
-      - name: download artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # pin@v8.0.1
-        with:
-          artifact-ids: ${{ needs.sign.outputs.artifact-id }}
-          path: "dist/"
-
-      - name: print tap update info
-        env:
-          VERSION: ${{ needs.build.outputs.version }}
-        run: |
-          sha_file="dist/OneShot.zip.sha256"
-          if [[ ! -f "$sha_file" ]]; then
-            echo "Release info unavailable: expected checksum not found at $sha_file"
-            exit 0
-          fi
-
-          sha=$(cat "$sha_file")
-          if [[ ! "$sha" =~ ^[0-9a-fA-F]{64}$ ]]; then
-            echo "Release info unavailable: invalid SHA256 in $sha_file"
-            exit 0
-          fi
-
-          green='\033[0;32m'
-          blue='\033[0;34m'
-          yellow='\033[0;33m'
-          off='\033[0m'
-
-          echo -e "${green}Homebrew tap update details:${off}"
-          echo -e "  ${blue}version${off}: ${VERSION}"
-          echo -e "  ${blue}sha256${off}: ${sha}"
-          echo
-          echo -e "${yellow}Cask snippet:${off}"
-          cat <<RUBY
-          cask "oneshot" do
-            version "${VERSION}"
-            sha256 "${sha}"
-
-            url "https://github.com/grantbirki/oneshot/releases/download/v#{version}/OneShot.zip"
-            name "OneShot"
-            desc "Open source screenshot utility"
-            homepage "https://github.com/grantbirki/oneshot"
-
-            livecheck do
-              url :url
-              strategy :github_latest
-            end
-
-            depends_on macos: ">= :tahoe"
-
-            app "OneShot.app"
-
-            zap trash: [
-              "~/Library/Preferences/com.grantbirki.oneshot.plist",
-              "~/Library/Saved Application State/com.grantbirki.oneshot.savedState",
-            ]
-          end
-          RUBY

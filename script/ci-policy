@@ -58,9 +58,6 @@ validate_workflow_steps() {
       if (job == "release") {
         return "uploads.github.com"
       }
-      if (job == "release_info") {
-        return ""
-      }
       return "__unexpected_release_job__"
     }
 
@@ -303,8 +300,8 @@ while IFS= read -r workflow; do
   validate_workflow_steps "$workflow" || fail "workflow step policy failed"
 done < <(find "$WORKFLOW_DIR" -type f \( -name "*.yml" -o -name "*.yaml" \) -print)
 
-[[ "$(grep -c "uses: $FENCE_REF" "$RELEASE_WORKFLOW")" == "4" ]] || fail "release workflow must protect all four Linux jobs with Fence"
-[[ "$(grep -c 'allow_github_artifacts: true' "$RELEASE_WORKFLOW")" == "4" ]] || fail "release Fence jobs must enable bounded GitHub artifact access"
+[[ "$(grep -c "uses: $FENCE_REF" "$RELEASE_WORKFLOW")" == "3" ]] || fail "release workflow must protect all three Linux jobs with Fence"
+[[ "$(grep -c 'allow_github_artifacts: true' "$RELEASE_WORKFLOW")" == "3" ]] || fail "release Fence jobs must enable bounded GitHub artifact access"
 if grep -q -E '^[[:space:]]+mode:' "$RELEASE_WORKFLOW"; then
   fail "release Fence jobs must use default block mode"
 fi
@@ -316,7 +313,6 @@ if grep -q "workflow_dispatch:" "$RELEASE_WORKFLOW"; then
 fi
 grep -Fq 'github.workflow_sha == github.sha' "$RELEASE_WORKFLOW" || fail "release workflow must come from the event commit"
 grep -Fq 'actual_sha=$(git rev-parse HEAD)' "$RELEASE_WORKFLOW" || fail "release checkout must verify HEAD"
-grep -Fq "if: \${{ always() && needs.build.result == 'success' && needs.release.result == 'success' }}" "$RELEASE_WORKFLOW" || fail "release info must require successful publication"
 
 sign_job=$(awk '
   /^  sign:$/ { in_job = 1 }
@@ -334,7 +330,7 @@ if grep -q -E 'run:[[:space:]]+script/|^[[:space:]]+script/' <<< "$sign_job"; th
   fail "sign job must not execute repository scripts"
 fi
 [[ "$(grep -Fc 'artifact-ids: ${{ needs.build.outputs.artifact-id }}' "$RELEASE_WORKFLOW")" == "1" ]] || fail "only sign may download the unnotarized build artifact"
-[[ "$(grep -Fc 'artifact-ids: ${{ needs.sign.outputs.artifact-id }}' "$RELEASE_WORKFLOW")" == "4" ]] || fail "all downstream jobs must download the signed artifact by ID"
+[[ "$(grep -Fc 'artifact-ids: ${{ needs.sign.outputs.artifact-id }}' "$RELEASE_WORKFLOW")" == "3" ]] || fail "all downstream jobs must download the signed artifact by ID"
 grep -Fq 'artifact-id: ${{ steps.upload-artifact.outputs.artifact-id }}' <<< "$sign_job" || fail "sign job must export its artifact ID"
 
 verify_line=$(grep -nF '      - name: verify unnotarized artifact' "$RELEASE_WORKFLOW" | cut -d: -f1)
@@ -382,6 +378,7 @@ grep -q -- "--signer-digest" "$RELEASE_WORKFLOW" || fail "attestation verificati
 grep -Fq 'bundle_artifact_id: ${{ steps.upload_bundle.outputs.artifact-id }}' "$RELEASE_WORKFLOW" || fail "attestation bundle artifact ID must be passed to verification"
 grep -Fq 'path: ${{ steps.attest.outputs.bundle-path }}' "$RELEASE_WORKFLOW" || fail "the exact generated attestation bundle must be uploaded"
 grep -Fq 'artifact-ids: ${{ needs.attest.outputs.bundle_artifact_id }}' "$RELEASE_WORKFLOW" || fail "verification must download the generated attestation bundle"
-grep -q -- '--bundle "$bundle_path"' "$RELEASE_WORKFLOW" || fail "verification must use the downloaded attestation bundle"
+grep -Fq 'BUNDLE_PATH: "dist/attestation/attestation.json"' "$RELEASE_WORKFLOW" || fail "verification must use the exact downloaded attestation bundle path"
+grep -q -- '--bundle "$BUNDLE_PATH"' "$RELEASE_WORKFLOW" || fail "verification must use the downloaded attestation bundle"
 
 echo "GitHub Actions policy: OK"
