@@ -7,7 +7,7 @@
 
 Open source screenshot utility for macOS with QoL improvements over the native Apple screenshot utility.
 
-Requires macOS Tahoe 26 or later on Apple silicon or Intel Macs.
+Requires macOS Tahoe 26 or later on Apple silicon.
 
 <img src="docs/assets/oneshot.png" alt="OneShot app icon" width="192">
 

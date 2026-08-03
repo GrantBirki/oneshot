@@ -18,7 +18,7 @@ This downloads checksum-pinned versions of XcodeGen, SwiftLint, and SwiftFormat 
 - Test: `script/test`
 - Lint/format checks: `script/lint`
 - Run the app (Debug): `script/server`
-- Build a universal Release archive: `script/package`
+- Build an Apple silicon Release archive: `script/package`
 - Verify a Release archive: `script/verify-package`
 
 If you change `project.yml`, run `script/update` to regenerate the Xcode project.
@@ -30,7 +30,7 @@ Versioning is driven by the `VERSION` file. Bump it manually (X.Y.Z) in a commit
 Releases are created by GitHub Actions when `VERSION` changes on `main`. The workflow:
 
 - Runs the test suite
-- Builds and verifies a universal Apple silicon and Intel application
+- Builds and verifies an Apple silicon application
 - Verifies the build artifact before the protected job receives credentials
 - Applies Developer ID signing, notarization, ticket stapling, and Gatekeeper verification
 - Attests the finalized archive and creates the GitHub release and tag

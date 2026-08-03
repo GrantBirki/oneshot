@@ -151,6 +151,17 @@ jobs:
             exit 1
           fi
 
+          executable_path="$app_path/Contents/MacOS/OneShot"
+          if [[ ! -x "$executable_path" ]]; then
+            echo "Application executable is missing or not executable."
+            exit 1
+          fi
+          architectures=$(lipo -archs "$executable_path")
+          if [[ "$architectures" != "arm64" ]]; then
+            echo "Expected exactly arm64 before signing; found: ${architectures:-none}."
+            exit 1
+          fi
+
           codesign --verify --deep --strict "$app_path"
           signature_details=$(codesign -d --verbose=4 "$app_path" 2>&1)
           if [[ "$signature_details" != *"flags="*"runtime"* ]]; then
