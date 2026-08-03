@@ -158,9 +158,13 @@ jobs:
             exit 1
           fi
 
-          entitlements=$(codesign -d --entitlements :- "$app_path" 2>/dev/null || true)
-          if [[ "$entitlements" == *"com.apple.security.get-task-allow"* ]]; then
-            echo "Release application must not contain get-task-allow."
+          entitlements_path="$staging_dir/entitlements.plist"
+          if ! codesign -d --entitlements :- "$app_path" > "$entitlements_path" 2>/dev/null; then
+            echo "Unable to read application entitlements."
+            exit 1
+          fi
+          if [[ -s "$entitlements_path" ]] && [[ "$(plutil -convert json -o - "$entitlements_path" 2>/dev/null)" != "{}" ]]; then
+            echo "Release application contains unexpected entitlements."
             exit 1
           fi
 
@@ -309,9 +313,13 @@ jobs:
             exit 1
           fi
 
-          entitlements=$(codesign -d --entitlements :- "$app_path" 2>/dev/null || true)
-          if [[ "$entitlements" == *"com.apple.security.get-task-allow"* ]]; then
-            echo "Release application must not contain get-task-allow."
+          signed_entitlements_path="$RUNNER_TEMP/oneshot-sign/signed-entitlements.plist"
+          if ! codesign -d --entitlements :- "$app_path" > "$signed_entitlements_path" 2>/dev/null; then
+            echo "Unable to read signed application entitlements."
+            exit 1
+          fi
+          if [[ -s "$signed_entitlements_path" ]] && [[ "$(plutil -convert json -o - "$signed_entitlements_path" 2>/dev/null)" != "{}" ]]; then
+            echo "Signed application contains unexpected entitlements."
             exit 1
           fi
 

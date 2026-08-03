@@ -37,6 +37,7 @@ targets:
         APP_DISPLAY_NAME: OneShot
         PRODUCT_BUNDLE_IDENTIFIER: com.grantbirki.oneshot
         SWIFT_VERSION: 6.0
+        ENABLE_HARDENED_RUNTIME: YES
         MARKETING_VERSION: 0.0.0
         CURRENT_PROJECT_VERSION: 0.0.0
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -45,7 +46,7 @@ targets:
           APP_DISPLAY_NAME: OneShot Dev
           PRODUCT_BUNDLE_IDENTIFIER: com.grantbirki.oneshot.dev
         Release:
-          ARCHS: "arm64 x86_64"
+          ARCHS: arm64
           ONLY_ACTIVE_ARCH: "NO"
   OneShotTests:
     type: bundle.unit-test
