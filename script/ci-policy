@@ -8,7 +8,7 @@ RELEASE_WORKFLOW="$WORKFLOW_DIR/release.yml"
 PROJECT_CONFIG="$ROOT_DIR/project.yml"
 VERIFY_PACKAGE_SCRIPT="$ROOT_DIR/script/verify-package"
 FENCE_SHA="e6b39c80c51cb2b2a39448ddeff74b3b886c0a63"
-USES_PATTERN='^([[:space:]]{4}|[[:space:]]{8}|[[:space:]]{6}-[[:space:]]+)uses[[:space:]]*:'
+USES_PATTERN='^[[:space:]]*(-[[:space:]]+)?uses[[:space:]]*:'
 
 fail() {
   echo "GitHub Actions policy: $1" >&2
@@ -45,21 +45,86 @@ step_block() {
   ' <<< "$2"
 }
 
+first_step_block() {
+  awk '
+    /^    steps:$/ { in_steps = 1; next }
+    in_steps && /^      - / {
+      if (found) exit
+      found = 1
+    }
+    found { print }
+  ' <<< "$1"
+}
+
+validate_checkouts() {
+  local path
+  for path in "$WORKFLOW_DIR"/*.yml "$WORKFLOW_DIR"/*.yaml; do
+    [[ -e "$path" ]] || continue
+    awk -v path="${path#"$ROOT_DIR/"}" '
+      function indentation(line) {
+        match(line, /[^[:space:]]/)
+        return RSTART ? RSTART - 1 : length(line)
+      }
+      function finish_step() {
+        if (checkout && !safe) {
+          print path ": checkout step must set with.persist-credentials to false" > "/dev/stderr"
+          failed = 1
+        }
+        checkout = safe = in_with = 0
+        step_indent = -1
+      }
+      {
+        trimmed = $0
+        sub(/^[[:space:]]+/, "", trimmed)
+        indent = indentation($0)
+        if (in_steps && trimmed != "" && indent <= steps_indent) {
+          finish_step()
+          in_steps = 0
+        }
+        if (trimmed == "steps:") {
+          finish_step()
+          in_steps = 1
+          steps_indent = indent
+          next
+        }
+        if (!in_steps) next
+        if (trimmed ~ /^-[[:space:]]+/ && indent == steps_indent + 2) finish_step()
+
+        direct = trimmed
+        if (indent == steps_indent + 2) sub(/^-[[:space:]]+/, "", direct)
+        if ((indent == steps_indent + 2 || indent == steps_indent + 4) && direct ~ /^uses:[[:space:]]*actions\/checkout@/) checkout = 1
+        if (indent == steps_indent + 4 && direct == "with:") {
+          in_with = 1
+          with_indent = indent
+          next
+        }
+        if (in_with && trimmed != "" && indent <= with_indent) in_with = 0
+        if (in_with && trimmed ~ /^persist-credentials:[[:space:]]*false([[:space:]]|$)/) safe = 1
+      }
+      END {
+        finish_step()
+        exit failed
+      }
+    ' "$path" || fail "every checkout must disable persisted credentials in its own step"
+  done
+}
+
 check_fence() {
   local job="$1"
   local expected_allowlist="$2"
   local block first_step allowlist
   block=$(job_block "$job") || fail "release workflow is missing the $job job"
-  first_step=$(grep -m1 -E '^      - name:' <<< "$block")
-  [[ "$first_step" == "      - name: fence" ]] || fail "Fence must be the first step in $job"
-  require "uses: openai/fence@$FENCE_SHA" "$block" "Fence must use the reviewed pin in $job"
-  require "allow_github_artifacts: true" "$block" "Fence must allow GitHub artifact access in $job"
-  forbid "          mode:" "$block" "Fence must run in enforcement mode in $job"
+  first_step=$(first_step_block "$block")
+  [[ "${first_step%%$'\n'*}" == "      - name: fence" ]] || fail "Fence must be the first step in $job"
+  require "        uses: openai/fence@$FENCE_SHA" "$first_step" "Fence must use the reviewed pin in its first $job step"
+  require "          allow_github_artifacts: true" "$first_step" "Fence must allow GitHub artifact access in $job"
+  forbid "        run:" "$first_step" "Fence must be the action executed by the first $job step"
+  forbid "          mode:" "$first_step" "Fence must run in enforcement mode in $job"
   allowlist=$(awk '
     $0 == "          allowlist: |" { capture = 1; next }
     capture && /^            [^[:space:]]/ { print substr($0, 13); next }
     capture { exit }
-  ' <<< "$block")
+  ' <<< "$first_step")
   [[ "$allowlist" == "$expected_allowlist" ]] || fail "Fence allowlist changed in $job"
 }
 
@@ -73,7 +138,6 @@ if grep -R -n -E "^[[:space:]]*(-[[:space:]]+)?[\"']uses[\"'][[:space:]]*:" "$WO
   fail "uses keys must use the repository's canonical unquoted form"
 fi
 
-checkout_count=0
 while IFS= read -r line; do
   use="${line#*:}"
   use="${use%%#*}"
@@ -89,11 +153,9 @@ while IFS= read -r line; do
   if [[ ! "$use" =~ @[0-9a-f]{40}$ ]] && [[ ! "$use" =~ @sha256:[0-9a-f]{64}$ ]]; then
     fail "action is not pinned to an immutable digest: $use"
   fi
-  [[ "$action" == "actions/checkout" ]] && checkout_count=$((checkout_count + 1))
 done < <(grep -R -h -E "$USES_PATTERN" "$WORKFLOW_DIR")
 
-persist_count=$({ grep -R -h -E '^[[:space:]]+persist-credentials:[[:space:]]+false([[:space:]]|$)' "$WORKFLOW_DIR" || true; } | wc -l | tr -d ' ')
-[[ "$persist_count" == "$checkout_count" ]] || fail "every checkout must disable persisted credentials"
+validate_checkouts
 
 require "      - main" "$release_text" "release workflow must target main"
 require '      - "VERSION"' "$release_text" "release workflow must trigger only when VERSION changes"
@@ -119,10 +181,14 @@ signing_step=$(step_block "sign + notarize" "$sign_job") || fail "sign job is mi
 
 require "    needs: build" "$sign_job" "sign must depend on build"
 require "    environment: release" "$sign_job" "sign must use the release environment"
+require "    runs-on: macos-26" "$sign_job" "sign must use the pinned hosted macOS runner"
 require "    permissions: {}" "$sign_job" "sign must not receive a GitHub token"
 require "    needs: [build, sign]" "$attest_job" "attest must depend on build and sign"
 require "    needs: [build, sign, attest]" "$verify_job" "verify must depend on all prior jobs"
 require "    needs: [build, sign, verify]" "$release_job" "release must depend on build, sign, and verify"
+require 'artifact-ids: ${{ needs.sign.outputs.artifact-id }}' "$attest_job" "attest must consume the signed artifact"
+require 'artifact-ids: ${{ needs.sign.outputs.artifact-id }}' "$verify_job" "verify must consume the signed artifact"
+require 'artifact-ids: ${{ needs.sign.outputs.artifact-id }}' "$release_job" "release must publish the signed artifact"
 forbid "actions/checkout@" "$sign_job" "sign must not check out repository code"
 forbid "run: script/" "$sign_job" "sign must not execute repository scripts"
 
