@@ -5,6 +5,9 @@ set -euo pipefail
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 WORKFLOW_DIR="$ROOT_DIR/.github/workflows"
 RELEASE_WORKFLOW="$WORKFLOW_DIR/release.yml"
+PROJECT_CONFIG="$ROOT_DIR/project.yml"
+PACKAGE_SCRIPT="$ROOT_DIR/script/package"
+VERIFY_PACKAGE_SCRIPT="$ROOT_DIR/script/verify-package"
 FENCE_USE="openai/fence@e6b39c80c51cb2b2a39448ddeff74b3b886c0a63 # pin@v0.10.0"
 ACTION_USES_PATTERN="^[[:space:]]*(-[[:space:]]+)?(uses|\"uses\"|'uses')[[:space:]]*:"
 
@@ -315,6 +318,23 @@ done < <(grep -E "$ACTION_USES_PATTERN" "$RELEASE_WORKFLOW")
 [[ "$release_checkout_count" == "1" ]] || fail "release workflow must have exactly one checkout"
 grep -Fq 'actual_sha=$(git rev-parse HEAD)' "$RELEASE_WORKFLOW" || fail "release workflow must resolve the checked-out commit"
 grep -Fq 'if [[ "$actual_sha" != "$GITHUB_SHA" ]]; then' "$RELEASE_WORKFLOW" || fail "release workflow must verify the checked-out commit"
+
+grep -Fq 'ENABLE_HARDENED_RUNTIME: YES' "$PROJECT_CONFIG" || fail "application target must explicitly enable the hardened runtime"
+grep -Fq 'ARCHS: arm64' "$PROJECT_CONFIG" || fail "release configuration must explicitly target arm64"
+grep -Fq 'Expected exactly arm64' "$VERIFY_PACKAGE_SCRIPT" || fail "package verification must require exactly arm64"
+grep -Fq 'Expected exactly arm64 before signing' "$RELEASE_WORKFLOW" || fail "sign must require exactly arm64 before loading credentials"
+if grep -q 'x86_64' "$PROJECT_CONFIG" "$PACKAGE_SCRIPT" "$VERIFY_PACKAGE_SCRIPT" "$RELEASE_WORKFLOW"; then
+  fail "release configuration must not target x86_64"
+fi
+grep -Fq 'Release application contains unexpected entitlements.' "$VERIFY_PACKAGE_SCRIPT" || fail "package verification must reject every unexpected entitlement"
+grep -Fq 'Release application contains unexpected entitlements.' "$RELEASE_WORKFLOW" || fail "sign must reject unexpected entitlements before loading credentials"
+grep -Fq 'Signed application contains unexpected entitlements.' "$RELEASE_WORKFLOW" || fail "sign must reject unexpected entitlements after signing"
+if grep -q 'ENTITLEMENTS_PATH' "$PACKAGE_SCRIPT"; then
+  fail "OneShot packaging must not accept entitlements"
+fi
+if grep -q 'get-task-allow' "$VERIFY_PACKAGE_SCRIPT" "$RELEASE_WORKFLOW"; then
+  fail "OneShot must reject the entire entitlement set instead of a single entitlement"
+fi
 
 sign_job=$(awk '
   /^  sign:$/ { in_job = 1 }

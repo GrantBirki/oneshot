@@ -37,11 +37,6 @@ NOTARY_ZIP="$STAGING_DIR/${APP_NAME}-notary.zip"
 
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
-ENTITLEMENTS_PATH="${ENTITLEMENTS_PATH:-}"
-
-if [[ -z "$ENTITLEMENTS_PATH" && -f "$DIR/${APP_NAME}.entitlements" ]]; then
-  ENTITLEMENTS_PATH="$DIR/${APP_NAME}.entitlements"
-fi
 
 rm -rf "$DIST_DIR" "$STAGING_DIR"
 mkdir -p "$DIST_DIR" "$STAGING_DIR"
@@ -60,7 +55,7 @@ build_args=(
   GIT_SHA="$GIT_SHA"
 )
 if [[ "$CONFIGURATION" == "Release" ]]; then
-  build_args+=(ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO)
+  build_args+=(ARCHS=arm64 ONLY_ACTIVE_ARCH=NO)
 fi
 xcodebuild "${build_args[@]}"
 
@@ -80,13 +75,6 @@ fi
 
 if [[ -n "$CODESIGN_IDENTITY" ]]; then
   codesign_args=(--force --options runtime --timestamp --sign "$CODESIGN_IDENTITY")
-  if [[ -n "$ENTITLEMENTS_PATH" ]]; then
-    if [[ ! -f "$ENTITLEMENTS_PATH" ]]; then
-      echo -e "${RED}Entitlements file not found at $ENTITLEMENTS_PATH${OFF}"
-      exit 1
-    fi
-    codesign_args+=(--entitlements "$ENTITLEMENTS_PATH")
-  fi
   codesign "${codesign_args[@]}" "$STAGING_APP"
 else
   codesign --force --options runtime --sign - "$STAGING_APP"

@@ -151,6 +151,17 @@ jobs:
             exit 1
           fi
 
+          executable_path="$app_path/Contents/MacOS/OneShot"
+          if [[ ! -x "$executable_path" ]]; then
+            echo "Application executable is missing or not executable."
+            exit 1
+          fi
+          architectures=$(lipo -archs "$executable_path")
+          if [[ "$architectures" != "arm64" ]]; then
+            echo "Expected exactly arm64 before signing; found: ${architectures:-none}."
+            exit 1
+          fi
+
           codesign --verify --deep --strict "$app_path"
           signature_details=$(codesign -d --verbose=4 "$app_path" 2>&1)
           if [[ "$signature_details" != *"flags="*"runtime"* ]]; then
@@ -158,9 +169,13 @@ jobs:
             exit 1
           fi
 
-          entitlements=$(codesign -d --entitlements :- "$app_path" 2>/dev/null || true)
-          if [[ "$entitlements" == *"com.apple.security.get-task-allow"* ]]; then
-            echo "Release application must not contain get-task-allow."
+          entitlements_path="$staging_dir/entitlements.plist"
+          if ! codesign -d --entitlements :- "$app_path" > "$entitlements_path" 2>/dev/null; then
+            echo "Unable to read application entitlements."
+            exit 1
+          fi
+          if [[ -s "$entitlements_path" ]] && [[ "$(plutil -convert json -o - "$entitlements_path" 2>/dev/null)" != "{}" ]]; then
+            echo "Release application contains unexpected entitlements."
             exit 1
           fi
 
@@ -309,9 +324,13 @@ jobs:
             exit 1
           fi
 
-          entitlements=$(codesign -d --entitlements :- "$app_path" 2>/dev/null || true)
-          if [[ "$entitlements" == *"com.apple.security.get-task-allow"* ]]; then
-            echo "Release application must not contain get-task-allow."
+          signed_entitlements_path="$RUNNER_TEMP/oneshot-sign/signed-entitlements.plist"
+          if ! codesign -d --entitlements :- "$app_path" > "$signed_entitlements_path" 2>/dev/null; then
+            echo "Unable to read signed application entitlements."
+            exit 1
+          fi
+          if [[ -s "$signed_entitlements_path" ]] && [[ "$(plutil -convert json -o - "$signed_entitlements_path" 2>/dev/null)" != "{}" ]]; then
+            echo "Signed application contains unexpected entitlements."
             exit 1
           fi
 
