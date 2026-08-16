@@ -49,7 +49,7 @@ final class PreviewDragPayload: NSObject, NSFilePromiseProviderDelegate {
         }
     }
 
-    func operationQueue(for _: NSFilePromiseProvider) -> OperationQueue {
+    nonisolated func operationQueue(for _: NSFilePromiseProvider) -> OperationQueue {
         writeQueue
     }
 }
