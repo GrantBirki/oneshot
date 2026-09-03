@@ -46,7 +46,11 @@ enum ClipboardService {
             ) else {
                 return nil
             }
-            CGImageDestinationAddImage(destination, image, nil)
+            let sourceProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+            var properties: [CFString: Any] = [:]
+            properties[kCGImagePropertyDPIWidth] = sourceProperties?[kCGImagePropertyDPIWidth]
+            properties[kCGImagePropertyDPIHeight] = sourceProperties?[kCGImagePropertyDPIHeight]
+            CGImageDestinationAddImage(destination, image, properties as CFDictionary)
             guard CGImageDestinationFinalize(destination) else { return nil }
             return data as Data
         }.value

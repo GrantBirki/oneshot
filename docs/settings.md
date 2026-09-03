@@ -26,6 +26,7 @@ The settings window is organized into General, Capture, Output, Preview, Hotkeys
 
 Notes:
 
+- Clipboard copies preserve the screenshot's full pixel resolution and display size in both PNG and TIFF formats, including Retina captures.
 - When `Copy to clipboard automatically` is off, only the `Default output` option `Copy to clipboard` will place images on the clipboard.
 - When `Default output` is `Copy to clipboard`, nothing is saved to disk and the save location/filename prefix are ignored.
 - When floating previews are disabled and clipboard-only output is selected, disk naming and location controls are disabled because they cannot affect the result.
