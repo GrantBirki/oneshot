@@ -2,6 +2,8 @@
 
 This document describes the settings available in OneShot.
 
+For settings with a fixed list of choices, an unrecognized saved value falls back to the default listed below.
+
 The settings window is organized into General, Capture, Output, Preview, Hotkeys, and About tabs. The Capture tab contains the selection and sound controls.
 
 ## General
@@ -72,5 +74,7 @@ Notes:
 - Hotkey changes take effect immediately.
 
 ## About
+
+The menu bar's `About OneShot` command opens this tab.
 
 - `Check for Updates`: Manually check GitHub Releases for a newer stable OneShot release. This only runs when clicked, downloads or installs nothing, and opens the GitHub release page only when you choose `Open Release`.

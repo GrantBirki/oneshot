@@ -182,6 +182,11 @@ final class SettingsStore: ObservableObject {
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
+        func loadEnum<T: RawRepresentable>(key: String, defaultValue: T) -> T where T.RawValue == String {
+            let rawValue = defaults.string(forKey: key) ?? defaultValue.rawValue
+            return T(rawValue: rawValue) ?? defaultValue
+        }
+
         self.defaults = defaults
 
         autoLaunchEnabled = defaults.object(forKey: Keys.autoLaunchEnabled) as? Bool ?? false
@@ -190,43 +195,39 @@ final class SettingsStore: ObservableObject {
         saveDelaySeconds = Self.loadSaveDelaySeconds(from: defaults)
         previewTimeoutEnabled = defaults.object(forKey: Keys.previewTimeoutEnabled) as? Bool ?? true
         previewEnabled = defaults.object(forKey: Keys.previewEnabled) as? Bool ?? true
-        previewAutoDismissBehavior = Self.loadPreviewAutoDismissBehavior(from: defaults)
-        previewReplacementBehavior = Self.loadPreviewReplacementBehavior(from: defaults)
-        previewDisabledOutputBehavior = Self.loadPreviewDisabledOutputBehavior(from: defaults)
-        selectionDimmingMode = Self.loadSelectionDimmingMode(from: defaults)
+        previewAutoDismissBehavior = loadEnum(key: Keys.previewAutoDismissBehavior, defaultValue: .saveToDisk)
+        previewReplacementBehavior = loadEnum(key: Keys.previewReplacementBehavior, defaultValue: .saveImmediately)
+        previewDisabledOutputBehavior = loadEnum(key: Keys.previewDisabledOutputBehavior, defaultValue: .saveToDisk)
+        selectionDimmingMode = loadEnum(key: Keys.selectionDimmingMode, defaultValue: .fullScreen)
         selectionDimmingColorHex = Self.loadSelectionDimmingColorHex(from: defaults)
-        selectionVisualCue = Self.loadSelectionVisualCue(from: defaults)
+        selectionVisualCue = loadEnum(key: Keys.selectionVisualCue, defaultValue: .none)
         autoCopyToClipboard = defaults.object(forKey: Keys.autoCopyToClipboard) as? Bool ?? true
-        saveLocationOption = Self.loadSaveLocationOption(from: defaults)
+        saveLocationOption = loadEnum(key: Keys.saveLocationOption, defaultValue: .downloads)
         customSavePath = defaults.string(forKey: Keys.customSavePath) ?? ""
         filenamePrefix = defaults.string(forKey: Keys.filenamePrefix) ?? "screenshot"
         shutterSoundEnabled = defaults.object(forKey: Keys.shutterSoundEnabled) as? Bool ?? true
-        shutterSound = Self.loadShutterSoundOption(from: defaults)
+        shutterSound = loadEnum(key: Keys.shutterSound, defaultValue: .shutter)
         shutterSoundVolume = Self.loadShutterSoundVolume(from: defaults)
 
         hotkeySelection = loadHotkey(
             keyCodeKey: Keys.hotkeySelectionKeyCode,
             modifiersKey: Keys.hotkeySelectionModifiers,
             legacyKey: LegacyKeys.hotkeySelection,
-            defaultValue: nil,
         )
         hotkeyFullScreen = loadHotkey(
             keyCodeKey: Keys.hotkeyFullScreenKeyCode,
             modifiersKey: Keys.hotkeyFullScreenModifiers,
             legacyKey: LegacyKeys.hotkeyFullScreen,
-            defaultValue: nil,
         )
         hotkeyWindow = loadHotkey(
             keyCodeKey: Keys.hotkeyWindowKeyCode,
             modifiersKey: Keys.hotkeyWindowModifiers,
             legacyKey: LegacyKeys.hotkeyWindow,
-            defaultValue: nil,
         )
         hotkeyScrolling = loadHotkey(
             keyCodeKey: Keys.hotkeyScrollingKeyCode,
             modifiersKey: Keys.hotkeyScrollingModifiers,
             legacyKey: nil,
-            defaultValue: nil,
         )
     }
 
@@ -318,8 +319,6 @@ final class SettingsStore: ObservableObject {
 }
 
 private extension SettingsStore {
-    typealias PreviewDisabledBehavior = PreviewDisabledOutputBehavior
-
     static func loadSaveDelaySeconds(from defaults: UserDefaults) -> Double {
         if let saveDelay = defaults.object(forKey: Keys.saveDelaySeconds) as? Double {
             let normalized = clampSaveDelaySeconds(saveDelay)
@@ -342,89 +341,15 @@ private extension SettingsStore {
         return ColorHexCodec.normalized(dimmingColorRaw) ?? ColorHexCodec.defaultSelectionDimmingColorHex
     }
 
-    static func loadPreviewAutoDismissBehavior(from defaults: UserDefaults) -> PreviewAutoDismissBehavior {
-        loadEnum(
-            PreviewAutoDismissBehavior.self,
-            from: defaults,
-            key: Keys.previewAutoDismissBehavior,
-            defaultValue: .saveToDisk,
-        )
-    }
-
-    static func loadPreviewReplacementBehavior(from defaults: UserDefaults) -> PreviewReplacementBehavior {
-        loadEnum(
-            PreviewReplacementBehavior.self,
-            from: defaults,
-            key: Keys.previewReplacementBehavior,
-            defaultValue: .saveImmediately,
-        )
-    }
-
-    static func loadPreviewDisabledOutputBehavior(from defaults: UserDefaults) -> PreviewDisabledBehavior {
-        loadEnum(
-            PreviewDisabledOutputBehavior.self,
-            from: defaults,
-            key: Keys.previewDisabledOutputBehavior,
-            defaultValue: .saveToDisk,
-        )
-    }
-
-    static func loadSelectionDimmingMode(from defaults: UserDefaults) -> SelectionDimmingMode {
-        loadEnum(
-            SelectionDimmingMode.self,
-            from: defaults,
-            key: Keys.selectionDimmingMode,
-            defaultValue: .fullScreen,
-        )
-    }
-
-    static func loadSelectionVisualCue(from defaults: UserDefaults) -> SelectionVisualCue {
-        loadEnum(
-            SelectionVisualCue.self,
-            from: defaults,
-            key: Keys.selectionVisualCue,
-            defaultValue: .none,
-        )
-    }
-
-    static func loadShutterSoundOption(from defaults: UserDefaults) -> ShutterSoundOption {
-        loadEnum(
-            ShutterSoundOption.self,
-            from: defaults,
-            key: Keys.shutterSound,
-            defaultValue: .shutter,
-        )
-    }
-
     static func loadShutterSoundVolume(from defaults: UserDefaults) -> Double {
         let value = defaults.object(forKey: Keys.shutterSoundVolume) as? Double ?? 1.0
         return clampVolume(value)
-    }
-
-    static func loadSaveLocationOption(from defaults: UserDefaults) -> SaveLocationOption {
-        loadEnum(
-            SaveLocationOption.self,
-            from: defaults,
-            key: Keys.saveLocationOption,
-            defaultValue: .downloads,
-        )
-    }
-
-    static func loadEnum<T: RawRepresentable>(
-        _: T.Type,
-        from defaults: UserDefaults,
-        key: String,
-        defaultValue: T,
-    ) -> T where T.RawValue == String {
-        let rawValue = defaults.string(forKey: key) ?? defaultValue.rawValue
-        return T(rawValue: rawValue) ?? defaultValue
     }
 
     func loadHotkey(
         keyCodeKey: String,
         modifiersKey: String,
         legacyKey: String?,
-        defaultValue: Hotkey?,
     ) -> Hotkey? {
         if defaults.object(forKey: keyCodeKey) != nil {
             return storedHotkey(keyCodeKey: keyCodeKey, modifiersKey: modifiersKey)
@@ -439,7 +364,7 @@ private extension SettingsStore {
             }
         }
 
-        return defaultValue
+        return nil
     }
 
     func storedHotkey(keyCodeKey: String, modifiersKey: String) -> Hotkey? {
