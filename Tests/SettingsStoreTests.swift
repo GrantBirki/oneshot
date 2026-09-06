@@ -321,4 +321,26 @@ final class SettingsStoreTests: XCTestCase {
         settings.shutterSoundVolume = -0.2
         XCTAssertEqual(settings.shutterSoundVolume, 0.0)
     }
+
+    func testInvalidStoredShutterSoundVolumesAreRepaired() {
+        for invalidValue in [Double.nan, .infinity, -.infinity] {
+            defaults.set(invalidValue, forKey: SettingsStoreKeys.shutterSoundVolume)
+
+            let settings = SettingsStore(defaults: defaults)
+
+            XCTAssertEqual(settings.shutterSoundVolume, 1.0)
+            XCTAssertEqual(defaults.double(forKey: SettingsStoreKeys.shutterSoundVolume), 1.0)
+        }
+    }
+
+    func testInvalidAssignedShutterSoundVolumesFallBackToDefault() {
+        let settings = SettingsStore(defaults: defaults)
+
+        for invalidValue in [Double.nan, .infinity, -.infinity] {
+            settings.shutterSoundVolume = invalidValue
+
+            XCTAssertEqual(settings.shutterSoundVolume, 1.0)
+            XCTAssertEqual(defaults.double(forKey: SettingsStoreKeys.shutterSoundVolume), 1.0)
+        }
+    }
 }

@@ -8,6 +8,7 @@ private typealias LegacyKeys = SettingsStoreLegacyKeys
 final class SettingsStore: ObservableObject {
     static let defaultSaveDelaySeconds: Double = 7
     static let maximumSaveDelaySeconds: Double = 3600
+    static let defaultShutterSoundVolume: Double = 1
 
     @Published var autoLaunchEnabled: Bool {
         didSet { defaults.set(autoLaunchEnabled, forKey: Keys.autoLaunchEnabled) }
@@ -342,8 +343,12 @@ private extension SettingsStore {
     }
 
     static func loadShutterSoundVolume(from defaults: UserDefaults) -> Double {
-        let value = defaults.object(forKey: Keys.shutterSoundVolume) as? Double ?? 1.0
-        return clampVolume(value)
+        let value = defaults.object(forKey: Keys.shutterSoundVolume) as? Double ?? defaultShutterSoundVolume
+        let clamped = clampVolume(value)
+        if clamped != value {
+            defaults.set(clamped, forKey: Keys.shutterSoundVolume)
+        }
+        return clamped
     }
 
     func loadHotkey(
@@ -440,7 +445,8 @@ private extension SettingsStore {
     }
 
     static func clampVolume(_ value: Double) -> Double {
-        min(max(value, 0), 1)
+        guard value.isFinite else { return defaultShutterSoundVolume }
+        return min(max(value, 0), 1)
     }
 
     static func clampSaveDelaySeconds(_ value: Double) -> Double {

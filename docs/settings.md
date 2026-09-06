@@ -38,7 +38,7 @@ Notes:
 
 - `Play shutter sound` (default: on): Play a sound when a screenshot is captured.
 - `Shutter sound` (default: `Default shutter`): Choose the capture sound (`Default shutter`, `Grant's camera`, `Leah's camera`, or `Norm's camera`).
-- `Volume` (default: `100%`): Set the shutter sound volume between 0% and 100%. Use the play button next to the slider to preview the selected sound at the current volume.
+- `Volume` (default: `100%`): Set the shutter sound volume between 0% and 100%. Invalid numeric values such as NaN or infinity reset to 100%. Use the play button next to the slider to preview the selected sound at the current volume.
 
 ## Preview
 

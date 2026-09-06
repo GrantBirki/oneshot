@@ -29,11 +29,13 @@ enum FilenameFormatter {
         guard maximumBytes > 0 else { return "" }
         guard value.utf8.count > maximumBytes else { return value }
 
-        var result = value
-        while result.utf8.count > maximumBytes, !result.isEmpty {
-            result.removeLast()
-        }
-        return result
+        var remainingBytes = maximumBytes
+        return String(value.prefix { character in
+            let byteCount = String(character).utf8.count
+            guard byteCount <= remainingBytes else { return false }
+            remainingBytes -= byteCount
+            return true
+        })
     }
 
     private static func sanitizePrefix(_ prefix: String) -> String {
