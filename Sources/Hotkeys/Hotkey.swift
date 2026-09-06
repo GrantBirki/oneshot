@@ -41,20 +41,7 @@ struct Hotkey: Codable, Equatable, Hashable {
     }
 
     static func normalizedModifiers(_ flags: NSEvent.ModifierFlags) -> NSEvent.ModifierFlags {
-        var normalized: NSEvent.ModifierFlags = []
-        if flags.contains(.command) {
-            normalized.insert(.command)
-        }
-        if flags.contains(.control) {
-            normalized.insert(.control)
-        }
-        if flags.contains(.option) {
-            normalized.insert(.option)
-        }
-        if flags.contains(.shift) {
-            normalized.insert(.shift)
-        }
-        return normalized
+        flags.intersection([.command, .control, .option, .shift])
     }
 
     enum CodingKeys: String, CodingKey {
@@ -87,24 +74,29 @@ struct Hotkey: Codable, Equatable, Hashable {
 
 enum HotkeyParser {
     static func parse(_ string: String) -> Hotkey? {
-        guard let parsed = HotkeyStringParser.parse(string),
-              let keyCode = HotkeyFormatter.keyCode(for: parsed.key)
-        else {
-            return nil
+        let normalized = string.lowercased().replacingOccurrences(of: " ", with: "")
+        var modifiers: NSEvent.ModifierFlags = []
+        var key: String?
+
+        for part in normalized.split(separator: "+") {
+            switch part {
+            case "ctrl", "control":
+                modifiers.insert(.control)
+            case "shift":
+                modifiers.insert(.shift)
+            case "alt", "option":
+                modifiers.insert(.option)
+            case "cmd", "command":
+                modifiers.insert(.command)
+            default:
+                key = String(part)
+            }
         }
 
-        var modifiers: NSEvent.ModifierFlags = []
-        if parsed.modifiers.contains(.control) {
-            modifiers.insert(.control)
-        }
-        if parsed.modifiers.contains(.shift) {
-            modifiers.insert(.shift)
-        }
-        if parsed.modifiers.contains(.option) {
-            modifiers.insert(.option)
-        }
-        if parsed.modifiers.contains(.command) {
-            modifiers.insert(.command)
+        guard let key, !modifiers.isEmpty,
+              let keyCode = HotkeyFormatter.keyCode(for: key)
+        else {
+            return nil
         }
 
         return Hotkey(keyCode: keyCode, modifiers: modifiers)

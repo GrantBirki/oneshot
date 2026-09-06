@@ -52,4 +52,36 @@ final class FilenameFormatterTests: XCTestCase {
         XCTAssertNotNil(filename.data(using: .utf8))
         XCTAssertTrue(filename.hasSuffix(".png"))
     }
+
+    func testTruncationPreservesWholeCharactersWithinByteBudget() {
+        let family = "👩‍👩‍👧‍👦"
+        let cases = [
+            ("", 10, ""),
+            ("abc", -1, ""),
+            ("abc", 0, ""),
+            ("abc", 2, "ab"),
+            ("abc", 3, "abc"),
+            ("abc", 4, "abc"),
+            ("e\u{301}x", 2, ""),
+            ("e\u{301}x", 3, "e\u{301}"),
+            ("🇺🇸x", 7, ""),
+            ("🇺🇸x", 8, "🇺🇸"),
+            ("a\(family)b", 25, "a"),
+            ("a\(family)b", 26, "a\(family)"),
+        ]
+        for (value, maximumBytes, expected) in cases {
+            XCTAssertEqual(
+                FilenameFormatter.truncateToUTF8Boundary(value, maximumBytes: maximumBytes),
+                expected,
+                "\(value) with a \(maximumBytes)-byte limit",
+            )
+        }
+    }
+
+    func testTruncationHandlesLongUnicodePrefix() {
+        XCTAssertEqual(
+            FilenameFormatter.truncateToUTF8Boundary(String(repeating: "📷", count: 100_000), maximumBytes: 210),
+            String(repeating: "📷", count: 52),
+        )
+    }
 }
