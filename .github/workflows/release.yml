@@ -13,6 +13,8 @@ concurrency:
   group: release-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: false
 
+cache-mode: none
+
 jobs:
   build:
     if: github.repository == 'GrantBirki/oneshot' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.workflow_sha == github.sha
