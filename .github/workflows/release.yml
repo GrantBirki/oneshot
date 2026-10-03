@@ -418,7 +418,7 @@ jobs:
       artifact-metadata: write
     steps:
       - name: fence
-        uses: openai/fence@e6b39c80c51cb2b2a39448ddeff74b3b886c0a63 # pin@v0.10.0
+        uses: openai/fence@530cce8d45da60a7c353da45511639ad5e154e9a # pin@v0.10.1
         with:
           allow_github_artifacts: true
           allowlist: |
@@ -433,7 +433,7 @@ jobs:
 
       - name: attest build provenance
         id: attest
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # pin@v4.2.0
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # pin@v4.2.2
         with:
           subject-path: "dist/OneShot.zip"
 
@@ -454,7 +454,7 @@ jobs:
       contents: read
     steps:
       - name: fence
-        uses: openai/fence@e6b39c80c51cb2b2a39448ddeff74b3b886c0a63 # pin@v0.10.0
+        uses: openai/fence@530cce8d45da60a7c353da45511639ad5e154e9a # pin@v0.10.1
         with:
           allow_github_artifacts: true
           allowlist: |
@@ -519,7 +519,7 @@ jobs:
       contents: write
     steps:
       - name: fence
-        uses: openai/fence@e6b39c80c51cb2b2a39448ddeff74b3b886c0a63 # pin@v0.10.0
+        uses: openai/fence@530cce8d45da60a7c353da45511639ad5e154e9a # pin@v0.10.1
         with:
           allow_github_artifacts: true
           allowlist: |
