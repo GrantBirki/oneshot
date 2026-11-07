@@ -107,7 +107,7 @@ final class ScrollingCaptureSession {
     }
 
     private func requestStop(reason: ScrollingCompletionReason) {
-        guard captureTask != nil else { return }
+        guard captureTask != nil, requestedCompletionReason != .cancelled else { return }
         requestedCompletionReason = reason
         captureTask?.cancel()
     }
@@ -124,7 +124,7 @@ final class ScrollingCaptureSession {
 
         while !Task.isCancelled {
             let startedAt = clock.now()
-            if let image = await captureFrame(), !Task.isCancelled {
+            if let image = await captureFrame(), !Task.isCancelled || requestedCompletionReason == .userStopped {
                 let status = await stitcher.add(image)
                 switch status {
                 case .accepted,
