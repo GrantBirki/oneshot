@@ -418,7 +418,7 @@ jobs:
       artifact-metadata: write
     steps:
       - name: fence
-        uses: openai/fence@530cce8d45da60a7c353da45511639ad5e154e9a # pin@v0.10.1
+        uses: openai/fence@9d10445098284f8e8bbf67495fc8c2eaa34c28c5 # pin@v0.12.7
         with:
           allow_github_artifacts: true
           allowlist: |
@@ -454,7 +454,7 @@ jobs:
       contents: read
     steps:
       - name: fence
-        uses: openai/fence@530cce8d45da60a7c353da45511639ad5e154e9a # pin@v0.10.1
+        uses: openai/fence@9d10445098284f8e8bbf67495fc8c2eaa34c28c5 # pin@v0.12.7
         with:
           allow_github_artifacts: true
           allowlist: |
@@ -519,7 +519,7 @@ jobs:
       contents: write
     steps:
       - name: fence
-        uses: openai/fence@530cce8d45da60a7c353da45511639ad5e154e9a # pin@v0.10.1
+        uses: openai/fence@9d10445098284f8e8bbf67495fc8c2eaa34c28c5 # pin@v0.12.7
         with:
           allow_github_artifacts: true
           allowlist: |
