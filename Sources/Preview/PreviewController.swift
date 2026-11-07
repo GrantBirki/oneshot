@@ -60,7 +60,6 @@ struct PreviewAutoDismissGate {
         }
 
         guard pending, !isBlockingDismissal else { return false }
-        pending = false
         return true
     }
 }
@@ -156,6 +155,9 @@ final class PreviewController {
         isTerminating = false
         if !isPerformingAction {
             panel?.setBusy(false)
+            if autoDismissGate.pending, !autoDismissGate.isBlockingDismissal {
+                scheduleGraceDismiss()
+            }
         }
     }
 
@@ -171,14 +173,22 @@ final class PreviewController {
     func resolveForReplacement() async -> Bool {
         guard !isPerformingAction else { return false }
         guard panel != nil, let replaceAction else { return true }
-        do {
-            try await replaceAction()
-            hide()
-            return true
-        } catch {
-            showRecovery(for: error, retryAction: replaceAction, dismissOnSuccess: true)
-            return false
+        isPerformingAction = true
+        panel?.setBusy(true)
+        var didReplace = false
+        let task = Task { @MainActor in
+            defer { finishAction() }
+            do {
+                try await replaceAction()
+                hide()
+                didReplace = true
+            } catch {
+                showRecovery(for: error, retryAction: replaceAction, dismissOnSuccess: true)
+            }
         }
+        actionTask = task
+        await task.value
+        return didReplace
     }
 
     func showRecovery(
@@ -188,6 +198,7 @@ final class PreviewController {
         successMessage: String? = nil,
     ) {
         guard let action = retryAction ?? saveAction else { return }
+        cancelDismissTasks()
         panel?.showRecovery(message: userMessage(for: error)) { [weak self] in
             self?.perform(
                 action,
@@ -216,13 +227,7 @@ final class PreviewController {
         panel?.setBusy(true)
         actionTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            defer {
-                actionTask = nil
-                isPerformingAction = false
-                if !isTerminating {
-                    panel?.setBusy(false)
-                }
-            }
+            defer { finishAction() }
             do {
                 try await action()
                 if dismissOnSuccess {
@@ -259,12 +264,24 @@ final class PreviewController {
         }
     }
 
+    private func finishAction() {
+        actionTask = nil
+        isPerformingAction = false
+        if !isTerminating {
+            panel?.setBusy(false)
+            if autoDismissGate.pending, !autoDismissGate.isBlockingDismissal {
+                performAutoDismiss()
+            }
+        }
+    }
+
     private func showOpenRecovery(
         for error: Error,
         retryAction: @escaping PreviewRequest.Action,
         revealAction: @escaping PreviewRequest.Action,
         dismissAction: @escaping PreviewRequest.Action,
     ) {
+        cancelDismissTasks()
         panel?.showOpenRecovery(
             message: userMessage(for: error),
             onRetryOpen: { [weak self] in
@@ -331,6 +348,11 @@ final class PreviewController {
     }
 
     private func performAutoDismiss() {
+        guard !isPerformingAction, !isTerminating else {
+            autoDismissGate.pending = true
+            return
+        }
+        autoDismissGate.pending = false
         guard let autoDismissAction else {
             hide()
             return
@@ -344,6 +366,7 @@ final class PreviewController {
         dismissTask = nil
         graceTask?.cancel()
         graceTask = nil
+        autoDismissGate.pending = false
     }
 
     private func userMessage(for error: Error) -> String {
