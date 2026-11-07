@@ -36,12 +36,11 @@ final class PreviewDragPayload: NSObject, NSFilePromiseProviderDelegate {
 
     func filePromiseProvider(
         _: NSFilePromiseProvider,
-        writePromiseTo destinationDirectory: URL,
+        writePromiseTo destinationURL: URL,
         completionHandler: @escaping (Error?) -> Void,
     ) {
         do {
-            let promisedURL = destinationDirectory.appendingPathComponent(filename)
-            _ = try FileSaveService.save(pngData: pngData, toFile: promisedURL)
+            _ = try FileSaveService.save(pngData: pngData, toFile: destinationURL)
             completionHandler(nil)
         } catch {
             AppLog.preview.error("Failed to write promised preview file: \(String(describing: error), privacy: .private)")

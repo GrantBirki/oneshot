@@ -23,7 +23,7 @@ final class PreviewDragPayloadTests: XCTestCase {
     }
 
     @MainActor
-    func testFilePromiseUsesSafeFilenameAndWritesPNG() throws {
+    func testFilePromiseWritesPNGToExactReceiverURL() throws {
         let cgImage = try XCTUnwrap(makeBitmapRep(width: 1, height: 1).cgImage)
         let pngData = try PNGDataEncoder.encode(cgImage: cgImage)
         let payload = PreviewDragPayload(
@@ -34,18 +34,46 @@ final class PreviewDragPayloadTests: XCTestCase {
         )
         let provider = NSFilePromiseProvider(fileType: "public.png", delegate: payload)
         let filename = payload.filePromiseProvider(provider, fileNameForType: "public.png")
+        let destinationURL = tempDirectory.appendingPathComponent("receiver-renamed.png")
         let completion = expectation(description: "Promise written")
         var writeError: Error?
 
-        payload.filePromiseProvider(provider, writePromiseTo: tempDirectory) { error in
+        payload.filePromiseProvider(provider, writePromiseTo: destinationURL) { error in
             writeError = error
             completion.fulfill()
         }
 
         wait(for: [completion], timeout: 1)
         XCTAssertNil(writeError)
-        XCTAssertEqual(try Data(contentsOf: tempDirectory.appendingPathComponent(filename)), pngData)
+        XCTAssertEqual(try destinationURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile, true)
+        XCTAssertEqual(try Data(contentsOf: destinationURL), pngData)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: tempDirectory.path), ["receiver-renamed.png"])
         XCTAssertLessThanOrEqual(filename.utf8.count, FilenameFormatter.maximumComponentBytes)
+    }
+
+    @MainActor
+    func testFilePromiseReportsWriteFailure() throws {
+        let cgImage = try XCTUnwrap(makeBitmapRep(width: 1, height: 1).cgImage)
+        let payload = try PreviewDragPayload(
+            image: NSImage(cgImage: cgImage, size: NSSize(width: 1, height: 1)),
+            pngData: PNGDataEncoder.encode(cgImage: cgImage),
+            filenamePrefix: "screenshot",
+        )
+        let provider = NSFilePromiseProvider(fileType: "public.png", delegate: payload)
+        let blockingFile = tempDirectory.appendingPathComponent("not-a-directory")
+        try Data("existing".utf8).write(to: blockingFile)
+        let destinationURL = blockingFile.appendingPathComponent("screenshot.png")
+        let completion = expectation(description: "Write failure reported")
+        var writeError: Error?
+
+        payload.filePromiseProvider(provider, writePromiseTo: destinationURL) { error in
+            writeError = error
+            completion.fulfill()
+        }
+
+        wait(for: [completion], timeout: 1)
+        XCTAssertNotNil(writeError)
+        XCTAssertEqual(try Data(contentsOf: blockingFile), Data("existing".utf8))
     }
 
     @MainActor
