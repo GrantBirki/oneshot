@@ -156,7 +156,11 @@ final class ScrollingCaptureSession {
         let signpostID = AppSignpost.begin("Scrolling final composition")
         let finalImage = await stitcher.finish()
         AppSignpost.end("Scrolling final composition", id: signpostID)
-        let reason = completionReason ?? requestedCompletionReason ?? .cancelled
+        let reason: ScrollingCompletionReason = if requestedCompletionReason == .cancelled {
+            .cancelled
+        } else {
+            completionReason ?? requestedCompletionReason ?? .cancelled
+        }
         finish(with: finalImage, reason: reason)
     }
 
