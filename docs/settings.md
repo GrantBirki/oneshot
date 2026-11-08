@@ -43,7 +43,7 @@ Notes:
 ## Preview
 
 - `Show floating preview` (default: on): Show the thumbnail preview after capture.
-- `Auto-dismiss preview` (default: on): Automatically dismiss the preview after the save delay. Hovering or dragging pauses the dismissal.
+- `Auto-dismiss preview` (default: on): Automatically dismiss the preview after the save delay. Hovering, dragging, or an ongoing preview action pauses the dismissal until the interaction finishes. Returning to the preview during the short dismissal grace period pauses it again.
 - `Save delay (seconds)` (default: `7`): Time to wait before the preview timeout or background save when previews are enabled. Finite values are limited to `0...3600` seconds; invalid stored values migrate to `7`.
 - `On preview timeout` (default: `Save to disk`): Choose whether the capture saves to disk or is discarded when the preview timer ends. Only applies when `Auto-dismiss preview` is on, and the control is disabled otherwise.
 - `On new screenshot` (default: `Save previous capture`): Choose whether a visible preview is saved immediately or discarded when a new capture happens.

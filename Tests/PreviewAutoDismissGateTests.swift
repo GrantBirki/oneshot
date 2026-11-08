@@ -15,7 +15,7 @@ final class PreviewAutoDismissGateTests: XCTestCase {
         XCTAssertFalse(gate.deadlineReached())
         XCTAssertTrue(gate.pending)
         XCTAssertTrue(gate.interactionChanged(isHovered: false))
-        XCTAssertFalse(gate.pending)
+        XCTAssertTrue(gate.pending)
     }
 
     func testDeadlineReachedDefersWhileDraggingThenDismissesOnDragEnd() {
@@ -24,6 +24,6 @@ final class PreviewAutoDismissGateTests: XCTestCase {
         XCTAssertFalse(gate.deadlineReached())
         XCTAssertTrue(gate.pending)
         XCTAssertTrue(gate.interactionChanged(isDragging: false))
-        XCTAssertFalse(gate.pending)
+        XCTAssertTrue(gate.pending)
     }
 }
