@@ -126,6 +126,88 @@ final class ScrollingCaptureSessionTests: XCTestCase {
 
         await fulfillment(of: [finished], timeout: 2)
     }
+
+    func testStopKeepsSuccessfulFirstFrameAlreadyInFlight() async {
+        let probe = SuspendedScrollingFrameCapture(pauseOnFrame: 1)
+        let finished = expectation(description: "In-flight first frame kept")
+        let session = ScrollingCaptureSession(clock: .immediateForTesting) { _ in
+            await probe.capture()
+        }
+
+        session.start(rect: CGRect(x: 0, y: 0, width: 4, height: 4)) { result in
+            XCTAssertEqual(result.reason, .userStopped)
+            XCTAssertEqual(result.image?.height, 4)
+            finished.fulfill()
+        }
+
+        await probe.waitUntilPaused()
+        session.stop()
+        await probe.resume()
+
+        await fulfillment(of: [finished], timeout: 2)
+    }
+
+    func testStopIncludesSuccessfulLastFrameAlreadyInFlight() async {
+        let probe = SuspendedScrollingFrameCapture(pauseOnFrame: 2)
+        let finished = expectation(description: "In-flight last frame kept")
+        let stitcher = ScrollingStitcher(offsetCalculator: SessionOffsetCalculator(vertical: 2))
+        let session = ScrollingCaptureSession(stitcher: stitcher, clock: .immediateForTesting) { _ in
+            await probe.capture()
+        }
+
+        session.start(rect: CGRect(x: 0, y: 0, width: 4, height: 4)) { result in
+            XCTAssertEqual(result.reason, .userStopped)
+            XCTAssertEqual(result.image?.height, 6)
+            finished.fulfill()
+        }
+
+        await probe.waitUntilPaused()
+        session.stop()
+        await probe.resume()
+
+        await fulfillment(of: [finished], timeout: 2)
+    }
+
+    func testCancelStillIgnoresSuccessfulFirstFrameAlreadyInFlight() async {
+        let probe = SuspendedScrollingFrameCapture(pauseOnFrame: 1)
+        let finished = expectation(description: "In-flight cancelled frame ignored")
+        let session = ScrollingCaptureSession(clock: .immediateForTesting) { _ in
+            await probe.capture()
+        }
+
+        session.start(rect: CGRect(x: 0, y: 0, width: 4, height: 4)) { result in
+            XCTAssertEqual(result.reason, .cancelled)
+            XCTAssertNil(result.image)
+            finished.fulfill()
+        }
+
+        await probe.waitUntilPaused()
+        session.cancel()
+        await probe.resume()
+
+        await fulfillment(of: [finished], timeout: 2)
+    }
+
+    func testStopCannotReplacePendingCancellation() async {
+        let probe = SuspendedScrollingFrameCapture(pauseOnFrame: 1)
+        let finished = expectation(description: "Cancellation kept after Stop")
+        let session = ScrollingCaptureSession(clock: .immediateForTesting) { _ in
+            await probe.capture()
+        }
+
+        session.start(rect: CGRect(x: 0, y: 0, width: 4, height: 4)) { result in
+            XCTAssertEqual(result.reason, .cancelled)
+            XCTAssertNil(result.image)
+            finished.fulfill()
+        }
+
+        await probe.waitUntilPaused()
+        session.cancel()
+        session.stop()
+        await probe.resume()
+
+        await fulfillment(of: [finished], timeout: 2)
+    }
 }
 
 private extension ScrollingSessionClock {
@@ -140,6 +222,41 @@ private struct SessionOffsetCalculator: ScrollingOffsetCalculating {
 
     mutating func offset(from _: CGImage, to _: CGImage) -> ScrollingOffset? {
         vertical.map { ScrollingOffset(horizontal: 0, vertical: $0) }
+    }
+}
+
+private actor SuspendedScrollingFrameCapture {
+    private let pauseOnFrame: Int
+    private var frameCount = 0
+    private var pausedFrame: CheckedContinuation<Void, Never>?
+    private var pauseWaiter: CheckedContinuation<Void, Never>?
+
+    init(pauseOnFrame: Int) {
+        self.pauseOnFrame = pauseOnFrame
+    }
+
+    func capture() async -> CGImage {
+        frameCount += 1
+        if frameCount == pauseOnFrame {
+            await withCheckedContinuation { continuation in
+                pausedFrame = continuation
+                pauseWaiter?.resume()
+                pauseWaiter = nil
+            }
+        }
+        return makeSolidProbeImage()
+    }
+
+    func waitUntilPaused() async {
+        guard pausedFrame == nil else { return }
+        await withCheckedContinuation { continuation in
+            pauseWaiter = continuation
+        }
+    }
+
+    func resume() {
+        pausedFrame?.resume()
+        pausedFrame = nil
     }
 }
 
