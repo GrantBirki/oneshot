@@ -7,7 +7,7 @@ WORKFLOW_DIR="$ROOT_DIR/.github/workflows"
 RELEASE_WORKFLOW="$WORKFLOW_DIR/release.yml"
 PROJECT_CONFIG="$ROOT_DIR/project.yml"
 VERIFY_PACKAGE_SCRIPT="$ROOT_DIR/script/verify-package"
-FENCE_SHA="7cba9082252803421a0e433f29198de6d0063221"
+FENCE_SHA="7703f3be10ee3d0a84e1839233e19fa00bb254a8"
 USES_PATTERN='^[[:space:]]*(-[[:space:]]+)?uses[[:space:]]*:'
 
 fail() {
